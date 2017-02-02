@@ -85,6 +85,16 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
     end
   end
 
+  ## Provider-specific settings, libvirt
+  config.vm.provider :libvirt do |v,override|
+    override.vm.box = "yk0/ubuntu-xenial"
+    override.hostmanager.ignore_private_ip = false
+
+    v.memory = ram_megabytes.to_s
+    v.nested = true
+    v.volume_cache = 'none'
+  end
+
   config.vm.provider :aws do |aws,override|
     # The "box" is specified as an AMI
     override.vm.box = "dummy"
@@ -147,6 +157,9 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
 
   def assign_local_ip(node, ip_address)
     node.vm.provider :virtualbox do |vb,override|
+      override.vm.network :private_network, ip: ip_address
+    end
+    node.vm.provider :libvirt do |lv,override|
       override.vm.network :private_network, ip: ip_address
     end
   end

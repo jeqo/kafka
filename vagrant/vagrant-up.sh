@@ -27,6 +27,7 @@ AWS=false
 PARALLEL=true
 MAX_PARALLEL=5
 DEBUG=false
+LIBVIRT=false
 
 readonly USAGE="Usage: $PROG_NAME [-h | --help] [--aws [--no-parallel] [--max-parallel MAX]]"
 readonly HELP="$(cat <<EOF
@@ -34,6 +35,7 @@ Tool to bring up a vagrant cluster on local machine or aws.
 
     -h | --help             Show this help message
     --aws                   Use if you are running in aws
+    --libvirt               Use if you are running in libvirt
     --no-parallel           Bring up machines not in parallel. Only applicable on aws
     --max-parallel  MAX     Maximum number of machines to bring up in parallel. Note: only applicable on test worker machines on aws. default: $MAX_PARALLEL
     --debug                 Enable debug information for vagrant
@@ -64,6 +66,9 @@ while [[ $# > 0 ]]; do
             ;;
         --aws)
             AWS=true
+            ;;
+        --libvirt)
+            LIBVIRT=true
             ;;
         --no-parallel)
             PARALLEL=false
@@ -200,6 +205,12 @@ function bring_up_local {
     vagrant provision
 }
 
+function bring_up_local_libvirt {
+    vagrant up --no-parallel --provider=libvirt
+    # vagrant hostmanager
+    # vagrant provision
+}
+
 function bring_up_aws {
     local parallel="$1"
     local max_parallel="$2"
@@ -240,7 +251,11 @@ function main {
     if [[ "$AWS" == "true" ]]; then
         bring_up_aws "$PARALLEL" "$MAX_PARALLEL" "$DEBUG"
     else
-        bring_up_local
+        if [[ "$LIBVIRT" == "true" ]]; then
+            bring_up_local_libvirt
+        else
+            bring_up_local
+        fi
     fi
 }
 
