@@ -144,4 +144,4 @@ Description for ubuntu or other information is [there](https://github.com/pradel
 
 
 Start things up with specified provider:
-```vagrant up --provider=libvirt```
+```vagrant up --provider=libvirt``` or ```vagrant/vagrant-up.sh --libvirt```
