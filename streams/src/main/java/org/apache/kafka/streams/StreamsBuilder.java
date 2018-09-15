@@ -55,12 +55,22 @@ import java.util.regex.Pattern;
 public class StreamsBuilder {
 
     /** The actual topology that is constructed by this StreamsBuilder. */
-    private final Topology topology = new Topology();
+    private final Topology topology;
 
     /** The topology's internal builder. */
-    final InternalTopologyBuilder internalTopologyBuilder = topology.internalTopologyBuilder;
+    final InternalTopologyBuilder internalTopologyBuilder;
 
-    private final InternalStreamsBuilder internalStreamsBuilder = new InternalStreamsBuilder(internalTopologyBuilder);
+    private final InternalStreamsBuilder internalStreamsBuilder;
+
+    public StreamsBuilder()  {
+        this(new Topology());
+    }
+
+    public StreamsBuilder(final Topology topology)  {
+        this.topology = topology;
+        internalTopologyBuilder = topology.internalTopologyBuilder;
+        internalStreamsBuilder = new InternalStreamsBuilder(internalTopologyBuilder);
+    }
 
     /**
      * Create a {@link KStream} from the specified topics.

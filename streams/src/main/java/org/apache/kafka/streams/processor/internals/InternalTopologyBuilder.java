@@ -485,7 +485,7 @@ public class InternalTopologyBuilder {
         nodeGroups = null;
     }
 
-    public final void addProcessor(final String name,
+    public void addProcessor(final String name,
                                    final ProcessorSupplier supplier,
                                    final String... predecessorNames) {
         Objects.requireNonNull(name, "name must not be null");
