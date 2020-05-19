@@ -58,6 +58,7 @@ versions += [
   apacheda: "1.0.2",
   apacheds: "2.0.0-M24",
   argparse4j: "0.7.0",
+  brave: "5.12.1",
   bcpkix: "1.64",
   checkstyle: "8.20",
   commonsCli: "1.4",
@@ -186,5 +187,6 @@ libs += [
   jfreechart: "jfreechart:jfreechart:$versions.jfreechart",
   mavenArtifact: "org.apache.maven:maven-artifact:$versions.mavenArtifact",
   zstd: "com.github.luben:zstd-jni:$versions.zstd",
-  httpclient: "org.apache.httpcomponents:httpclient:$versions.httpclient"
+  httpclient: "org.apache.httpcomponents:httpclient:$versions.httpclient",
+  brave: "io.zipkin.brave:brave:$versions.brave"
 ]
