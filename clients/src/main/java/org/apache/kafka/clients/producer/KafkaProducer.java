@@ -16,6 +16,9 @@
  */
 package org.apache.kafka.clients.producer;
 
+import brave.ScopedSpan;
+import brave.Span;
+import brave.Tracing;
 import org.apache.kafka.clients.ApiVersions;
 import org.apache.kafka.clients.ClientDnsLookup;
 import org.apache.kafka.clients.ClientUtils;
@@ -71,6 +74,7 @@ import org.apache.kafka.common.utils.LogContext;
 import org.apache.kafka.common.utils.Time;
 import org.apache.kafka.common.utils.Utils;
 import org.slf4j.Logger;
+import zipkin2.reporter.brave.ZipkinSpanHandler;
 
 import java.net.InetSocketAddress;
 import java.time.Duration;
@@ -256,6 +260,9 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
     private final ApiVersions apiVersions;
     private final TransactionManager transactionManager;
 
+    //Tracing
+    private final Tracing tracing;
+
     /**
      * A producer is instantiated by providing a set of key-value pairs as configuration. Valid configuration strings
      * are documented <a href="http://kafka.apache.org/documentation.html#producerconfigs">here</a>. Values can be
@@ -428,6 +435,10 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
             this.ioThread.start();
             config.logUnused();
             AppInfoParser.registerAppInfo(JMX_PREFIX, clientId, metrics, time.milliseconds());
+            //Tracing
+            tracing = Tracing.newBuilder()
+                .localServiceName("kafka-producer")
+                .build();
             log.debug("Kafka producer started");
         } catch (Throwable t) {
             // call close methods if internal objects are already constructed this is to prevent resource leak. see KAFKA-2121
@@ -859,9 +870,19 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
      */
     @Override
     public Future<RecordMetadata> send(ProducerRecord<K, V> record, Callback callback) {
-        // intercept the record, which can be potentially modified; this method does not throw exceptions
-        ProducerRecord<K, V> interceptedRecord = this.interceptors.onSend(record);
-        return doSend(interceptedRecord, callback);
+        ScopedSpan sendSpan = tracing.tracer().startScopedSpan("send");
+        try {
+            Span onSendSpan = tracing.tracer().nextSpan().name("on_send").start();
+            // intercept the record, which can be potentially modified; this method does not throw exceptions
+            ProducerRecord<K, V> interceptedRecord = this.interceptors.onSend(record);
+            onSendSpan.finish();
+            return doSend(interceptedRecord, callback);
+        } catch (RuntimeException | Error e) {
+            sendSpan.error(e);
+            throw e;
+        } finally {
+            sendSpan.finish();
+        }
     }
 
     // Verify that this producer instance has not been closed. This method throws IllegalStateException if the producer
@@ -875,48 +896,68 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
      * Implementation of asynchronously send a record to a topic.
      */
     private Future<RecordMetadata> doSend(ProducerRecord<K, V> record, Callback callback) {
+        Span doSendSpan = tracing.tracer().nextSpan().name("do_send").start();
         TopicPartition tp = null;
         try {
             throwIfProducerClosed();
             // first make sure the metadata for the topic is available
             long nowMs = time.milliseconds();
+            Span clusterAndWaitSpan = tracing.tracer().nextSpan().start();
             ClusterAndWaitTime clusterAndWaitTime;
             try {
                 clusterAndWaitTime = waitOnMetadata(record.topic(), record.partition(), nowMs, maxBlockTimeMs);
             } catch (KafkaException e) {
+                clusterAndWaitSpan.error(e);
                 if (metadata.isClosed())
                     throw new KafkaException("Producer closed while send in progress", e);
                 throw e;
+            } finally {
+                clusterAndWaitSpan.finish();
             }
             nowMs += clusterAndWaitTime.waitedOnMetadataMs;
             long remainingWaitMs = Math.max(0, maxBlockTimeMs - clusterAndWaitTime.waitedOnMetadataMs);
+            doSendSpan.tag("remaining-wait-ms", Long.toString(remainingWaitMs));
             Cluster cluster = clusterAndWaitTime.cluster;
+            Span serializeKeySpan = tracing.tracer().nextSpan().name("serialize_key");
             byte[] serializedKey;
             try {
                 serializedKey = keySerializer.serialize(record.topic(), record.headers(), record.key());
             } catch (ClassCastException cce) {
+                serializeKeySpan.error(cce);
                 throw new SerializationException("Can't convert key of class " + record.key().getClass().getName() +
                         " to class " + producerConfig.getClass(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG).getName() +
                         " specified in key.serializer", cce);
+            } finally {
+                serializeKeySpan.finish();
             }
+            Span serializeValueSpan = tracing.tracer().nextSpan().name("serialize_value");
             byte[] serializedValue;
             try {
                 serializedValue = valueSerializer.serialize(record.topic(), record.headers(), record.value());
             } catch (ClassCastException cce) {
+                serializeValueSpan.error(cce);
                 throw new SerializationException("Can't convert value of class " + record.value().getClass().getName() +
                         " to class " + producerConfig.getClass(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG).getName() +
                         " specified in value.serializer", cce);
+            } finally {
+                serializeValueSpan.finish();
             }
             int partition = partition(record, serializedKey, serializedValue, cluster);
             tp = new TopicPartition(record.topic(), partition);
+            doSendSpan.tag("partition", Integer.toString(partition));
+            doSendSpan.annotate("partition set");
 
             setReadOnly(record.headers());
+            doSendSpan.annotate("headers set as read-only");
             Header[] headers = record.headers().toArray();
 
             int serializedSize = AbstractRecords.estimateSizeInBytesUpperBound(apiVersions.maxUsableProduceMagic(),
                     compressionType, serializedKey, serializedValue, headers);
+            doSendSpan.tag("serialized size", Integer.toString(serializedSize));
             ensureValidRecordSize(serializedSize);
+            doSendSpan.annotate("valid record size");
             long timestamp = record.timestamp() == null ? nowMs : record.timestamp();
+            doSendSpan.tag("timestamp", Long.toString(timestamp));
             if (log.isTraceEnabled()) {
                 log.trace("Attempting to append record {} with callback {} to topic {} partition {}", record, callback, record.topic(), partition);
             }
@@ -944,18 +985,22 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
                     serializedValue, headers, interceptCallback, remainingWaitMs, false, nowMs);
             }
 
-            if (transactionManager != null && transactionManager.isTransactional())
+            if (transactionManager != null && transactionManager.isTransactional()) {
+                doSendSpan.tag("is_transactional", Boolean.toString(true));
                 transactionManager.maybeAddPartitionToTransaction(tp);
+            }
 
             if (result.batchIsFull || result.newBatchCreated) {
                 log.trace("Waking up the sender since topic {} partition {} is either full or getting a new batch", record.topic(), partition);
                 this.sender.wakeup();
             }
+            doSendSpan.annotate("returning future");
             return result.future;
             // handling exceptions and record the errors;
             // for API exceptions return them in the future,
             // for other exceptions throw directly
         } catch (ApiException e) {
+            doSendSpan.error(e);
             log.debug("Exception occurred during message send:", e);
             if (callback != null)
                 callback.onCompletion(null, e);
@@ -963,17 +1008,22 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
             this.interceptors.onSendError(record, tp, e);
             return new FutureFailure(e);
         } catch (InterruptedException e) {
+            doSendSpan.error(e);
             this.errors.record();
             this.interceptors.onSendError(record, tp, e);
             throw new InterruptException(e);
         } catch (KafkaException e) {
+            doSendSpan.error(e);
             this.errors.record();
             this.interceptors.onSendError(record, tp, e);
             throw e;
         } catch (Exception e) {
+            doSendSpan.error(e);
             // we notify interceptor about all exceptions, since onSend is called before anything else in this method
             this.interceptors.onSendError(record, tp, e);
             throw e;
+        } finally {
+            doSendSpan.finish();
         }
     }
 
@@ -1264,11 +1314,19 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
      * calls configured partitioner class to compute the partition.
      */
     private int partition(ProducerRecord<K, V> record, byte[] serializedKey, byte[] serializedValue, Cluster cluster) {
-        Integer partition = record.partition();
-        return partition != null ?
+        Span setPartitionSpan = tracing.tracer().nextSpan().name("set_partition").start();
+        try {
+            Integer partition = record.partition();
+            return partition != null ?
                 partition :
                 partitioner.partition(
-                        record.topic(), record.key(), serializedKey, record.value(), serializedValue, cluster);
+                    record.topic(), record.key(), serializedKey, record.value(), serializedValue, cluster);
+        } catch (RuntimeException | Error e) {
+            setPartitionSpan.error(e);
+            throw e;
+        } finally {
+            setPartitionSpan.finish();
+        }
     }
 
     private void throwIfInvalidGroupMetadata(ConsumerGroupMetadata groupMetadata) {
