@@ -17,13 +17,11 @@
 package org.apache.kafka.streams.kstream;
 
 import org.apache.kafka.clients.producer.internals.DefaultPartitioner;
+import org.apache.kafka.common.header.Header;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.common.utils.Bytes;
-import org.apache.kafka.streams.KeyValue;
-import org.apache.kafka.streams.StreamsBuilder;
-import org.apache.kafka.streams.StreamsConfig;
-import org.apache.kafka.streams.Topology;
+import org.apache.kafka.streams.*;
 import org.apache.kafka.streams.processor.ConnectedStoreProvider;
 import org.apache.kafka.streams.processor.Processor;
 import org.apache.kafka.streams.processor.ProcessorContext;
@@ -4014,4 +4012,29 @@ public interface KStream<K, V> {
     void process(final ProcessorSupplier<? super K, ? super V> processorSupplier,
                  final Named named,
                  final String... stateStoreNames);
+
+    KStream<K, V> setHeaders(final Iterable<Header> headers, final Named named);
+
+    KStream<K, V> setHeaders(final Iterable<Header> headers);
+
+    KStream<K, V> setHeader(final Header header, final Named named);
+
+    KStream<K, V> setHeader(final Header header);
+
+    KStream<K, V> setHeader(final String key, final byte[] value, final Named named);
+
+    KStream<K, V> setHeader(final String key, final byte[] value);
+
+    KStream<K, V> removeHeaders(final Iterable<String> headerKeys, final Named named);
+
+    KStream<K, V> removeHeaders(final Iterable<String> headerKeys);
+
+    KStream<K, V> removeHeader(final String headerKeys, final Named named);
+
+    KStream<K, V> removeHeader(final String headerKeys);
+
+    KStream<K, ValueAndHeaders<V>> withHeaders(final Named named);
+
+    KStream<K, ValueAndHeaders<V>> withHeaders();
+
 }

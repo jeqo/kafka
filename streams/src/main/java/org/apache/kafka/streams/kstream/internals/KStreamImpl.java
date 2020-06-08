@@ -16,9 +16,12 @@
  */
 package org.apache.kafka.streams.kstream.internals;
 
+import org.apache.kafka.common.header.Header;
+import org.apache.kafka.common.header.internals.RecordHeader;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.utils.Bytes;
 import org.apache.kafka.streams.KeyValue;
+import org.apache.kafka.streams.ValueAndHeaders;
 import org.apache.kafka.streams.kstream.ForeachAction;
 import org.apache.kafka.streams.kstream.GlobalKTable;
 import org.apache.kafka.streams.kstream.Grouped;
@@ -116,6 +119,12 @@ public class KStreamImpl<K, V> extends AbstractStream<K, V> implements KStream<K
     private static final String PRINTING_NAME = "KSTREAM-PRINTER-";
 
     private static final String KEY_SELECT_NAME = "KSTREAM-KEY-SELECT-";
+
+    private static final String WITH_HEADERS_NAME = "KSTREAM-WITH-HEADERS-";
+
+    private static final String SET_HEADERS_NAME = "KSTREAM-SET-HEADERS-";
+
+    private static final String REMOVE_HEADERS_NAME = "KSTREAM-REMOVE-HEADERS-";
 
     private static final String TRANSFORM_NAME = "KSTREAM-TRANSFORM-";
 
@@ -240,6 +249,103 @@ public class KStreamImpl<K, V> extends AbstractStream<K, V> implements KStream<K
     @Override
     public <KR, VR> KStream<KR, VR> map(final KeyValueMapper<? super K, ? super V, ? extends KeyValue<? extends KR, ? extends VR>> mapper) {
         return map(mapper, NamedInternal.empty());
+    }
+
+    public KStream<K, V> removeHeader(final String headerKey) {
+        return removeHeaders(Collections.singleton(headerKey), NamedInternal.empty());
+    }
+
+    public KStream<K, V> removeHeaders(final Iterable<String> headerKeys) {
+        return removeHeaders(headerKeys, NamedInternal.empty());
+    }
+
+    public KStream<K, V> removeHeaders(final Iterable<String> headerKeys, final Named named) {
+        final String name = new NamedInternal(named).orElseGenerateWithPrefix(builder, WITH_HEADERS_NAME);
+        final ProcessorParameters<K, ValueAndHeaders<V>> processorParameters =
+                new ProcessorParameters<>(new KStreamRemoveHeaders<>(headerKeys), name);
+        final ProcessorGraphNode<K, ValueAndHeaders<V>> setHeadersProcessorNode =
+                new ProcessorGraphNode<>(name, processorParameters);
+        setHeadersProcessorNode.setValueChangingOperation(true);
+
+        builder.addGraphNode(streamsGraphNode, setHeadersProcessorNode);
+
+        // value serde cannot be preserved
+        return new KStreamImpl<>(
+                name,
+                keySerde,
+                null,
+                subTopologySourceNodes,
+                repartitionRequired,
+                setHeadersProcessorNode,
+                builder);
+    }
+
+    public KStream<K, V> setHeader(final String key, final byte[] value) {
+        return setHeaders(Collections.singleton(new RecordHeader(key, value)), NamedInternal.empty());
+    }
+
+    public KStream<K, V> setHeader(final String key, final byte[] value, Named named) {
+        return setHeaders(Collections.singleton(new RecordHeader(key, value)), named);
+    }
+
+    public KStream<K, V> setHeader(final Header header) {
+        return setHeaders(Collections.singleton(header), NamedInternal.empty());
+    }
+
+    public KStream<K, V> setHeader(final Header header, Named named) {
+        return setHeaders(Collections.singleton(header), named);
+    }
+
+    public KStream<K, V> setHeaders(final Iterable<Header> headers) {
+        return setHeaders(headers, NamedInternal.empty());
+    }
+
+    public KStream<K, V> setHeaders(final Iterable<Header> headers, final Named named) {
+        final String name = new NamedInternal(named).orElseGenerateWithPrefix(builder, WITH_HEADERS_NAME);
+        final ProcessorParameters<K, ValueAndHeaders<V>> processorParameters =
+                new ProcessorParameters<>(new KStreamSetHeaders<>(headers), name);
+        final ProcessorGraphNode<K, ValueAndHeaders<V>> setHeadersProcessorNode =
+                new ProcessorGraphNode<>(name, processorParameters);
+        setHeadersProcessorNode.setValueChangingOperation(true);
+
+        builder.addGraphNode(streamsGraphNode, setHeadersProcessorNode);
+
+        // value serde cannot be preserved
+        return new KStreamImpl<>(
+                name,
+                keySerde,
+                null,
+                subTopologySourceNodes,
+                repartitionRequired,
+                setHeadersProcessorNode,
+                builder);
+    }
+
+    @Override
+    public KStream<K, ValueAndHeaders<V>> withHeaders() {
+        return withHeaders(NamedInternal.empty());
+    }
+
+    @Override
+    public KStream<K, ValueAndHeaders<V>> withHeaders(final Named named) {
+        final String name = new NamedInternal(named).orElseGenerateWithPrefix(builder, WITH_HEADERS_NAME);
+        final ProcessorParameters<? super K, ? super V> processorParameters =
+                new ProcessorParameters<>(new KStreamWithHeaders<>(), name);
+        final ProcessorGraphNode<? super K, ? super V> withHeadersProcessorNode =
+                new ProcessorGraphNode<>(name, processorParameters);
+        withHeadersProcessorNode.setValueChangingOperation(true);
+
+        builder.addGraphNode(streamsGraphNode, withHeadersProcessorNode);
+
+        // value serde cannot be preserved
+        return new KStreamImpl<>(
+                name,
+                keySerde,
+                null,
+                subTopologySourceNodes,
+                repartitionRequired,
+                withHeadersProcessorNode,
+                builder);
     }
 
     @Override
