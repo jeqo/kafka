@@ -29,6 +29,10 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
+
+import brave.Span;
+import brave.Tracer;
+import brave.Tracing;
 import org.apache.kafka.clients.ApiVersions;
 import org.apache.kafka.clients.producer.Callback;
 import org.apache.kafka.common.utils.ProducerIdAndEpoch;
@@ -191,7 +195,10 @@ public final class RecordAccumulator {
         appendsInProgress.incrementAndGet();
         ByteBuffer buffer = null;
         if (headers == null) headers = Record.EMPTY_HEADERS;
-        try {
+        Tracer tracer = Tracing.currentTracer();
+        if (tracer == null) { tracer = Tracing.newBuilder().build().tracer(); }
+        Span appendSpan = tracer.nextSpan().name("append").start();
+        try (Tracer.SpanInScope ws1 = tracer.withSpanInScope(appendSpan)) {
             // check if we have an in-progress batch
             Deque<ProducerBatch> dq = getOrCreateDeque(tp);
             synchronized (dq) {
@@ -242,6 +249,7 @@ public final class RecordAccumulator {
             if (buffer != null)
                 free.deallocate(buffer);
             appendsInProgress.decrementAndGet();
+            appendSpan.finish();
         }
     }
 
