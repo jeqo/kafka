@@ -970,6 +970,7 @@ project(':clients') {
     compile libs.snappy
     compile libs.slf4jApi
     compile libs.brave
+    compile libs.zipkinReporterJava
 
     compileOnly libs.jacksonDatabind // for SASL/OAUTHBEARER bearer token parsing
     compileOnly libs.jacksonJDK8Datatypes

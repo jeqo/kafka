@@ -18,6 +18,7 @@ package org.apache.kafka.clients.producer;
 
 import brave.ScopedSpan;
 import brave.Span;
+import brave.Tracer;
 import brave.Tracing;
 import org.apache.kafka.clients.ApiVersions;
 import org.apache.kafka.clients.ClientDnsLookup;
@@ -74,7 +75,9 @@ import org.apache.kafka.common.utils.LogContext;
 import org.apache.kafka.common.utils.Time;
 import org.apache.kafka.common.utils.Utils;
 import org.slf4j.Logger;
+import zipkin2.reporter.AsyncReporter;
 import zipkin2.reporter.brave.ZipkinSpanHandler;
+import zipkin2.reporter.okhttp3.OkHttpSender;
 
 import java.net.InetSocketAddress;
 import java.time.Duration;
@@ -438,6 +441,7 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
             //Tracing
             tracing = Tracing.newBuilder()
                 .localServiceName("kafka-producer")
+                .addSpanHandler(ZipkinSpanHandler.create(AsyncReporter.create(OkHttpSender.create("http://localhost:9411/api/v2/spans"))))
                 .build();
             log.debug("Kafka producer started");
         } catch (Throwable t) {
@@ -898,13 +902,13 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
     private Future<RecordMetadata> doSend(ProducerRecord<K, V> record, Callback callback) {
         Span doSendSpan = tracing.tracer().nextSpan().name("do_send").start();
         TopicPartition tp = null;
-        try {
+        try (Tracer.SpanInScope ws = tracing.tracer().withSpanInScope(doSendSpan)) {
             throwIfProducerClosed();
             // first make sure the metadata for the topic is available
             long nowMs = time.milliseconds();
-            Span clusterAndWaitSpan = tracing.tracer().nextSpan().start();
+            Span clusterAndWaitSpan = tracing.tracer().nextSpan().name("cluster_and_wait_time").start();
             ClusterAndWaitTime clusterAndWaitTime;
-            try {
+            try (Tracer.SpanInScope ws1 = tracing.tracer().withSpanInScope(clusterAndWaitSpan)) {
                 clusterAndWaitTime = waitOnMetadata(record.topic(), record.partition(), nowMs, maxBlockTimeMs);
             } catch (KafkaException e) {
                 clusterAndWaitSpan.error(e);
@@ -918,9 +922,9 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
             long remainingWaitMs = Math.max(0, maxBlockTimeMs - clusterAndWaitTime.waitedOnMetadataMs);
             doSendSpan.tag("remaining-wait-ms", Long.toString(remainingWaitMs));
             Cluster cluster = clusterAndWaitTime.cluster;
-            Span serializeKeySpan = tracing.tracer().nextSpan().name("serialize_key");
+            Span serializeKeySpan = tracing.tracer().nextSpan().name("serialize_key").start();
             byte[] serializedKey;
-            try {
+            try (Tracer.SpanInScope ws2 = tracing.tracer().withSpanInScope(serializeKeySpan)) {
                 serializedKey = keySerializer.serialize(record.topic(), record.headers(), record.key());
             } catch (ClassCastException cce) {
                 serializeKeySpan.error(cce);
@@ -930,9 +934,9 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
             } finally {
                 serializeKeySpan.finish();
             }
-            Span serializeValueSpan = tracing.tracer().nextSpan().name("serialize_value");
+            Span serializeValueSpan = tracing.tracer().nextSpan().name("serialize_value").start();
             byte[] serializedValue;
-            try {
+            try (Tracer.SpanInScope ws3 = tracing.tracer().withSpanInScope(serializeValueSpan)) {
                 serializedValue = valueSerializer.serialize(record.topic(), record.headers(), record.value());
             } catch (ClassCastException cce) {
                 serializeValueSpan.error(cce);
