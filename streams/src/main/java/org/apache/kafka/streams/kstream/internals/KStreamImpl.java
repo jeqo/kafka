@@ -252,15 +252,20 @@ public class KStreamImpl<K, V> extends AbstractStream<K, V> implements KStream<K
     }
 
     public KStream<K, V> removeHeader(final String headerKey) {
-        return removeHeaders(Collections.singleton(headerKey), NamedInternal.empty());
+        return removeHeader(headerKey, NamedInternal.empty());
     }
 
     public KStream<K, V> removeHeaders(final Iterable<String> headerKeys) {
         return removeHeaders(headerKeys, NamedInternal.empty());
     }
 
+    @Override
+    public KStream<K, V> removeHeader(String headerKeys, Named named) {
+        return removeHeaders(Collections.singleton(headerKeys), named);
+    }
+
     public KStream<K, V> removeHeaders(final Iterable<String> headerKeys, final Named named) {
-        final String name = new NamedInternal(named).orElseGenerateWithPrefix(builder, WITH_HEADERS_NAME);
+        final String name = new NamedInternal(named).orElseGenerateWithPrefix(builder, REMOVE_HEADERS_NAME);
         final ProcessorParameters<K, ValueAndHeaders<V>> processorParameters =
                 new ProcessorParameters<>(new KStreamRemoveHeaders<>(headerKeys), name);
         final ProcessorGraphNode<K, ValueAndHeaders<V>> setHeadersProcessorNode =
@@ -301,7 +306,7 @@ public class KStreamImpl<K, V> extends AbstractStream<K, V> implements KStream<K
     }
 
     public KStream<K, V> setHeaders(final Iterable<Header> headers, final Named named) {
-        final String name = new NamedInternal(named).orElseGenerateWithPrefix(builder, WITH_HEADERS_NAME);
+        final String name = new NamedInternal(named).orElseGenerateWithPrefix(builder, SET_HEADERS_NAME);
         final ProcessorParameters<K, ValueAndHeaders<V>> processorParameters =
                 new ProcessorParameters<>(new KStreamSetHeaders<>(headers), name);
         final ProcessorGraphNode<K, ValueAndHeaders<V>> setHeadersProcessorNode =

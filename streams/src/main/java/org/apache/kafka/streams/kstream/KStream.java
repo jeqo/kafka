@@ -4029,9 +4029,9 @@ public interface KStream<K, V> {
 
     KStream<K, V> removeHeaders(final Iterable<String> headerKeys);
 
-    KStream<K, V> removeHeader(final String headerKeys, final Named named);
+    KStream<K, V> removeHeader(final String headerKey, final Named named);
 
-    KStream<K, V> removeHeader(final String headerKeys);
+    KStream<K, V> removeHeader(final String headerKey);
 
     KStream<K, ValueAndHeaders<V>> withHeaders(final Named named);
 
