@@ -1,31 +1,29 @@
 package org.apache.kafka.streams.kstream.internals;
 
-import org.apache.kafka.common.header.Header;
-import org.apache.kafka.streams.ValueAndHeaders;
+import org.apache.kafka.streams.kstream.SetHeadersAction;
 import org.apache.kafka.streams.processor.Processor;
 import org.apache.kafka.streams.processor.ProcessorContext;
 import org.apache.kafka.streams.processor.ProcessorSupplier;
 
 public class KStreamSetHeaders<K, V> implements ProcessorSupplier<K, V> {
+    private final SetHeadersAction<K, V> action;
 
-    final Iterable<Header> headers;
-
-    public KStreamSetHeaders(final Iterable<Header> headers) {
-        this.headers = headers;
+    public KStreamSetHeaders(SetHeadersAction<K, V> action) {
+        this.action = action;
     }
 
     @Override
     public Processor<K, V> get() {
-        return new KStreamWithHeadersProcessor<>(headers);
+        return new KStreamWithHeadersProcessor<>(action);
     }
 
     private static class KStreamWithHeadersProcessor<K, V> implements Processor<K, V> {
-        private final Iterable<Header> headers;
+        private final SetHeadersAction<K, V> action;
 
         private ProcessorContext context;
 
-        public KStreamWithHeadersProcessor(final Iterable<Header> headers) {
-            this.headers = headers;
+        public KStreamWithHeadersProcessor(final SetHeadersAction<K, V> action) {
+            this.action = action;
         }
 
         @Override
@@ -35,7 +33,7 @@ public class KStreamSetHeaders<K, V> implements ProcessorSupplier<K, V> {
 
         @Override
         public void process(K key, V value) {
-            headers.forEach(header -> context.headers().add(header));
+            action.apply(key, value).forEach(header -> context.headers().add(header));
             context.forward(key, value);
         }
 

@@ -4013,17 +4013,13 @@ public interface KStream<K, V> {
                  final Named named,
                  final String... stateStoreNames);
 
-    KStream<K, V> setHeaders(final Iterable<Header> headers, final Named named);
+    KStream<K, V> setHeaders(final SetHeadersAction<? super K, ? super V> action, final Named named);
 
-    KStream<K, V> setHeaders(final Iterable<Header> headers);
+    KStream<K, V> setHeaders(final SetHeadersAction<? super K, ? super V> action);
 
-    KStream<K, V> setHeader(final Header header, final Named named);
+    KStream<K, V> setHeader(final SetHeaderAction<? super K, ? super V> action, final Named named);
 
-    KStream<K, V> setHeader(final Header header);
-
-    KStream<K, V> setHeader(final String key, final byte[] value, final Named named);
-
-    KStream<K, V> setHeader(final String key, final byte[] value);
+    KStream<K, V> setHeader(final SetHeaderAction<? super K, ? super V> action);
 
     KStream<K, V> removeHeaders(final Iterable<String> headerKeys, final Named named);
 

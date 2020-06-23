@@ -16,8 +16,6 @@
  */
 package org.apache.kafka.streams.kstream.internals;
 
-import org.apache.kafka.common.header.Header;
-import org.apache.kafka.common.header.internals.RecordHeader;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.utils.Bytes;
 import org.apache.kafka.streams.KeyValue;
@@ -37,6 +35,8 @@ import org.apache.kafka.streams.kstream.Predicate;
 import org.apache.kafka.streams.kstream.Printed;
 import org.apache.kafka.streams.kstream.Produced;
 import org.apache.kafka.streams.kstream.Repartitioned;
+import org.apache.kafka.streams.kstream.SetHeaderAction;
+import org.apache.kafka.streams.kstream.SetHeadersAction;
 import org.apache.kafka.streams.kstream.StreamJoined;
 import org.apache.kafka.streams.kstream.TransformerSupplier;
 import org.apache.kafka.streams.kstream.ValueJoiner;
@@ -285,41 +285,32 @@ public class KStreamImpl<K, V> extends AbstractStream<K, V> implements KStream<K
                 builder);
     }
 
-    public KStream<K, V> setHeader(final String key, final byte[] value) {
-        return setHeaders(Collections.singleton(new RecordHeader(key, value)), NamedInternal.empty());
+    public KStream<K, V> setHeader(final SetHeaderAction<? super K, ? super V> action) {
+        return setHeader(action, NamedInternal.empty());
     }
 
-    public KStream<K, V> setHeader(final String key, final byte[] value, Named named) {
-        return setHeaders(Collections.singleton(new RecordHeader(key, value)), named);
+    public KStream<K, V> setHeader(final SetHeaderAction<? super K, ? super V> action, Named named) {
+        return setHeaders((key, value) -> Collections.singletonList(action.apply(key, value)), named);
     }
 
-    public KStream<K, V> setHeader(final Header header) {
-        return setHeaders(Collections.singleton(header), NamedInternal.empty());
+    public KStream<K, V> setHeaders(final SetHeadersAction<? super K, ? super V> action) {
+        return setHeaders(action, NamedInternal.empty());
     }
 
-    public KStream<K, V> setHeader(final Header header, Named named) {
-        return setHeaders(Collections.singleton(header), named);
-    }
-
-    public KStream<K, V> setHeaders(final Iterable<Header> headers) {
-        return setHeaders(headers, NamedInternal.empty());
-    }
-
-    public KStream<K, V> setHeaders(final Iterable<Header> headers, final Named named) {
+    public KStream<K, V> setHeaders(final SetHeadersAction<? super K, ? super V> action, final Named named) {
         final String name = new NamedInternal(named).orElseGenerateWithPrefix(builder, SET_HEADERS_NAME);
-        final ProcessorParameters<K, ValueAndHeaders<V>> processorParameters =
-                new ProcessorParameters<>(new KStreamSetHeaders<>(headers), name);
-        final ProcessorGraphNode<K, ValueAndHeaders<V>> setHeadersProcessorNode =
+        final ProcessorParameters<? super K, ? super V> processorParameters =
+                new ProcessorParameters<>(new KStreamSetHeaders<>(action), name);
+        final ProcessorGraphNode<? super K, ? super V> setHeadersProcessorNode =
                 new ProcessorGraphNode<>(name, processorParameters);
         setHeadersProcessorNode.setValueChangingOperation(true);
 
         builder.addGraphNode(streamsGraphNode, setHeadersProcessorNode);
 
-        // value serde cannot be preserved
         return new KStreamImpl<>(
                 name,
                 keySerde,
-                null,
+                valueSerde,
                 subTopologySourceNodes,
                 repartitionRequired,
                 setHeadersProcessorNode,
