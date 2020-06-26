@@ -193,22 +193,26 @@ public class RocksDBTimestampedStore extends RocksDBStore implements Timestamped
 
         @Override
         public KeyValueIterator<Bytes, byte[]> range(final Bytes from,
-                                                     final Bytes to) {
+                                                     final Bytes to,
+                                                     final boolean reverse) {
             return new RocksDBDualCFRangeIterator(
                 name,
                 db.newIterator(newColumnFamily),
                 db.newIterator(oldColumnFamily),
                 from,
-                to);
+                to,
+                reverse);
         }
 
         @Override
-        public KeyValueIterator<Bytes, byte[]> all() {
+        public KeyValueIterator<Bytes, byte[]> all(final boolean reverse) {
             final RocksIterator innerIterWithTimestamp = db.newIterator(newColumnFamily);
-            innerIterWithTimestamp.seekToFirst();
+            if (reverse) innerIterWithTimestamp.seekToLast();
+            else innerIterWithTimestamp.seekToFirst();
             final RocksIterator innerIterNoTimestamp = db.newIterator(oldColumnFamily);
-            innerIterNoTimestamp.seekToFirst();
-            return new RocksDBDualCFIterator(name, innerIterWithTimestamp, innerIterNoTimestamp);
+            if (reverse) innerIterNoTimestamp.seekToLast();
+            else innerIterNoTimestamp.seekToFirst();
+            return new RocksDBDualCFIterator(name, innerIterWithTimestamp, innerIterNoTimestamp, reverse);
         }
 
         @Override
@@ -268,13 +272,16 @@ public class RocksDBTimestampedStore extends RocksDBStore implements Timestamped
         private byte[] nextWithTimestamp;
         private byte[] nextNoTimestamp;
         private KeyValue<Bytes, byte[]> next;
+        private final boolean reverse;
 
         RocksDBDualCFIterator(final String storeName,
                               final RocksIterator iterWithTimestamp,
-                              final RocksIterator iterNoTimestamp) {
+                              final RocksIterator iterNoTimestamp,
+                              final boolean reverse) {
             this.iterWithTimestamp = iterWithTimestamp;
             this.iterNoTimestamp = iterNoTimestamp;
             this.storeName = storeName;
+            this.reverse = reverse;
         }
 
         @Override
@@ -306,22 +313,26 @@ public class RocksDBTimestampedStore extends RocksDBStore implements Timestamped
                 } else {
                     next = KeyValue.pair(new Bytes(nextWithTimestamp), iterWithTimestamp.value());
                     nextWithTimestamp = null;
-                    iterWithTimestamp.next();
+                    if (reverse) iterWithTimestamp.prev();
+                    else iterWithTimestamp.next();
                 }
             } else {
                 if (nextWithTimestamp == null) {
                     next = KeyValue.pair(new Bytes(nextNoTimestamp), convertToTimestampedFormat(iterNoTimestamp.value()));
                     nextNoTimestamp = null;
-                    iterNoTimestamp.next();
+                    if (reverse) iterNoTimestamp.prev();
+                    else iterNoTimestamp.next();
                 } else {
                     if (comparator.compare(nextNoTimestamp, nextWithTimestamp) <= 0) {
                         next = KeyValue.pair(new Bytes(nextNoTimestamp), convertToTimestampedFormat(iterNoTimestamp.value()));
                         nextNoTimestamp = null;
-                        iterNoTimestamp.next();
+                        if (reverse) iterNoTimestamp.prev();
+                        else iterNoTimestamp.next();
                     } else {
                         next = KeyValue.pair(new Bytes(nextWithTimestamp), iterWithTimestamp.value());
                         nextWithTimestamp = null;
-                        iterWithTimestamp.next();
+                        if (reverse) iterWithTimestamp.prev();
+                        else iterWithTimestamp.next();
                     }
                 }
             }
@@ -357,10 +368,13 @@ public class RocksDBTimestampedStore extends RocksDBStore implements Timestamped
                                    final RocksIterator iterWithTimestamp,
                                    final RocksIterator iterNoTimestamp,
                                    final Bytes from,
-                                   final Bytes to) {
-            super(storeName, iterWithTimestamp, iterNoTimestamp);
-            iterWithTimestamp.seek(from.get());
-            iterNoTimestamp.seek(from.get());
+                                   final Bytes to,
+                                   final boolean reverse) {
+            super(storeName, iterWithTimestamp, iterNoTimestamp, reverse);
+            if (reverse) iterWithTimestamp.seek(to.get());
+            else iterWithTimestamp.seek(from.get());
+            if (reverse) iterNoTimestamp.seek(to.get());
+            else iterNoTimestamp.seek(from.get());
             upperBoundKey = to.get();
             if (upperBoundKey == null) {
                 throw new NullPointerException("RocksDBDualCFRangeIterator: upperBoundKey is null for key " + to);

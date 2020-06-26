@@ -367,7 +367,7 @@ public class RocksDBStoreTest {
     }
 
     @Test
-    public void shouldHandleDeletesAndPutbackOnRestoreAll() {
+    public void shouldHandleDeletesAndPutBackOnRestoreAll() {
         final List<KeyValue<byte[], byte[]>> entries = new ArrayList<>();
         entries.add(new KeyValue<>("1".getBytes(UTF_8), "a".getBytes(UTF_8)));
         entries.add(new KeyValue<>("2".getBytes(UTF_8), "b".getBytes(UTF_8)));

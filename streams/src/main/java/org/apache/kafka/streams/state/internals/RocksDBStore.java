@@ -28,7 +28,7 @@ import org.apache.kafka.streams.processor.ProcessorContext;
 import org.apache.kafka.streams.processor.StateStore;
 import org.apache.kafka.streams.processor.internals.metrics.StreamsMetricsImpl;
 import org.apache.kafka.streams.state.KeyValueIterator;
-import org.apache.kafka.streams.state.KeyValueStore;
+import org.apache.kafka.streams.state.KeyValueStoreWithReverseIteration;
 import org.apache.kafka.streams.state.RocksDBConfigSetter;
 import org.apache.kafka.streams.state.internals.metrics.RocksDBMetricsRecorder;
 import org.rocksdb.BlockBasedTableConfig;
@@ -71,7 +71,7 @@ import static org.apache.kafka.streams.StreamsConfig.METRICS_RECORDING_LEVEL_CON
 /**
  * A persistent key-value store based on RocksDB.
  */
-public class RocksDBStore implements KeyValueStore<Bytes, byte[]>, BatchWritingStore {
+public class RocksDBStore implements KeyValueStoreWithReverseIteration<Bytes, byte[]>, BatchWritingStore {
     private static final Logger log = LoggerFactory.getLogger(RocksDBStore.class);
 
     private static final Pattern SST_FILE_EXTENSION = Pattern.compile(".*\\.sst");
@@ -307,19 +307,29 @@ public class RocksDBStore implements KeyValueStore<Bytes, byte[]>, BatchWritingS
     @Override
     public synchronized KeyValueIterator<Bytes, byte[]> range(final Bytes from,
                                                               final Bytes to) {
+        return range(from, to, false);
+    }
+
+    @Override
+    public synchronized KeyValueIterator<Bytes, byte[]> reverseRange(final Bytes from,
+                                                                     final Bytes to) {
+        return range(from, to, true);
+    }
+
+    KeyValueIterator<Bytes, byte[]> range(final Bytes from, final Bytes to, final boolean reverse) {
         Objects.requireNonNull(from, "from cannot be null");
         Objects.requireNonNull(to, "to cannot be null");
 
         if (from.compareTo(to) > 0) {
             log.warn("Returning empty iterator for fetch with invalid key range: from > to. "
-                + "This may be due to serdes that don't preserve ordering when lexicographically comparing the serialized bytes. " +
-                "Note that the built-in numerical serdes do not follow this for negative numbers");
+                    + "This may be due to serdes that don't preserve ordering when lexicographically comparing the serialized bytes. " +
+                    "Note that the built-in numerical serdes do not follow this for negative numbers");
             return KeyValueIterators.emptyIterator();
         }
 
         validateStoreOpen();
 
-        final KeyValueIterator<Bytes, byte[]> rocksDBRangeIterator = dbAccessor.range(from, to);
+        final KeyValueIterator<Bytes, byte[]> rocksDBRangeIterator = dbAccessor.range(from, to, reverse);
         openIterators.add(rocksDBRangeIterator);
 
         return rocksDBRangeIterator;
@@ -327,8 +337,17 @@ public class RocksDBStore implements KeyValueStore<Bytes, byte[]>, BatchWritingS
 
     @Override
     public synchronized KeyValueIterator<Bytes, byte[]> all() {
+        return all(false);
+    }
+
+    @Override
+    public synchronized KeyValueIterator<Bytes, byte[]> reverseAll() {
+        return all(true);
+    }
+
+    KeyValueIterator<Bytes, byte[]> all(final boolean reverse) {
         validateStoreOpen();
-        final KeyValueIterator<Bytes, byte[]> rocksDbIterator = dbAccessor.all();
+        final KeyValueIterator<Bytes, byte[]> rocksDbIterator = dbAccessor.all(reverse);
         openIterators.add(rocksDbIterator);
         return rocksDbIterator;
     }
@@ -461,9 +480,10 @@ public class RocksDBStore implements KeyValueStore<Bytes, byte[]>, BatchWritingS
         byte[] getOnly(final byte[] key) throws RocksDBException;
 
         KeyValueIterator<Bytes, byte[]> range(final Bytes from,
-                                              final Bytes to);
+                                              final Bytes to,
+                                              final boolean reverse);
 
-        KeyValueIterator<Bytes, byte[]> all();
+        KeyValueIterator<Bytes, byte[]> all(final boolean reverse);
 
         long approximateNumEntries() throws RocksDBException;
 
@@ -527,20 +547,23 @@ public class RocksDBStore implements KeyValueStore<Bytes, byte[]>, BatchWritingS
 
         @Override
         public KeyValueIterator<Bytes, byte[]> range(final Bytes from,
-                                                     final Bytes to) {
+                                                     final Bytes to,
+                                                     final boolean reverse) {
             return new RocksDBRangeIterator(
                 name,
                 db.newIterator(columnFamily),
                 openIterators,
                 from,
-                to);
+                to,
+                reverse);
         }
 
         @Override
-        public KeyValueIterator<Bytes, byte[]> all() {
+        public KeyValueIterator<Bytes, byte[]> all(final boolean reverse) {
             final RocksIterator innerIterWithTimestamp = db.newIterator(columnFamily);
-            innerIterWithTimestamp.seekToFirst();
-            return new RocksDbIterator(name, innerIterWithTimestamp, openIterators);
+            if (reverse) innerIterWithTimestamp.seekToLast();
+            else innerIterWithTimestamp.seekToFirst();
+            return new RocksDbIterator(name, innerIterWithTimestamp, openIterators, reverse);
         }
 
         @Override
