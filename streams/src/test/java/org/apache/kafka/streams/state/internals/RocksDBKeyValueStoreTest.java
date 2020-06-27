@@ -20,7 +20,7 @@ import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.streams.errors.InvalidStateStoreException;
 import org.apache.kafka.streams.processor.ProcessorContext;
 import org.apache.kafka.streams.state.KeyValueIterator;
-import org.apache.kafka.streams.state.KeyValueStore;
+import org.apache.kafka.streams.state.KeyValueStoreWithReverseIteration;
 import org.apache.kafka.streams.state.RocksDBConfigSetter;
 import org.apache.kafka.streams.state.StoreBuilder;
 import org.apache.kafka.streams.state.Stores;
@@ -38,13 +38,13 @@ public class RocksDBKeyValueStoreTest extends AbstractKeyValueStoreTest {
 
     @SuppressWarnings("unchecked")
     @Override
-    protected <K, V> KeyValueStore<K, V> createKeyValueStore(final ProcessorContext context) {
-        final StoreBuilder<KeyValueStore<K, V>> storeBuilder = Stores.keyValueStoreBuilder(
-                Stores.persistentKeyValueStore("my-store"),
+    protected <K, V> KeyValueStoreWithReverseIteration<K, V> createKeyValueStore(final ProcessorContext context) {
+        final StoreBuilder<KeyValueStoreWithReverseIteration<K, V>> storeBuilder = Stores.keyValueStoreBuilder(
+                Stores.persistentKeyValueStoreWithReverseIteration("my-store"),
                 (Serde<K>) context.keySerde(),
                 (Serde<V>) context.valueSerde());
 
-        final KeyValueStore<K, V> store = storeBuilder.build();
+        final KeyValueStoreWithReverseIteration<K, V> store = storeBuilder.build();
         store.init(context, store);
         return store;
     }
@@ -75,6 +75,17 @@ public class RocksDBKeyValueStoreTest extends AbstractKeyValueStoreTest {
     }
 
     @Test
+    public void shouldPerformReverseRangeQueriesWithCachingDisabled() {
+        context.setTime(1L);
+        store.put(1, "hi");
+        store.put(2, "goodbye");
+        final KeyValueIterator<Integer, String> range = store.reverseRange(1, 2);
+        assertEquals("goodbye", range.next().value);
+        assertEquals("hi", range.next().value);
+        assertFalse(range.hasNext());
+    }
+
+    @Test
     public void shouldPerformAllQueriesWithCachingDisabled() {
         context.setTime(1L);
         store.put(1, "hi");
@@ -82,6 +93,17 @@ public class RocksDBKeyValueStoreTest extends AbstractKeyValueStoreTest {
         final KeyValueIterator<Integer, String> range = store.all();
         assertEquals("hi", range.next().value);
         assertEquals("goodbye", range.next().value);
+        assertFalse(range.hasNext());
+    }
+
+    @Test
+    public void shouldPerformReverseAllQueriesWithCachingDisabled() {
+        context.setTime(1L);
+        store.put(1, "hi");
+        store.put(2, "goodbye");
+        final KeyValueIterator<Integer, String> range = store.reverseAll();
+        assertEquals("goodbye", range.next().value);
+        assertEquals("hi", range.next().value);
         assertFalse(range.hasNext());
     }
 

@@ -22,25 +22,25 @@ import org.apache.kafka.common.utils.Time;
 import org.apache.kafka.streams.KeyValue;
 import org.apache.kafka.streams.processor.ProcessorContext;
 import org.apache.kafka.streams.processor.StateStore;
-import org.apache.kafka.streams.state.KeyValueBytesStoreSupplier;
 import org.apache.kafka.streams.state.KeyValueIterator;
-import org.apache.kafka.streams.state.KeyValueStore;
+import org.apache.kafka.streams.state.KeyValueStoreWithReverseIteration;
+import org.apache.kafka.streams.state.ReverseKeyValueBytesStoreSupplier;
 import org.apache.kafka.streams.state.TimestampedBytesStore;
-import org.apache.kafka.streams.state.TimestampedKeyValueStore;
+import org.apache.kafka.streams.state.TimestampedKeyValueStoreWithReverseIteration;
 import org.apache.kafka.streams.state.ValueAndTimestamp;
 
 import java.util.List;
 import java.util.Objects;
 
-public class TimestampedKeyValueStoreBuilder<K, V>
-    extends AbstractStoreBuilder<K, ValueAndTimestamp<V>, TimestampedKeyValueStore<K, V>> {
+public class TimestampedReverseKeyValueStoreBuilder<K, V>
+    extends AbstractStoreBuilder<K, ValueAndTimestamp<V>, TimestampedKeyValueStoreWithReverseIteration<K, V>> {
 
-    private final KeyValueBytesStoreSupplier storeSupplier;
+    private final ReverseKeyValueBytesStoreSupplier storeSupplier;
 
-    public TimestampedKeyValueStoreBuilder(final KeyValueBytesStoreSupplier storeSupplier,
-                                           final Serde<K> keySerde,
-                                           final Serde<V> valueSerde,
-                                           final Time time) {
+    public TimestampedReverseKeyValueStoreBuilder(final ReverseKeyValueBytesStoreSupplier storeSupplier,
+                                                  final Serde<K> keySerde,
+                                                  final Serde<V> valueSerde,
+                                                  final Time time) {
         super(
             storeSupplier.name(),
             keySerde,
@@ -51,16 +51,16 @@ public class TimestampedKeyValueStoreBuilder<K, V>
     }
 
     @Override
-    public TimestampedKeyValueStore<K, V> build() {
-        KeyValueStore<Bytes, byte[]> store = storeSupplier.get();
+    public TimestampedKeyValueStoreWithReverseIteration<K, V> build() {
+        KeyValueStoreWithReverseIteration<Bytes, byte[]> store = storeSupplier.get();
         if (!(store instanceof TimestampedBytesStore)) {
             if (store.persistent()) {
-                store = new KeyValueToTimestampedKeyValueByteStoreAdapter(store);
+                store = new KeyValueToTimestampedReverseKeyValueByteStoreAdapter(store);
             } else {
                 store = new InMemoryTimestampedKeyValueStoreMarker(store);
             }
         }
-        return new MeteredTimestampedKeyValueStore<>(
+        return new MeteredTimestampedReverseKeyValueStore<K, V>(
             maybeWrapCaching(maybeWrapLogging(store)),
             storeSupplier.metricsScope(),
             time,
@@ -68,26 +68,26 @@ public class TimestampedKeyValueStoreBuilder<K, V>
             valueSerde);
     }
 
-    private KeyValueStore<Bytes, byte[]> maybeWrapCaching(final KeyValueStore<Bytes, byte[]> inner) {
+    private KeyValueStoreWithReverseIteration<Bytes, byte[]> maybeWrapCaching(final KeyValueStoreWithReverseIteration<Bytes, byte[]> inner) {
         if (!enableCaching) {
             return inner;
         }
-        return new CachingKeyValueStore(inner);
+        return new CachingReverseKeyValueStore(inner);
     }
 
-    private KeyValueStore<Bytes, byte[]> maybeWrapLogging(final KeyValueStore<Bytes, byte[]> inner) {
+    private KeyValueStoreWithReverseIteration<Bytes, byte[]> maybeWrapLogging(final KeyValueStoreWithReverseIteration<Bytes, byte[]> inner) {
         if (!enableLogging) {
             return inner;
         }
-        return new ChangeLoggingTimestampedKeyValueBytesStore(inner);
+        return new ChangeLoggingTimestampedReverseKeyValueBytesStore(inner);
     }
 
     private final static class InMemoryTimestampedKeyValueStoreMarker
-            implements KeyValueStore<Bytes, byte[]>, TimestampedBytesStore {
+        implements KeyValueStoreWithReverseIteration<Bytes, byte[]>, TimestampedBytesStore {
 
-        final KeyValueStore<Bytes, byte[]> wrapped;
+        final KeyValueStoreWithReverseIteration<Bytes, byte[]> wrapped;
 
-        private InMemoryTimestampedKeyValueStoreMarker(final KeyValueStore<Bytes, byte[]> wrapped) {
+        private InMemoryTimestampedKeyValueStoreMarker(final KeyValueStoreWithReverseIteration<Bytes, byte[]> wrapped) {
             if (wrapped.persistent()) {
                 throw new IllegalArgumentException("Provided store must not be a persistent store, but it is.");
             }
@@ -134,8 +134,19 @@ public class TimestampedKeyValueStoreBuilder<K, V>
         }
 
         @Override
+        public KeyValueIterator<Bytes, byte[]> reverseRange(final Bytes from,
+                                                            final Bytes to) {
+            return wrapped.reverseRange(from, to);
+        }
+
+        @Override
         public KeyValueIterator<Bytes, byte[]> all() {
             return wrapped.all();
+        }
+
+        @Override
+        public KeyValueIterator<Bytes, byte[]> reverseAll() {
+            return wrapped.reverseAll();
         }
 
         @Override

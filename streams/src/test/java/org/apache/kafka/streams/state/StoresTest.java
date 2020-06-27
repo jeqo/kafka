@@ -134,7 +134,7 @@ public class StoresTest {
 
     @Test
     public void shouldThrowIfSupplierIsNullForKeyValueStoreBuilder() {
-        final Exception e = assertThrows(NullPointerException.class, () -> Stores.keyValueStoreBuilder(null, Serdes.ByteArray(), Serdes.ByteArray()));
+        final Exception e = assertThrows(NullPointerException.class, () -> Stores.keyValueStoreBuilder((KeyValueBytesStoreSupplier) null, Serdes.ByteArray(), Serdes.ByteArray()));
         assertEquals("supplier cannot be null", e.getMessage());
     }
 

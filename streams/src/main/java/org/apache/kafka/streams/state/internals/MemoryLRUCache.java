@@ -21,7 +21,7 @@ import org.apache.kafka.streams.KeyValue;
 import org.apache.kafka.streams.processor.ProcessorContext;
 import org.apache.kafka.streams.processor.StateStore;
 import org.apache.kafka.streams.state.KeyValueIterator;
-import org.apache.kafka.streams.state.KeyValueStore;
+import org.apache.kafka.streams.state.KeyValueStoreWithReverseIteration;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -31,7 +31,7 @@ import java.util.Objects;
 /**
  * An in-memory LRU cache store based on HashSet and HashMap.
  */
-public class MemoryLRUCache implements KeyValueStore<Bytes, byte[]> {
+public class MemoryLRUCache implements KeyValueStoreWithReverseIteration<Bytes, byte[]> {
 
     public interface EldestEntryRemovalListener {
         void apply(Bytes key, byte[] value);
@@ -146,9 +146,26 @@ public class MemoryLRUCache implements KeyValueStore<Bytes, byte[]> {
      * @throws UnsupportedOperationException at every invocation
      */
     @Override
+    public KeyValueIterator<Bytes, byte[]> reverseRange(final Bytes from, final Bytes to) {
+        throw new UnsupportedOperationException("MemoryLRUCache does not support range() function.");
+    }
+
+    /**
+     * @throws UnsupportedOperationException at every invocation
+     */
+    @Override
     public KeyValueIterator<Bytes, byte[]> all() {
         throw new UnsupportedOperationException("MemoryLRUCache does not support all() function.");
     }
+
+    /**
+     * @throws UnsupportedOperationException at every invocation
+     */
+    @Override
+    public KeyValueIterator<Bytes, byte[]> reverseAll() {
+        throw new UnsupportedOperationException("MemoryLRUCache does not support all() function.");
+    }
+
 
     @Override
     public long approximateNumEntries() {

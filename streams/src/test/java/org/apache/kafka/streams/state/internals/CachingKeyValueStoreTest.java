@@ -30,6 +30,7 @@ import org.apache.kafka.streams.processor.internals.MockStreamsMetrics;
 import org.apache.kafka.streams.processor.internals.ProcessorRecordContext;
 import org.apache.kafka.streams.state.KeyValueIterator;
 import org.apache.kafka.streams.state.KeyValueStore;
+import org.apache.kafka.streams.state.KeyValueStoreWithReverseIteration;
 import org.apache.kafka.streams.state.StoreBuilder;
 import org.apache.kafka.streams.state.Stores;
 import org.apache.kafka.test.InternalMockProcessorContext;
@@ -87,14 +88,14 @@ public class CachingKeyValueStoreTest extends AbstractKeyValueStoreTest {
 
     @SuppressWarnings("unchecked")
     @Override
-    protected <K, V> KeyValueStore<K, V> createKeyValueStore(final ProcessorContext context) {
-        final StoreBuilder<KeyValueStore<K, V>> storeBuilder = Stores.keyValueStoreBuilder(
-                Stores.persistentKeyValueStore("cache-store"),
+    protected <K, V> KeyValueStoreWithReverseIteration<K, V> createKeyValueStore(final ProcessorContext context) {
+        final StoreBuilder<KeyValueStoreWithReverseIteration<K, V>> storeBuilder = Stores.keyValueStoreBuilder(
+                Stores.persistentKeyValueStoreWithReverseIteration("cache-store"),
                 (Serde<K>) context.keySerde(),
                 (Serde<V>) context.valueSerde())
                 .withCachingEnabled();
 
-        final KeyValueStore<K, V> store = storeBuilder.build();
+        final KeyValueStoreWithReverseIteration<K, V> store = storeBuilder.build();
         store.init(context, store);
         return store;
     }

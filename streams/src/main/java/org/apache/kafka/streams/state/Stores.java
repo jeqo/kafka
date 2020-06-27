@@ -25,11 +25,14 @@ import org.apache.kafka.streams.state.internals.InMemorySessionBytesStoreSupplie
 import org.apache.kafka.streams.state.internals.InMemoryWindowBytesStoreSupplier;
 import org.apache.kafka.streams.state.internals.KeyValueStoreBuilder;
 import org.apache.kafka.streams.state.internals.MemoryNavigableLRUCache;
+import org.apache.kafka.streams.state.internals.ReverseKeyValueStoreBuilder;
 import org.apache.kafka.streams.state.internals.RocksDbKeyValueBytesStoreSupplier;
+import org.apache.kafka.streams.state.internals.RocksDbReverseKeyValueBytesStoreSupplier;
 import org.apache.kafka.streams.state.internals.RocksDbSessionBytesStoreSupplier;
 import org.apache.kafka.streams.state.internals.RocksDbWindowBytesStoreSupplier;
 import org.apache.kafka.streams.state.internals.SessionStoreBuilder;
 import org.apache.kafka.streams.state.internals.TimestampedKeyValueStoreBuilder;
+import org.apache.kafka.streams.state.internals.TimestampedReverseKeyValueStoreBuilder;
 import org.apache.kafka.streams.state.internals.TimestampedWindowStoreBuilder;
 import org.apache.kafka.streams.state.internals.WindowStoreBuilder;
 
@@ -93,6 +96,11 @@ public final class Stores {
         return new RocksDbKeyValueBytesStoreSupplier(name, false);
     }
 
+    public static ReverseKeyValueBytesStoreSupplier persistentKeyValueStoreWithReverseIteration(final String name) {
+        Objects.requireNonNull(name, "name cannot be null");
+        return new RocksDbReverseKeyValueBytesStoreSupplier(name, false);
+    }
+
     /**
      * Create a persistent {@link KeyValueBytesStoreSupplier}.
      * <p>
@@ -108,6 +116,11 @@ public final class Stores {
     public static KeyValueBytesStoreSupplier persistentTimestampedKeyValueStore(final String name) {
         Objects.requireNonNull(name, "name cannot be null");
         return new RocksDbKeyValueBytesStoreSupplier(name, true);
+    }
+
+    public static ReverseKeyValueBytesStoreSupplier persistentTimestampedKeyValueStoreWithReverseIteration(final String name) {
+        Objects.requireNonNull(name, "name cannot be null");
+        return new RocksDbReverseKeyValueBytesStoreSupplier(name, true);
     }
 
     /**
@@ -130,6 +143,26 @@ public final class Stores {
 
             @Override
             public KeyValueStore<Bytes, byte[]> get() {
+                return new InMemoryKeyValueStore(name);
+            }
+
+            @Override
+            public String metricsScope() {
+                return "in-memory";
+            }
+        };
+    }
+
+    public static ReverseKeyValueBytesStoreSupplier inMemoryKeyValueStoreWithReverseIteration(final String name) {
+        Objects.requireNonNull(name, "name cannot be null");
+        return new ReverseKeyValueBytesStoreSupplier() {
+            @Override
+            public String name() {
+                return name;
+            }
+
+            @Override
+            public KeyValueStoreWithReverseIteration<Bytes, byte[]> get() {
                 return new InMemoryKeyValueStore(name);
             }
 
@@ -164,6 +197,29 @@ public final class Stores {
 
             @Override
             public KeyValueStore<Bytes, byte[]> get() {
+                return new MemoryNavigableLRUCache(name, maxCacheSize);
+            }
+
+            @Override
+            public String metricsScope() {
+                return "in-memory-lru";
+            }
+        };
+    }
+
+    public static ReverseKeyValueBytesStoreSupplier lruMapWithReverseIteration(final String name, final int maxCacheSize) {
+        Objects.requireNonNull(name, "name cannot be null");
+        if (maxCacheSize < 0) {
+            throw new IllegalArgumentException("maxCacheSize cannot be negative");
+        }
+        return new ReverseKeyValueBytesStoreSupplier() {
+            @Override
+            public String name() {
+                return name;
+            }
+
+            @Override
+            public KeyValueStoreWithReverseIteration<Bytes, byte[]> get() {
                 return new MemoryNavigableLRUCache(name, maxCacheSize);
             }
 
@@ -433,6 +489,13 @@ public final class Stores {
         return new KeyValueStoreBuilder<>(supplier, keySerde, valueSerde, Time.SYSTEM);
     }
 
+    public static <K, V> StoreBuilder<KeyValueStoreWithReverseIteration<K, V>> keyValueStoreBuilder(final ReverseKeyValueBytesStoreSupplier supplier,
+                                                                                                    final Serde<K> keySerde,
+                                                                                                    final Serde<V> valueSerde) {
+        Objects.requireNonNull(supplier, "supplier cannot be null");
+        return new ReverseKeyValueStoreBuilder<>(supplier, keySerde, valueSerde, Time.SYSTEM);
+    }
+
     /**
      * Creates a {@link StoreBuilder} that can be used to build a {@link TimestampedKeyValueStore}.
      * <p>
@@ -453,6 +516,13 @@ public final class Stores {
                                                                                                       final Serde<V> valueSerde) {
         Objects.requireNonNull(supplier, "supplier cannot be null");
         return new TimestampedKeyValueStoreBuilder<>(supplier, keySerde, valueSerde, Time.SYSTEM);
+    }
+
+    public static <K, V> StoreBuilder<TimestampedKeyValueStoreWithReverseIteration<K, V>> timestampedKeyValueStoreBuilder(final ReverseKeyValueBytesStoreSupplier supplier,
+                                                                                                                          final Serde<K> keySerde,
+                                                                                                                          final Serde<V> valueSerde) {
+        Objects.requireNonNull(supplier, "supplier cannot be null");
+        return new TimestampedReverseKeyValueStoreBuilder<>(supplier, keySerde, valueSerde, Time.SYSTEM);
     }
 
     /**
