@@ -260,7 +260,7 @@ public class KStreamImpl<K, V> extends AbstractStream<K, V> implements KStream<K
     }
 
     @Override
-    public KStream<K, V> removeHeader(String headerKeys, Named named) {
+    public KStream<K, V> removeHeader(final String headerKeys, final Named named) {
         return removeHeaders(Collections.singleton(headerKeys), named);
     }
 
@@ -289,7 +289,7 @@ public class KStreamImpl<K, V> extends AbstractStream<K, V> implements KStream<K
         return setHeader(action, NamedInternal.empty());
     }
 
-    public KStream<K, V> setHeader(final SetHeaderAction<? super K, ? super V> action, Named named) {
+    public KStream<K, V> setHeader(final SetHeaderAction<? super K, ? super V> action, final Named named) {
         return setHeaders((key, value) -> Collections.singletonList(action.apply(key, value)), named);
     }
 
