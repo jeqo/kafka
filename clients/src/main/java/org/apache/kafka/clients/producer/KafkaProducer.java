@@ -1058,19 +1058,17 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
      * Validate that the record size isn't too large
      */
     private void ensureValidRecordSize(String topic, CompressionType compressionType, int size) {
-        if (size > maxRequestSize) {
-            float ratio = CompressionRatioEstimator.estimation(topic, compressionType);
-            if (size * ratio > maxRequestSize) {
-                throw new RecordTooLargeException("The message is " + size +
-                    " bytes when serialized which is larger than " + maxRequestSize + ", which is the value of the " +
-                    ProducerConfig.MAX_REQUEST_SIZE_CONFIG + " configuration.");
-            }
-        }
-        if (size > totalMemorySize)
-            throw new RecordTooLargeException("The message is " + size +
-                    " bytes when serialized which is larger than the total memory buffer you have configured with the " +
-                    ProducerConfig.BUFFER_MEMORY_CONFIG +
-                    " configuration.");
+        float ratio = CompressionRatioEstimator.estimation(topic, compressionType);
+        float expectedSize = size * ratio;
+        if (expectedSize > maxRequestSize)
+            throw new RecordTooLargeException("The message expected size using compression type " + compressionType + " is " + expectedSize +
+                " bytes when serialized which is larger than " + maxRequestSize + ", which is the value of the " +
+                ProducerConfig.MAX_REQUEST_SIZE_CONFIG + " configuration. (original size = " + size + " and expected ratio = " + ratio + ")");
+        if (expectedSize > totalMemorySize)
+            throw new RecordTooLargeException("The message expected size using compression type " + compressionType + " is " + expectedSize +
+                " bytes when serialized which is larger than the total memory buffer you have configured with the " +
+                ProducerConfig.BUFFER_MEMORY_CONFIG +
+                " configuration. (original size = " + size + " and expected ratio = " + ratio + ")");
     }
 
     /**
