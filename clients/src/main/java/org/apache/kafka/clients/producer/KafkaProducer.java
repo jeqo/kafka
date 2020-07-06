@@ -64,6 +64,7 @@ import org.apache.kafka.common.metrics.Sensor;
 import org.apache.kafka.common.network.ChannelBuilder;
 import org.apache.kafka.common.network.Selector;
 import org.apache.kafka.common.record.AbstractRecords;
+import org.apache.kafka.common.record.CompressionRatioEstimator;
 import org.apache.kafka.common.record.CompressionType;
 import org.apache.kafka.common.record.RecordBatch;
 import org.apache.kafka.common.requests.JoinGroupRequest;
@@ -921,7 +922,7 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
 
             int serializedSize = AbstractRecords.estimateSizeInBytesUpperBound(apiVersions.maxUsableProduceMagic(),
                     compressionType, serializedKey, serializedValue, headers);
-            ensureValidRecordSize(serializedSize);
+            ensureValidRecordSize(record.topic(), compressionType, serializedSize);
             long timestamp = record.timestamp() == null ? nowMs : record.timestamp();
             if (log.isTraceEnabled()) {
                 log.trace("Attempting to append record {} with callback {} to topic {} partition {}", record, callback, record.topic(), partition);
@@ -1056,11 +1057,15 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
     /**
      * Validate that the record size isn't too large
      */
-    private void ensureValidRecordSize(int size) {
-        if (size > maxRequestSize)
-            throw new RecordTooLargeException("The message is " + size +
+    private void ensureValidRecordSize(String topic, CompressionType compressionType, int size) {
+        if (size > maxRequestSize) {
+            float ratio = CompressionRatioEstimator.estimation(topic, compressionType);
+            if (size * ratio > maxRequestSize) {
+                throw new RecordTooLargeException("The message is " + size +
                     " bytes when serialized which is larger than " + maxRequestSize + ", which is the value of the " +
                     ProducerConfig.MAX_REQUEST_SIZE_CONFIG + " configuration.");
+            }
+        }
         if (size > totalMemorySize)
             throw new RecordTooLargeException("The message is " + size +
                     " bytes when serialized which is larger than the total memory buffer you have configured with the " +
