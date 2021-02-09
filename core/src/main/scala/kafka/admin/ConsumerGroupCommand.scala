@@ -6,7 +6,7 @@
  * (the "License"); you may not use this file except in compliance with
  * the License.  You may obtain a copy of the License at
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,31 +17,28 @@
 
 package kafka.admin
 
-import java.time.{Duration, Instant}
-import java.util.Properties
 import com.fasterxml.jackson.dataformat.csv.CsvMapper
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import com.fasterxml.jackson.module.scala.experimental.ScalaObjectMapper
-import kafka.utils._
+import joptsimple.{OptionException, OptionSpec}
 import kafka.utils.Implicits._
+import kafka.utils._
+import org.apache.kafka.clients.CommonClientConfigs
 import org.apache.kafka.clients.admin._
 import org.apache.kafka.clients.consumer.OffsetAndMetadata
-import org.apache.kafka.clients.CommonClientConfigs
+import org.apache.kafka.common.protocol.Errors
+import org.apache.kafka.common.requests.ListOffsetsResponse
 import org.apache.kafka.common.utils.Utils
-import org.apache.kafka.common.{KafkaException, Node, TopicPartition}
+import org.apache.kafka.common.{ConsumerGroupState, KafkaException, Node, TopicPartition}
 
-import scala.jdk.CollectionConverters._
+import java.time.{Duration, Instant}
+import java.util.Properties
+import scala.collection.immutable.TreeMap
 import scala.collection.mutable.ListBuffer
 import scala.collection.{Map, Seq, immutable, mutable}
-import scala.util.{Failure, Success, Try}
-import joptsimple.OptionSpec
-import org.apache.kafka.common.protocol.Errors
-
-import scala.collection.immutable.TreeMap
+import scala.jdk.CollectionConverters._
 import scala.reflect.ClassTag
-import org.apache.kafka.common.ConsumerGroupState
-import joptsimple.OptionException
-import org.apache.kafka.common.requests.ListOffsetsResponse
+import scala.util.{Failure, Success, Try}
 
 object ConsumerGroupCommand extends Logging {
 
@@ -126,38 +123,46 @@ object ConsumerGroupCommand extends Logging {
   }
 
   private[admin] case class PartitionAssignmentState(group: String, coordinator: Option[Node], topic: Option[String],
-                                                partition: Option[Int], offset: Option[Long], lag: Option[Long],
-                                                consumerId: Option[String], host: Option[String],
-                                                clientId: Option[String], logEndOffset: Option[Long])
+                                                     partition: Option[Int], offset: Option[Long], lag: Option[Long],
+                                                     consumerId: Option[String], host: Option[String],
+                                                     clientId: Option[String], logEndOffset: Option[Long])
 
   private[admin] case class MemberAssignmentState(group: String, consumerId: String, host: String, clientId: String, groupInstanceId: String,
-                                             numPartitions: Int, assignment: List[TopicPartition])
+                                                  numPartitions: Int, assignment: List[TopicPartition])
 
   private[admin] case class GroupState(group: String, coordinator: Node, assignmentStrategy: String, state: String, numMembers: Int)
 
   private[admin] sealed trait CsvRecord
+
   private[admin] case class CsvRecordWithGroup(group: String, topic: String, partition: Int, offset: Long) extends CsvRecord
+
   private[admin] case class CsvRecordNoGroup(topic: String, partition: Int, offset: Long) extends CsvRecord
+
   private[admin] object CsvRecordWithGroup {
     val fields = Array("group", "topic", "partition", "offset")
   }
+
   private[admin] object CsvRecordNoGroup {
     val fields = Array("topic", "partition", "offset")
   }
+
   // Example: CsvUtils().readerFor[CsvRecordWithoutGroup]
   private[admin] case class CsvUtils() {
     val mapper = new CsvMapper with ScalaObjectMapper
     mapper.registerModule(DefaultScalaModule)
+
     def readerFor[T <: CsvRecord : ClassTag] = {
       val schema = getSchema[T]
       val clazz = implicitly[ClassTag[T]].runtimeClass
       mapper.readerFor(clazz).`with`(schema)
     }
+
     def writerFor[T <: CsvRecord : ClassTag] = {
       val schema = getSchema[T]
       val clazz = implicitly[ClassTag[T]].runtimeClass
       mapper.writerFor(clazz).`with`(schema)
     }
+
     private def getSchema[T <: CsvRecord : ClassTag] = {
       val clazz = implicitly[ClassTag[T]].runtimeClass
 
@@ -243,7 +248,7 @@ object ConsumerGroupCommand extends Logging {
             // the control should never reach here
             throw new KafkaException(s"Expected a valid consumer group state, but found '${other.getOrElse("NONE")}'.")
         }
-        !state.contains("Dead") && num > 0
+          !state.contains("Dead") && num > 0
       }
     }
 
@@ -296,7 +301,7 @@ object ConsumerGroupCommand extends Logging {
               memberAssignments.foreach { memberAssignment =>
                 maxGroupLen = Math.max(maxGroupLen, memberAssignment.group.length)
                 maxConsumerIdLen = Math.max(maxConsumerIdLen, memberAssignment.consumerId.length)
-                maxGroupInstanceIdLen =  Math.max(maxGroupInstanceIdLen, memberAssignment.groupInstanceId.length)
+                maxGroupInstanceIdLen = Math.max(maxGroupInstanceIdLen, memberAssignment.groupInstanceId.length)
                 maxHostLen = Math.max(maxHostLen, memberAssignment.host.length)
                 maxClientIdLen = Math.max(maxClientIdLen, memberAssignment.clientId.length)
                 includeGroupInstanceId = includeGroupInstanceId || memberAssignment.groupInstanceId.length > 0
@@ -305,10 +310,10 @@ object ConsumerGroupCommand extends Logging {
 
           if (includeGroupInstanceId) {
             print(s"\n%${-maxGroupLen}s %${-maxConsumerIdLen}s %${-maxGroupInstanceIdLen}s %${-maxHostLen}s %${-maxClientIdLen}s %-15s "
-                .format("GROUP", "CONSUMER-ID", "GROUP-INSTANCE-ID", "HOST", "CLIENT-ID", "#PARTITIONS"))
+              .format("GROUP", "CONSUMER-ID", "GROUP-INSTANCE-ID", "HOST", "CLIENT-ID", "#PARTITIONS"))
           } else {
             print(s"\n%${-maxGroupLen}s %${-maxConsumerIdLen}s %${-maxHostLen}s %${-maxClientIdLen}s %-15s "
-                .format("GROUP", "CONSUMER-ID", "HOST", "CLIENT-ID", "#PARTITIONS"))
+              .format("GROUP", "CONSUMER-ID", "HOST", "CLIENT-ID", "#PARTITIONS"))
           }
           if (verbose)
             print(s"%s".format("ASSIGNMENT"))
@@ -552,15 +557,15 @@ object ConsumerGroupCommand extends Logging {
     }
 
     /**
-      * Returns the state of the specified consumer group and partition assignment states
-      */
+     * Returns the state of the specified consumer group and partition assignment states
+     */
     def collectGroupOffsets(groupId: String): (Option[String], Option[Seq[PartitionAssignmentState]]) = {
       collectGroupsOffsets(List(groupId)).getOrElse(groupId, (None, None))
     }
 
     /**
-      * Returns states of the specified consumer groups and partition assignment states
-      */
+     * Returns states of the specified consumer groups and partition assignment states
+     */
     def collectGroupsOffsets(groupIds: Seq[String]): TreeMap[String, (Option[String], Option[Seq[PartitionAssignmentState]])] = {
       val consumerGroups = describeConsumerGroups(groupIds)
 
@@ -684,6 +689,11 @@ object ConsumerGroupCommand extends Logging {
         case (topicPartition, listOffsetsResultInfo) => topicPartition -> LogOffsetResult.LogOffset(listOffsetsResultInfo.offset)
       }.toMap
 
+      unsuccessfulOffsetsForTimes.foreach { entry =>
+        println(s"\nWarn: Partition " + entry._1.partition() + " from topic " + entry._1.topic() +
+          " is empty, without a committed offset. Falling back to latest offset.")
+      }
+
       successfulLogTimestampOffsets ++ getLogEndOffsets(groupId, unsuccessfulOffsetsForTimes.keySet.toSeq)
     }
 
@@ -694,11 +704,11 @@ object ConsumerGroupCommand extends Logging {
     private def createAdminClient(configOverrides: Map[String, String]): Admin = {
       val props = if (opts.options.has(opts.commandConfigOpt)) Utils.loadProps(opts.options.valueOf(opts.commandConfigOpt)) else new Properties()
       props.put(CommonClientConfigs.BOOTSTRAP_SERVERS_CONFIG, opts.options.valueOf(opts.bootstrapServerOpt))
-      configOverrides.forKeyValue { (k, v) => props.put(k, v)}
+      configOverrides.forKeyValue { (k, v) => props.put(k, v) }
       Admin.create(props)
     }
 
-    private def withTimeoutMs [T <: AbstractOptions[T]] (options : T) =  {
+    private def withTimeoutMs[T <: AbstractOptions[T]](options: T) = {
       val t = opts.options.valueOf(opts.timeoutMsOpt).intValue()
       options.timeoutMs(t)
     }
@@ -713,8 +723,8 @@ object ConsumerGroupCommand extends Logging {
           Seq(topic).asJava,
           withTimeoutMs(new DescribeTopicsOptions)
         ).all().get.asScala
-        val r = descriptionMap.flatMap{ case(topic, description) =>
-          description.partitions().asScala.map{ tpInfo =>
+        val r = descriptionMap.flatMap { case (topic, description) =>
+          description.partitions().asScala.map { tpInfo =>
             new TopicPartition(topic, tpInfo.partition)
           }
         }
@@ -743,6 +753,7 @@ object ConsumerGroupCommand extends Logging {
     }
 
     type GroupMetadata = immutable.Map[String, immutable.Map[TopicPartition, OffsetAndMetadata]]
+
     private def parseResetPlan(resetPlanCsv: String): GroupMetadata = {
       def updateGroupMetadata(group: String, topic: String, partition: Int, offset: Long, acc: GroupMetadata) = {
         val topicPartition = new TopicPartition(topic, partition)
@@ -750,6 +761,7 @@ object ConsumerGroupCommand extends Logging {
         val dataMap = acc.getOrElse(group, immutable.Map()).updated(topicPartition, offsetAndMetadata)
         acc.updated(group, dataMap)
       }
+
       val csvReader = CsvUtils().readerFor[CsvRecordNoGroup]
       val lines = resetPlanCsv.split("\n")
       val isSingleGroupQuery = opts.options.valuesOf(opts.groupOpt).size() == 1
@@ -864,7 +876,7 @@ object ConsumerGroupCommand extends Logging {
 
         preparedOffsetsForPartitionsWithCommittedOffset ++ preparedOffsetsForPartitionsWithoutCommittedOffset
       } else {
-        CommandLineUtils.printUsageAndDie(opts.parser, "Option '%s' requires one of the following scenarios: %s".format(opts.resetOffsetsOpt, opts.allResetOffsetScenarioOpts) )
+        CommandLineUtils.printUsageAndDie(opts.parser, "Option '%s' requires one of the following scenarios: %s".format(opts.resetOffsetsOpt, opts.allResetOffsetScenarioOpts))
       }
     }
 
@@ -947,9 +959,13 @@ object ConsumerGroupCommand extends Logging {
   sealed trait LogOffsetResult
 
   object LogOffsetResult {
+
     case class LogOffset(value: Long) extends LogOffsetResult
+
     case object Unknown extends LogOffsetResult
+
     case object Ignore extends LogOffsetResult
+
   }
 
   class ConsumerGroupCommandOptions(args: Array[String]) extends CommandDefaultOptions(args) {
@@ -1001,71 +1017,71 @@ object ConsumerGroupCommand extends Logging {
     val DeleteOffsetsDoc = "Delete offsets of consumer group. Supports one consumer group at the time, and multiple topics."
 
     val bootstrapServerOpt = parser.accepts("bootstrap-server", BootstrapServerDoc)
-                                   .withRequiredArg
-                                   .describedAs("server to connect to")
-                                   .ofType(classOf[String])
+      .withRequiredArg
+      .describedAs("server to connect to")
+      .ofType(classOf[String])
     val groupOpt = parser.accepts("group", GroupDoc)
-                         .withRequiredArg
-                         .describedAs("consumer group")
-                         .ofType(classOf[String])
+      .withRequiredArg
+      .describedAs("consumer group")
+      .ofType(classOf[String])
     val topicOpt = parser.accepts("topic", TopicDoc)
-                         .withRequiredArg
-                         .describedAs("topic")
-                         .ofType(classOf[String])
+      .withRequiredArg
+      .describedAs("topic")
+      .ofType(classOf[String])
     val allTopicsOpt = parser.accepts("all-topics", AllTopicsDoc)
     val listOpt = parser.accepts("list", ListDoc)
     val describeOpt = parser.accepts("describe", DescribeDoc)
     val allGroupsOpt = parser.accepts("all-groups", AllGroupsDoc)
     val deleteOpt = parser.accepts("delete", DeleteDoc)
     val timeoutMsOpt = parser.accepts("timeout", TimeoutMsDoc)
-                             .withRequiredArg
-                             .describedAs("timeout (ms)")
-                             .ofType(classOf[Long])
-                             .defaultsTo(5000)
+      .withRequiredArg
+      .describedAs("timeout (ms)")
+      .ofType(classOf[Long])
+      .defaultsTo(5000)
     val commandConfigOpt = parser.accepts("command-config", CommandConfigDoc)
-                                  .withRequiredArg
-                                  .describedAs("command config property file")
-                                  .ofType(classOf[String])
+      .withRequiredArg
+      .describedAs("command config property file")
+      .ofType(classOf[String])
     val resetOffsetsOpt = parser.accepts("reset-offsets", ResetOffsetsDoc)
     val deleteOffsetsOpt = parser.accepts("delete-offsets", DeleteOffsetsDoc)
     val dryRunOpt = parser.accepts("dry-run", DryRunDoc)
     val executeOpt = parser.accepts("execute", ExecuteDoc)
     val exportOpt = parser.accepts("export", ExportDoc)
     val resetToOffsetOpt = parser.accepts("to-offset", ResetToOffsetDoc)
-                           .withRequiredArg()
-                           .describedAs("offset")
-                           .ofType(classOf[Long])
+      .withRequiredArg()
+      .describedAs("offset")
+      .ofType(classOf[Long])
     val resetFromFileOpt = parser.accepts("from-file", ResetFromFileDoc)
-                                 .withRequiredArg()
-                                 .describedAs("path to CSV file")
-                                 .ofType(classOf[String])
+      .withRequiredArg()
+      .describedAs("path to CSV file")
+      .ofType(classOf[String])
     val resetToDatetimeOpt = parser.accepts("to-datetime", ResetToDatetimeDoc)
-                                   .withRequiredArg()
-                                   .describedAs("datetime")
-                                   .ofType(classOf[String])
+      .withRequiredArg()
+      .describedAs("datetime")
+      .ofType(classOf[String])
     val resetByDurationOpt = parser.accepts("by-duration", ResetByDurationDoc)
-                                   .withRequiredArg()
-                                   .describedAs("duration")
-                                   .ofType(classOf[String])
+      .withRequiredArg()
+      .describedAs("duration")
+      .ofType(classOf[String])
     val resetToEarliestOpt = parser.accepts("to-earliest", ResetToEarliestDoc)
     val resetToLatestOpt = parser.accepts("to-latest", ResetToLatestDoc)
     val resetToCurrentOpt = parser.accepts("to-current", ResetToCurrentDoc)
     val resetShiftByOpt = parser.accepts("shift-by", ResetShiftByDoc)
-                             .withRequiredArg()
-                             .describedAs("number-of-offsets")
-                             .ofType(classOf[Long])
+      .withRequiredArg()
+      .describedAs("number-of-offsets")
+      .ofType(classOf[Long])
     val membersOpt = parser.accepts("members", MembersDoc)
-                           .availableIf(describeOpt)
+      .availableIf(describeOpt)
     val verboseOpt = parser.accepts("verbose", VerboseDoc)
-                           .availableIf(describeOpt)
+      .availableIf(describeOpt)
     val offsetsOpt = parser.accepts("offsets", OffsetsDoc)
-                           .availableIf(describeOpt)
+      .availableIf(describeOpt)
     val stateOpt = parser.accepts("state", StateDoc)
-                         .availableIf(describeOpt, listOpt)
-                         .withOptionalArg()
-                         .ofType(classOf[String])
+      .availableIf(describeOpt, listOpt)
+      .withOptionalArg()
+      .ofType(classOf[String])
 
-    options = parser.parse(args : _*)
+    options = parser.parse(args: _*)
 
     val allGroupSelectionScopeOpts = immutable.Set[OptionSpec[_]](groupOpt, allGroupsOpt)
     val allConsumerGroupLevelOpts = immutable.Set[OptionSpec[_]](listOpt, describeOpt, deleteOpt, resetOffsetsOpt)
@@ -1123,14 +1139,14 @@ object ConsumerGroupCommand extends Logging {
         if (!options.has(groupOpt) && !options.has(allGroupsOpt))
           CommandLineUtils.printUsageAndDie(parser,
             s"Option $resetOffsetsOpt takes one of these options: ${allGroupSelectionScopeOpts.mkString(", ")}")
-        CommandLineUtils.checkInvalidArgs(parser, options, resetToOffsetOpt,   allResetOffsetScenarioOpts - resetToOffsetOpt)
+        CommandLineUtils.checkInvalidArgs(parser, options, resetToOffsetOpt, allResetOffsetScenarioOpts - resetToOffsetOpt)
         CommandLineUtils.checkInvalidArgs(parser, options, resetToDatetimeOpt, allResetOffsetScenarioOpts - resetToDatetimeOpt)
         CommandLineUtils.checkInvalidArgs(parser, options, resetByDurationOpt, allResetOffsetScenarioOpts - resetByDurationOpt)
         CommandLineUtils.checkInvalidArgs(parser, options, resetToEarliestOpt, allResetOffsetScenarioOpts - resetToEarliestOpt)
-        CommandLineUtils.checkInvalidArgs(parser, options, resetToLatestOpt,   allResetOffsetScenarioOpts - resetToLatestOpt)
-        CommandLineUtils.checkInvalidArgs(parser, options, resetToCurrentOpt,  allResetOffsetScenarioOpts - resetToCurrentOpt)
-        CommandLineUtils.checkInvalidArgs(parser, options, resetShiftByOpt,    allResetOffsetScenarioOpts - resetShiftByOpt)
-        CommandLineUtils.checkInvalidArgs(parser, options, resetFromFileOpt,   allResetOffsetScenarioOpts - resetFromFileOpt)
+        CommandLineUtils.checkInvalidArgs(parser, options, resetToLatestOpt, allResetOffsetScenarioOpts - resetToLatestOpt)
+        CommandLineUtils.checkInvalidArgs(parser, options, resetToCurrentOpt, allResetOffsetScenarioOpts - resetToCurrentOpt)
+        CommandLineUtils.checkInvalidArgs(parser, options, resetShiftByOpt, allResetOffsetScenarioOpts - resetShiftByOpt)
+        CommandLineUtils.checkInvalidArgs(parser, options, resetFromFileOpt, allResetOffsetScenarioOpts - resetFromFileOpt)
       }
 
       CommandLineUtils.checkInvalidArgs(parser, options, groupOpt, allGroupSelectionScopeOpts - groupOpt)
@@ -1138,4 +1154,5 @@ object ConsumerGroupCommand extends Logging {
       CommandLineUtils.checkInvalidArgs(parser, options, topicOpt, allConsumerGroupLevelOpts - deleteOpt - resetOffsetsOpt)
     }
   }
+
 }

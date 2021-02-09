@@ -185,6 +185,16 @@ class ResetConsumerGroupOffsetTest extends ConsumerGroupCommandTest {
   }
 
   @Test
+  def testResetOffsetsByDurationFallbackToLatest(): Unit = {
+    val topic = "foo2"
+    val args = buildArgsForGroup(group, "--topic", topic, "--by-duration", "PT1M", "--execute")
+    createTopic(topic)
+    resetAndAssertOffsets(args, expectedOffset = 0, topics = Seq("foo2"))
+
+    adminZkClient.deleteTopic(topic)
+  }
+
+  @Test
   def testResetOffsetsByDurationToEarliest(): Unit = {
     val args = buildArgsForGroup(group, "--all-topics", "--by-duration", "PT0.1S", "--execute")
     produceConsumeAndShutdown(topic, group, totalMessages = 100)
