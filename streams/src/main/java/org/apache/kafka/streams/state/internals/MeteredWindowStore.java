@@ -157,13 +157,6 @@ public class MeteredWindowStore<K, V>
         return false;
     }
 
-    @Deprecated
-    @Override
-    public void put(final K key,
-                    final V value) {
-        put(key, value, context != null ? context.timestamp() : 0L);
-    }
-
     @Override
     public void put(final K key,
                     final V value,
@@ -197,7 +190,6 @@ public class MeteredWindowStore<K, V>
         );
     }
 
-    @SuppressWarnings("deprecation") // note, this method must be kept if super#fetch(...) is removed
     @Override
     public WindowStoreIterator<V> fetch(final K key,
                                         final long timeFrom,
@@ -224,7 +216,6 @@ public class MeteredWindowStore<K, V>
         );
     }
 
-    @SuppressWarnings("deprecation") // note, this method must be kept if super#fetchAll(...) is removed
     @Override
     public KeyValueIterator<Windowed<K>, V> fetch(final K keyFrom,
                                                   final K keyTo,
@@ -251,7 +242,6 @@ public class MeteredWindowStore<K, V>
             time);
     }
 
-    @SuppressWarnings("deprecation") // note, this method must be kept if super#fetch(...) is removed
     @Override
     public KeyValueIterator<Windowed<K>, V> fetchAll(final long timeFrom,
                                                      final long timeTo) {
