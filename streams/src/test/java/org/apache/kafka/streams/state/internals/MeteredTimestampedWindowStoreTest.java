@@ -200,7 +200,6 @@ public class MeteredTimestampedWindowStoreTest {
     }
 
     @Test
-    @SuppressWarnings("deprecation")
     public void shouldNotThrowExceptionIfSerdesCorrectlySetFromProcessorContext() {
         EasyMock.expect(innerStoreMock.name()).andStubReturn("mocked-store");
         EasyMock.replay(innerStoreMock);
@@ -215,7 +214,7 @@ public class MeteredTimestampedWindowStoreTest {
         store.init((StateStoreContext) context, innerStoreMock);
 
         try {
-            store.put("key", ValueAndTimestamp.make(42L, 60000));
+            store.put("key", ValueAndTimestamp.make(42L, 60000), 60000L);
         } catch (final StreamsException exception) {
             if (exception.getCause() instanceof ClassCastException) {
                 fail("Serdes are not correctly set from processor context.");
@@ -225,7 +224,6 @@ public class MeteredTimestampedWindowStoreTest {
     }
 
     @Test
-    @SuppressWarnings("deprecation")
     public void shouldNotThrowExceptionIfSerdesCorrectlySetFromConstructorParameters() {
         EasyMock.expect(innerStoreMock.name()).andStubReturn("mocked-store");
         EasyMock.replay(innerStoreMock);
@@ -240,7 +238,7 @@ public class MeteredTimestampedWindowStoreTest {
         store.init((StateStoreContext) context, innerStoreMock);
 
         try {
-            store.put("key", ValueAndTimestamp.make(42L, 60000));
+            store.put("key", ValueAndTimestamp.make(42L, 60000), 60000L);
         } catch (final StreamsException exception) {
             if (exception.getCause() instanceof ClassCastException) {
                 fail("Serdes are not correctly set from constructor parameters.");
