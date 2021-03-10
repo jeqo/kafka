@@ -78,7 +78,7 @@ public class ReadOnlyWindowStoreFacadeTest {
         replay(mockedWindowTimestampIterator, mockedWindowTimestampStore);
 
         final WindowStoreIterator<String> iterator =
-            readOnlyWindowStoreFacade.fetch("key1", 21L, 42L);
+            readOnlyWindowStoreFacade.fetch("key1", Instant.ofEpochMilli(21L), Instant.ofEpochMilli(42L));
 
         assertThat(iterator.next(), is(KeyValue.pair(21L, "value1")));
         assertThat(iterator.next(), is(KeyValue.pair(42L, "value2")));
@@ -116,7 +116,7 @@ public class ReadOnlyWindowStoreFacadeTest {
         replay(mockedKeyValueWindowTimestampIterator, mockedWindowTimestampStore);
 
         final KeyValueIterator<Windowed<String>, String> iterator =
-            readOnlyWindowStoreFacade.fetch("key1", "key2", 21L, 42L);
+            readOnlyWindowStoreFacade.fetch("key1", "key2", Instant.ofEpochMilli(21L), Instant.ofEpochMilli(42L));
 
         assertThat(iterator.next(), is(KeyValue.pair(new Windowed<>("key1", new TimeWindow(21L, 22L)), "value1")));
         assertThat(iterator.next(), is(KeyValue.pair(new Windowed<>("key2", new TimeWindow(42L, 43L)), "value2")));
@@ -158,7 +158,7 @@ public class ReadOnlyWindowStoreFacadeTest {
         replay(mockedKeyValueWindowTimestampIterator, mockedWindowTimestampStore);
 
         final KeyValueIterator<Windowed<String>, String> iterator =
-            readOnlyWindowStoreFacade.fetchAll(21L, 42L);
+            readOnlyWindowStoreFacade.fetchAll(Instant.ofEpochMilli(21L), Instant.ofEpochMilli(42L));
 
         assertThat(iterator.next(), is(KeyValue.pair(new Windowed<>("key1", new TimeWindow(21L, 22L)), "value1")));
         assertThat(iterator.next(), is(KeyValue.pair(new Windowed<>("key2", new TimeWindow(42L, 43L)), "value2")));
