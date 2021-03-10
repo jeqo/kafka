@@ -67,7 +67,7 @@ public class CompositeReadOnlyWindowStore<K, V> implements ReadOnlyWindowStore<K
     @Override
     public WindowStoreIterator<V> fetch(final K key,
                                         final Instant timeFrom,
-                                        final Instant timeTo) throws IllegalArgumentException {
+                                        final Instant timeTo) {
         Objects.requireNonNull(key, "key can't be null");
         final List<ReadOnlyWindowStore<K, V>> stores = provider.stores(storeName, windowStoreType);
         for (final ReadOnlyWindowStore<K, V> windowStore : stores) {
