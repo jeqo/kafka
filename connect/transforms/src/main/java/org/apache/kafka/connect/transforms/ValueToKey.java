@@ -84,19 +84,47 @@ public class ValueToKey<R extends ConnectRecord<R>> implements Transformation<R>
         if (keySchema == null) {
             final SchemaBuilder keySchemaBuilder = SchemaBuilder.struct();
             for (String field : fields) {
-                final Field fieldFromValue = value.schema().field(field);
-                if (fieldFromValue == null) {
-                    throw new DataException("Field does not exist: " + field);
+                Schema schema = null;
+                for (String f : field.split("\\.")) {
+                    if (schema == null) {
+                        schema = value.schema();
+                    }
+                    final Field fieldFromValue = schema.field(f);
+                    if (fieldFromValue == null) {
+                        throw new DataException("Field does not exist: " + field);
+                    }
+                    schema = fieldFromValue.schema();
                 }
-                keySchemaBuilder.field(field, fieldFromValue.schema());
+                //keySchemaBuilder.field(field.replace(".", "_"), schema);
+                keySchemaBuilder.field(field, schema);
             }
             keySchema = keySchemaBuilder.build();
+            System.out.println(keySchema.fields());
             valueToKeySchemaCache.put(value.schema(), keySchema);
         }
 
         final Struct key = new Struct(keySchema);
         for (String field : fields) {
-            key.put(field, value.get(field));
+            Object v = null;
+            if (field.contains(".")) {
+                Struct struct = null;
+                final String[] split = field.split("\\.");
+                for (int i = 0; i < split.length; i++) {
+                    if (struct == null) {
+                        struct = value.getStruct(split[i]);
+                    } else {
+                        if (i == split.length - 1) {
+                            v = struct.get(split[i]);
+                        } else {
+                            struct = struct.getStruct(split[i]);
+                        }
+                    }
+                }
+            } else {
+                v = value.get(field);
+            }
+            //key.put(field.replace(".", "_"), v);
+            key.put(field, v);
         }
 
         return record.newRecord(record.topic(), record.kafkaPartition(), keySchema, key, value.schema(), value, record.timestamp());

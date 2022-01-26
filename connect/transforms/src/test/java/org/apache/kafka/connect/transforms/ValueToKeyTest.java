@@ -60,6 +60,39 @@ public class ValueToKeyTest {
     }
 
     @Test
+    public void withNestedSchema() {
+        xform.configure(Collections.singletonMap("fields", "a,c.d"));
+
+        final SchemaBuilder dSchema = SchemaBuilder.struct()
+            .field("d", Schema.INT32_SCHEMA);
+        final Schema valueSchema = SchemaBuilder.struct()
+            .field("a", Schema.INT32_SCHEMA)
+            .field("b", Schema.INT32_SCHEMA)
+            .field("c", dSchema)
+            .build();
+
+        final Struct value = new Struct(valueSchema);
+        value.put("a", 1);
+        value.put("b", 2);
+        value.put("c", new Struct(dSchema).put("d", 3));
+
+        final SinkRecord record = new SinkRecord("", 0, null, null, valueSchema, value, 0);
+        final SinkRecord transformedRecord = xform.apply(record);
+
+        final Schema expectedKeySchema = SchemaBuilder.struct()
+            .field("a", Schema.INT32_SCHEMA)
+            .field("c.d", Schema.INT32_SCHEMA)
+            .build();
+
+        final Struct expectedKey = new Struct(expectedKeySchema)
+            .put("a", 1)
+            .put("c.d", 3);
+
+        assertEquals(expectedKeySchema, transformedRecord.keySchema());
+        assertEquals(expectedKey, transformedRecord.key());
+    }
+
+    @Test
     public void withSchema() {
         xform.configure(Collections.singletonMap("fields", "a,b"));
 
