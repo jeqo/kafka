@@ -140,19 +140,33 @@ public abstract class Cast<R extends ConnectRecord<R>> implements Transformation
     public void close() {
     }
 
-
+    @SuppressWarnings("unchecked")
     private R applySchemaless(R record) {
         if (wholeValueCastType != null) {
             return newRecord(record, null, castValueToType(null, operatingValue(record), wholeValueCastType));
         }
 
         final Map<String, Object> value = requireMap(operatingValue(record), PURPOSE);
-        final HashMap<String, Object> updatedValue = new HashMap<>(value);
         for (Map.Entry<String, Schema.Type> fieldSpec : casts.entrySet()) {
             String field = fieldSpec.getKey();
-            updatedValue.put(field, castValueToType(null, value.get(field), fieldSpec.getValue()));
+            final Type fieldSpecValue = fieldSpec.getValue();
+            if (field.contains(".")) {
+                final String[] split = field.split("\\.");
+                Map<String, Object> root = new HashMap<>(value);
+                for (int i = 0; i < split.length; i++) {
+                    if (i == split.length - 1) {
+                        final Object newVal = castValueToType(null, root.get(split[i]), fieldSpecValue);
+                        root.put(split[i], newVal);
+                    } else {
+                        root = (Map<String, Object>) root.get(split[i]);
+                    }
+                }
+            } else {
+                value.put(field,
+                    castValueToType(null, value.get(field), fieldSpecValue));
+            }
         }
-        return newRecord(record, null, updatedValue);
+        return newRecord(record, null, value);
     }
 
     private R applyWithSchema(R record) {

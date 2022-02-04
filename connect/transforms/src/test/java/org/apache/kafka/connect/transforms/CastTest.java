@@ -17,11 +17,6 @@
 
 package org.apache.kafka.connect.transforms;
 
-import java.nio.ByteBuffer;
-import java.util.Arrays;
-import java.util.List;
-import java.util.concurrent.TimeUnit;
-
 import org.apache.kafka.common.config.ConfigException;
 import org.apache.kafka.connect.data.Decimal;
 import org.apache.kafka.connect.data.Schema;
@@ -39,8 +34,12 @@ import org.junit.jupiter.api.Test;
 import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.Date;
+import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -263,7 +262,7 @@ public class CastTest {
     public void castWholeRecordKeySchemaless() {
         xformKey.configure(Collections.singletonMap(Cast.SPEC_CONFIG, "int8"));
         SourceRecord transformed = xformKey.apply(new SourceRecord(null, null, "topic", 0,
-                null, 42, Schema.STRING_SCHEMA, "bogus"));
+            null, 42, Schema.STRING_SCHEMA, "bogus"));
 
         assertNull(transformed.keySchema());
         assertEquals((byte) 42, transformed.key());
@@ -549,7 +548,7 @@ public class CastTest {
     @SuppressWarnings("unchecked")
     @Test
     public void castFieldsSchemaless() {
-        xformValue.configure(Collections.singletonMap(Cast.SPEC_CONFIG, "int8:int16,int16:int32,int32:int64,int64:boolean,float32:float64,float64:boolean,boolean:int8,string:int32"));
+        xformValue.configure(Collections.singletonMap(Cast.SPEC_CONFIG, "int8:int16,int16:int32,int32:int64,int64:boolean,float32:float64,float64:boolean,boolean:int8,string:int32,magic.val:int32"));
         Map<String, Object> recordValue = new HashMap<>();
         recordValue.put("int8", (byte) 8);
         recordValue.put("int16", (short) 16);
@@ -559,6 +558,9 @@ public class CastTest {
         recordValue.put("float64", -64.);
         recordValue.put("boolean", true);
         recordValue.put("string", "42");
+        Map<String, Object> magic = new HashMap<>();
+        magic.put("val", "42");
+        recordValue.put("magic", magic);
         SourceRecord transformed = xformValue.apply(new SourceRecord(null, null, "topic", 0,
                 null, recordValue));
 
@@ -571,6 +573,7 @@ public class CastTest {
         assertEquals(true, ((Map<String, Object>) transformed.value()).get("float64"));
         assertEquals((byte) 1, ((Map<String, Object>) transformed.value()).get("boolean"));
         assertEquals(42, ((Map<String, Object>) transformed.value()).get("string"));
+        assertEquals(42, ((Map<String, Object>) ((Map<String, Object>) transformed.value()).get("magic")).get("val"));
     }
 
 }
