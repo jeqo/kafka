@@ -21,6 +21,7 @@ import org.apache.kafka.connect.connector.ConnectRecord;
 import org.apache.kafka.connect.data.Field;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
+import org.apache.kafka.connect.transforms.util.FieldUtil;
 import org.apache.kafka.connect.transforms.util.SimpleConfig;
 
 import java.util.Map;
@@ -56,16 +57,12 @@ public abstract class ExtractField<R extends ConnectRecord<R>> implements Transf
         final Schema schema = operatingSchema(record);
         if (schema == null) {
             final Map<String, Object> value = requireMapOrNull(operatingValue(record), PURPOSE);
-            return newRecord(record, null, value == null ? null : value.get(fieldName));
+            return newRecord(record, null, value == null ? null : FieldUtil.valueFrom(value, fieldName));
         } else {
             final Struct value = requireStructOrNull(operatingValue(record), PURPOSE);
-            Field field = schema.field(fieldName);
+            Field field = FieldUtil.check(schema, fieldName);
 
-            if (field == null) {
-                throw new IllegalArgumentException("Unknown field: " + fieldName);
-            }
-
-            return newRecord(record, field.schema(), value == null ? null : value.get(fieldName));
+            return newRecord(record, field.schema(), value == null ? null : FieldUtil.valueFrom(value, fieldName));
         }
     }
 

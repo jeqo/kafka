@@ -50,6 +50,19 @@ public class ExtractFieldTest {
     }
 
     @Test
+    public void schemalessNested() {
+        xform.configure(Collections.singletonMap("field", "magic.val"));
+
+        final SinkRecord record = new SinkRecord("test", 0, null,
+            Collections.singletonMap("magic", Collections.singletonMap("val", 42)),
+            null, null, 0);
+        final SinkRecord transformedRecord = xform.apply(record);
+
+        assertNull(transformedRecord.keySchema());
+        assertEquals(42, transformedRecord.key());
+    }
+
+    @Test
     public void testNullSchemaless() {
         xform.configure(Collections.singletonMap("field", "magic"));
 
@@ -67,6 +80,22 @@ public class ExtractFieldTest {
 
         final Schema keySchema = SchemaBuilder.struct().field("magic", Schema.INT32_SCHEMA).build();
         final Struct key = new Struct(keySchema).put("magic", 42);
+        final SinkRecord record = new SinkRecord("test", 0, keySchema, key, null, null, 0);
+        final SinkRecord transformedRecord = xform.apply(record);
+
+        assertEquals(Schema.INT32_SCHEMA, transformedRecord.keySchema());
+        assertEquals(42, transformedRecord.key());
+    }
+
+    @Test
+    public void withSchemaNested() {
+        xform.configure(Collections.singletonMap("field", "magic.val"));
+
+        final SchemaBuilder fieldSchema = SchemaBuilder.struct().field("val", Schema.INT32_SCHEMA);
+        final Schema keySchema = SchemaBuilder.struct()
+            .field("magic", fieldSchema)
+            .build();
+        final Struct key = new Struct(keySchema).put("magic", new Struct(fieldSchema).put("val", 42));
         final SinkRecord record = new SinkRecord("test", 0, keySchema, key, null, null, 0);
         final SinkRecord transformedRecord = xform.apply(record);
 

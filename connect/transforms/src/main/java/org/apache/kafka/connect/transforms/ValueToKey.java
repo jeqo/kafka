@@ -21,11 +21,10 @@ import org.apache.kafka.common.cache.LRUCache;
 import org.apache.kafka.common.cache.SynchronizedCache;
 import org.apache.kafka.common.config.ConfigDef;
 import org.apache.kafka.connect.connector.ConnectRecord;
-import org.apache.kafka.connect.data.Field;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.SchemaBuilder;
 import org.apache.kafka.connect.data.Struct;
-import org.apache.kafka.connect.errors.DataException;
+import org.apache.kafka.connect.transforms.util.FieldUtil;
 import org.apache.kafka.connect.transforms.util.NonEmptyListValidator;
 import org.apache.kafka.connect.transforms.util.SimpleConfig;
 
@@ -84,18 +83,7 @@ public class ValueToKey<R extends ConnectRecord<R>> implements Transformation<R>
         if (keySchema == null) {
             final SchemaBuilder keySchemaBuilder = SchemaBuilder.struct();
             for (String field : fields) {
-                Schema schema = null;
-                for (String f : field.split("\\.")) {
-                    if (schema == null) {
-                        schema = value.schema();
-                    }
-                    final Field fieldFromValue = schema.field(f);
-                    if (fieldFromValue == null) {
-                        throw new DataException("Field does not exist: " + field);
-                    }
-                    schema = fieldFromValue.schema();
-                }
-                //keySchemaBuilder.field(field.replace(".", "_"), schema);
+                final Schema schema = FieldUtil.schemaFrom(value, field);
                 keySchemaBuilder.field(field, schema);
             }
             keySchema = keySchemaBuilder.build();
@@ -105,25 +93,7 @@ public class ValueToKey<R extends ConnectRecord<R>> implements Transformation<R>
 
         final Struct key = new Struct(keySchema);
         for (String field : fields) {
-            Object v = null;
-            if (field.contains(".")) {
-                Struct struct = null;
-                final String[] split = field.split("\\.");
-                for (int i = 0; i < split.length; i++) {
-                    if (struct == null) {
-                        struct = value.getStruct(split[i]);
-                    } else {
-                        if (i == split.length - 1) {
-                            v = struct.get(split[i]);
-                        } else {
-                            struct = struct.getStruct(split[i]);
-                        }
-                    }
-                }
-            } else {
-                v = value.get(field);
-            }
-            //key.put(field.replace(".", "_"), v);
+            final Object v = FieldUtil.valueFrom(value, field);
             key.put(field, v);
         }
 
