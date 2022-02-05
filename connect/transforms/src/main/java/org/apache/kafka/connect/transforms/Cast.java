@@ -179,24 +179,17 @@ public abstract class Cast<R extends ConnectRecord<R>> implements Transformation
         final Struct value = requireStruct(operatingValue(record), PURPOSE);
 
         final Struct updatedValue = new Struct(updatedSchema);
-        updateValue(updatedValue, updatedSchema, value, casts);
-//        for (Field field : value.schema().fields()) {
-//            final Object origFieldValue = value.get(field);
-//            final Schema.Type targetType = casts.get(field.name());
-//            final Object newFieldValue = targetType != null ? castValueToType(field.schema(), origFieldValue, targetType) : origFieldValue;
-//            log.trace("Cast field '{}' from '{}' to '{}'", field.name(), origFieldValue, newFieldValue);
-//            updatedValue.put(updatedSchema.field(field.name()), newFieldValue);
-//        }
+        updateFields(updatedValue, updatedSchema, value, casts);
         return newRecord(record, updatedSchema, updatedValue);
     }
 
-    private Struct updateValue(Struct updatedValue, Schema updatedSchema, Struct value, Map<String, Type> casts) {
+    private Struct updateFields(Struct updatedValue, Schema updatedSchema, Struct value, Map<String, Type> casts) {
         for (Field field : value.schema().fields()) {
             if (field.schema().type() == Type.STRUCT) {
                 Map<String, Map<String, Type>> entries = castsEntries(casts);
                 if (entries.containsKey(field.name())) {
                     Schema schema = updatedSchema.field(field.name()).schema();
-                    Struct newStruct = updateValue(new Struct(schema), schema, value.getStruct(field.name()), entries.get(field.name()));
+                    Struct newStruct = updateFields(new Struct(schema), schema, value.getStruct(field.name()), entries.get(field.name()));
                     updatedValue.put(updatedSchema.field(field.name()), newStruct);
                 }
             } else {
@@ -221,20 +214,6 @@ public abstract class Cast<R extends ConnectRecord<R>> implements Transformation
         } else {
             builder = SchemaUtil.copySchemaBasics(valueSchema, SchemaBuilder.struct());
             applyCasts(valueSchema.fields(), builder, casts);
-//            for (Field field : valueSchema.fields()) {
-//                if (casts.containsKey(field.name())) {
-//                    SchemaBuilder fieldBuilder = convertFieldType(casts.get(field.name()));
-//                    if (field.schema().isOptional())
-//                        fieldBuilder.optional();
-//                    if (field.schema().defaultValue() != null) {
-//                        Schema fieldSchema = field.schema();
-//                        fieldBuilder.defaultValue(castValueToType(fieldSchema, fieldSchema.defaultValue(), fieldBuilder.type()));
-//                    }
-//                    builder.field(field.name(), fieldBuilder.build());
-//                } else {
-//                    builder.field(field.name(), field.schema());
-//                }
-//            }
         }
 
         if (valueSchema.isOptional())
