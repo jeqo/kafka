@@ -48,6 +48,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 
 import static org.apache.kafka.connect.transforms.util.Requirements.requireMap;
 import static org.apache.kafka.connect.transforms.util.Requirements.requireStruct;
@@ -140,7 +141,6 @@ public abstract class Cast<R extends ConnectRecord<R>> implements Transformation
     public void close() {
     }
 
-    @SuppressWarnings("unchecked")
     private R applySchemaless(R record) {
         if (wholeValueCastType != null) {
             return newRecord(record, null, castValueToType(null, operatingValue(record), wholeValueCastType));
@@ -148,25 +148,23 @@ public abstract class Cast<R extends ConnectRecord<R>> implements Transformation
 
         final Map<String, Object> value = requireMap(operatingValue(record), PURPOSE);
         for (Map.Entry<String, Schema.Type> fieldSpec : casts.entrySet()) {
-            String field = fieldSpec.getKey();
-            final Type fieldSpecValue = fieldSpec.getValue();
-            if (field.contains(".")) {
-                final String[] split = field.split("\\.");
-                Map<String, Object> root = new HashMap<>(value);
-                for (int i = 0; i < split.length; i++) {
-                    if (i == split.length - 1) {
-                        final Object newVal = castValueToType(null, root.get(split[i]), fieldSpecValue);
-                        root.put(split[i], newVal);
-                    } else {
-                        root = (Map<String, Object>) root.get(split[i]);
-                    }
-                }
-            } else {
-                value.put(field,
-                    castValueToType(null, value.get(field), fieldSpecValue));
-            }
+            String fieldName = fieldSpec.getKey();
+            final Type fieldType = fieldSpec.getValue();
+            updateField(value, fieldName, o -> castValueToType(null, o, fieldType));
         }
         return newRecord(record, null, value);
+    }
+
+    @SuppressWarnings("unchecked")
+    public static void updateField(Map<String, Object> value, String path, Function<Object, Object> fieldValue) {
+        if (path.contains(".")) {
+            final String fieldName = path.substring(0, path.indexOf("."));
+            final String tail = path.substring(path.indexOf(".") + 1);
+            updateField((Map<String, Object>) value.get(fieldName), tail, fieldValue);
+        } else {
+            Object apply = fieldValue.apply(value.get(path));
+            value.put(path, apply);
+        }
     }
 
     private R applyWithSchema(R record) {
@@ -181,14 +179,35 @@ public abstract class Cast<R extends ConnectRecord<R>> implements Transformation
         final Struct value = requireStruct(operatingValue(record), PURPOSE);
 
         final Struct updatedValue = new Struct(updatedSchema);
-        for (Field field : value.schema().fields()) {
-            final Object origFieldValue = value.get(field);
-            final Schema.Type targetType = casts.get(field.name());
-            final Object newFieldValue = targetType != null ? castValueToType(field.schema(), origFieldValue, targetType) : origFieldValue;
-            log.trace("Cast field '{}' from '{}' to '{}'", field.name(), origFieldValue, newFieldValue);
-            updatedValue.put(updatedSchema.field(field.name()), newFieldValue);
-        }
+        updateValue(updatedValue, updatedSchema, value, casts);
+//        for (Field field : value.schema().fields()) {
+//            final Object origFieldValue = value.get(field);
+//            final Schema.Type targetType = casts.get(field.name());
+//            final Object newFieldValue = targetType != null ? castValueToType(field.schema(), origFieldValue, targetType) : origFieldValue;
+//            log.trace("Cast field '{}' from '{}' to '{}'", field.name(), origFieldValue, newFieldValue);
+//            updatedValue.put(updatedSchema.field(field.name()), newFieldValue);
+//        }
         return newRecord(record, updatedSchema, updatedValue);
+    }
+
+    private Struct updateValue(Struct updatedValue, Schema updatedSchema, Struct value, Map<String, Type> casts) {
+        for (Field field : value.schema().fields()) {
+            if (field.schema().type() == Type.STRUCT) {
+                Map<String, Map<String, Type>> entries = castsEntries(casts);
+                if (entries.containsKey(field.name())) {
+                    Schema schema = updatedSchema.field(field.name()).schema();
+                    Struct newStruct = updateValue(new Struct(schema), schema, value.getStruct(field.name()), entries.get(field.name()));
+                    updatedValue.put(updatedSchema.field(field.name()), newStruct);
+                }
+            } else {
+                final Object origFieldValue = value.get(field);
+                final Schema.Type targetType = casts.get(field.name());
+                final Object newFieldValue = targetType != null ? castValueToType(field.schema(), origFieldValue, targetType) : origFieldValue;
+                log.trace("Cast field '{}' from '{}' to '{}'", field.name(), origFieldValue, newFieldValue);
+                updatedValue.put(updatedSchema.field(field.name()), newFieldValue);
+            }
+        }
+        return updatedValue;
     }
 
     private Schema getOrBuildSchema(Schema valueSchema) {
@@ -201,20 +220,21 @@ public abstract class Cast<R extends ConnectRecord<R>> implements Transformation
             builder = SchemaUtil.copySchemaBasics(valueSchema, convertFieldType(wholeValueCastType));
         } else {
             builder = SchemaUtil.copySchemaBasics(valueSchema, SchemaBuilder.struct());
-            for (Field field : valueSchema.fields()) {
-                if (casts.containsKey(field.name())) {
-                    SchemaBuilder fieldBuilder = convertFieldType(casts.get(field.name()));
-                    if (field.schema().isOptional())
-                        fieldBuilder.optional();
-                    if (field.schema().defaultValue() != null) {
-                        Schema fieldSchema = field.schema();
-                        fieldBuilder.defaultValue(castValueToType(fieldSchema, fieldSchema.defaultValue(), fieldBuilder.type()));
-                    }
-                    builder.field(field.name(), fieldBuilder.build());
-                } else {
-                    builder.field(field.name(), field.schema());
-                }
-            }
+            applyCasts(valueSchema.fields(), builder, casts);
+//            for (Field field : valueSchema.fields()) {
+//                if (casts.containsKey(field.name())) {
+//                    SchemaBuilder fieldBuilder = convertFieldType(casts.get(field.name()));
+//                    if (field.schema().isOptional())
+//                        fieldBuilder.optional();
+//                    if (field.schema().defaultValue() != null) {
+//                        Schema fieldSchema = field.schema();
+//                        fieldBuilder.defaultValue(castValueToType(fieldSchema, fieldSchema.defaultValue(), fieldBuilder.type()));
+//                    }
+//                    builder.field(field.name(), fieldBuilder.build());
+//                } else {
+//                    builder.field(field.name(), field.schema());
+//                }
+//            }
         }
 
         if (valueSchema.isOptional())
@@ -227,7 +247,66 @@ public abstract class Cast<R extends ConnectRecord<R>> implements Transformation
         return updatedSchema;
     }
 
-    private SchemaBuilder convertFieldType(Schema.Type type) {
+    private static void applyCasts(List<Field> fields, SchemaBuilder builder, Map<String, Schema.Type> casts) {
+        Map<String, Map<String, Type>> nested = castsEntries(casts);
+        Set<String> strings = nested.keySet();
+        for (Field field : fields) {
+            if (casts.containsKey(field.name())) {
+                SchemaBuilder fieldBuilder = convertFieldType(casts.get(field.name()));
+                if (field.schema().isOptional())
+                    fieldBuilder.optional();
+                if (field.schema().defaultValue() != null) {
+                    Schema fieldSchema = field.schema();
+                    fieldBuilder.defaultValue(castValueToType(fieldSchema, fieldSchema.defaultValue(), fieldBuilder.type()));
+                }
+                builder.field(field.name(), fieldBuilder.build());
+            } else {
+                if (strings.contains(field.name())) {
+                    SchemaBuilder otherBuilder = SchemaUtil.copySchemaBasics(field.schema(), SchemaBuilder.struct());
+                    applyCasts(field.schema().fields(), otherBuilder, nested.get(field.name()));
+                    builder.field(field.name(), otherBuilder);
+                } else {
+                    builder.field(field.name(), field.schema());
+                }
+            }
+        }
+    }
+
+    private static Map<String, Map<String, Type>> castsEntries(Map<String, Type> casts) {
+        final Map<String, Map<String, Schema.Type>> entries = new HashMap<>();
+        for (String path: casts.keySet()) {
+            if (path.contains(".")) {
+                final String fieldName = path.substring(0, path.indexOf("."));
+                final String tail = path.substring(path.indexOf(".") + 1);
+                entries.computeIfPresent(fieldName, (s, map) -> {
+                    map.put(tail, casts.get(path));
+                    return map;
+                });
+                entries.computeIfAbsent(fieldName, s -> {
+                    Map<String, Schema.Type> map = new HashMap<>();
+                    map.put(tail, casts.get(path));
+                    return map;
+                });
+            }
+        }
+        return entries;
+    }
+
+    public static void main(String[] args) {
+        Map<String, Type> map = new HashMap<>();
+        map.put("a.a1", Schema.STRING_SCHEMA.type());
+        map.put("a.a2", Schema.STRING_SCHEMA.type());
+        map.put("a.a3.a31", Schema.STRING_SCHEMA.type());
+        map.put("b", Schema.STRING_SCHEMA.type());
+        Map<String, Map<String, Type>> r = castsEntries(map);
+        r.forEach((s, stringTypeMap) -> {
+            System.out.println(s + "->");
+            stringTypeMap.forEach((s1, type) -> System.out.println("  " + s1 + "->" + type));
+            System.out.println();
+        });
+    }
+
+    private static SchemaBuilder convertFieldType(Schema.Type type) {
         switch (type) {
             case INT8:
                 return SchemaBuilder.int8();
@@ -298,7 +377,7 @@ public abstract class Cast<R extends ConnectRecord<R>> implements Transformation
                 case STRING:
                     return castToString(value);
                 default:
-                    throw new DataException(targetType.toString() + " is not supported in the Cast transformation.");
+                    throw new DataException(targetType + " is not supported in the Cast transformation.");
             }
         } catch (NumberFormatException e) {
             throw new DataException("Value (" + value.toString() + ") was out of range for requested data type", e);

@@ -16,90 +16,68 @@
  */
 package org.apache.kafka.connect.transforms.util;
 
-import java.util.Map;
 import org.apache.kafka.connect.data.Field;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.errors.DataException;
 
+import java.util.Map;
+
 public class FieldUtil {
 
-    public static Schema schemaFrom(Struct value, String field) {
-        Schema schema = null;
-        for (String f : field.split("\\.")) {
-            if (schema == null) {
-                schema = value.schema();
-            }
-            final Field fieldFromValue = schema.field(f);
-            if (fieldFromValue == null) {
-                throw new DataException("Field does not exist: " + field);
-            }
-            schema = fieldFromValue.schema();
+    public static Schema schemaFrom(Schema schema, String path) {
+        if (path.contains(".")) {
+            final String fieldName = path.substring(0, path.indexOf("."));
+            final String tail = path.substring(path.indexOf(".") + 1);
+            final Field field = schema.field(fieldName);
+            if (field == null)
+                throw new DataException("Field does not exist: " + path);
+            return schemaFrom(field.schema(), tail);
+        } else {
+            final Field field = schema.field(path);
+            if (field == null)
+                throw new DataException("Field does not exist: " + path);
+            return field.schema();
         }
-        return schema;
     }
 
     @SuppressWarnings("unchecked")
-    public static Object valueFrom(Map<String, Object> value, String field) {
-        Object v = null;
-        if (field.contains(".")) {
-            Object object = null;
-            final String[] split = field.split("\\.");
-            for (int i = 0; i < split.length; i++) {
-                if (object == null) {
-                    object = value.get(split[i]);
-                } else {
-                    final Map<String, Object> map = (Map<String, Object>) object;
-                    object = map.get(split[i]);
-                    if (i == split.length - 1) {
-                        v = object;
-                    }
-                }
-            }
+    public static Object valueFrom(Map<String, Object> value, String path) {
+        if (path.contains(".")) {
+            final String fieldName = path.substring(0, path.indexOf("."));
+            final String tail = path.substring(path.indexOf(".") + 1);
+            return valueFrom((Map<String, Object>) value.get(fieldName), tail);
         } else {
-            v = value.get(field);
+            return value.get(path);
         }
-        return v;
     }
 
-    public static Object valueFrom(Struct value, String field) {
-        Object v = null;
-        if (field.contains(".")) {
-            Struct struct = null;
-            final String[] split = field.split("\\.");
-            for (int i = 0; i < split.length; i++) {
-                if (struct == null) {
-                    struct = value.getStruct(split[i]);
-                } else {
-                    if (i == split.length - 1) {
-                        v = struct.get(split[i]);
-                    } else {
-                        struct = struct.getStruct(split[i]);
-                    }
-                }
-            }
+    public static Object valueFrom(Struct value, String path) {
+        if (path.contains(".")) {
+            final String fieldName = path.substring(0, path.indexOf("."));
+            final String tail = path.substring(path.indexOf(".") + 1);
+            return valueFrom(value.getStruct(fieldName), tail);
         } else {
-            v = value.get(field);
+            return value.get(path);
         }
-        return v;
     }
 
-    public static Field check(Schema schema, String fieldName) {
-        Field field = null;
-        if (fieldName.contains(".")) {
-            final String[] split = fieldName.split("\\.");
-            for (String s : split) {
-                field = schema.field(s);
-                schema = field.schema();
+    public static Field check(Schema schema, String path) {
+        if (path.contains(".")) {
+            final String fieldName = path.substring(0, path.indexOf("."));
+            final String tail = path.substring(path.indexOf(".") + 1);
+            Field field = schema.field(fieldName);
+            if (field == null) {
+                throw new IllegalArgumentException("Unknown field: " + fieldName);
             }
+            return check(field.schema(), tail);
         } else {
-            field = schema.field(fieldName);
+            Field field = schema.field(path);
+            if (field == null) {
+                throw new IllegalArgumentException("Unknown field: " + path);
+            }
+            return field;
         }
-
-        if (field == null) {
-            throw new IllegalArgumentException("Unknown field: " + fieldName);
-        }
-
-        return field;
     }
+
 }

@@ -465,7 +465,7 @@ public class CastTest {
         ByteBuffer byteBuffer = ByteBuffer.wrap(Arrays.copyOf(byteArray, byteArray.length));
 
         xformValue.configure(Collections.singletonMap(Cast.SPEC_CONFIG,
-                "int8:int16,int16:int32,int32:int64,int64:boolean,float32:float64,float64:boolean,boolean:int8,string:int32,bigdecimal:string,date:string,optional:int32,bytes:string,byteArray:string"));
+                "int8:int16,int16:int32,int32:int64,int64:boolean,float32:float64,float64:boolean,boolean:int8,string:int32,bigdecimal:string,date:string,optional:int32,bytes:string,byteArray:string,magic.val:int32"));
 
         // Include an optional fields and fields with defaults to validate their values are passed through properly
         SchemaBuilder builder = SchemaBuilder.struct();
@@ -484,6 +484,8 @@ public class CastTest {
         builder.field("timestamp", Timestamp.SCHEMA);
         builder.field("bytes", Schema.BYTES_SCHEMA);
         builder.field("byteArray", Schema.BYTES_SCHEMA);
+        Schema magicSchema = SchemaBuilder.struct().field("val", Schema.STRING_SCHEMA).build();
+        builder.field("magic", magicSchema);
 
         Schema supportedTypesSchema = builder.build();
 
@@ -501,6 +503,9 @@ public class CastTest {
         recordValue.put("timestamp", new Date(0));
         recordValue.put("bytes", byteBuffer);
         recordValue.put("byteArray", byteArray);
+        Struct magic = new Struct(magicSchema);
+        magic.put("val", "42");
+        recordValue.put("magic", magic);
 
         // optional field intentionally omitted
 
@@ -523,6 +528,7 @@ public class CastTest {
         assertEquals(new Date(0), ((Struct) transformed.value()).get("timestamp"));
         assertEquals("/ty6mHZUMhA=", ((Struct) transformed.value()).get("bytes"));
         assertEquals("/ty6mHZUMhA=", ((Struct) transformed.value()).get("byteArray"));
+        assertEquals(42, ((Struct) ((Struct) transformed.value()).get("magic")).get("val"));
 
         assertNull(((Struct) transformed.value()).get("optional"));
 
@@ -540,6 +546,7 @@ public class CastTest {
         assertEquals(Schema.OPTIONAL_INT32_SCHEMA.type(), transformedSchema.field("optional").schema().type());
         assertEquals(Schema.STRING_SCHEMA.type(), transformedSchema.field("bytes").schema().type());
         assertEquals(Schema.STRING_SCHEMA.type(), transformedSchema.field("byteArray").schema().type());
+        assertEquals(Schema.INT32_SCHEMA.type(), transformedSchema.field("magic").schema().field("val").schema().type());
 
         // The following fields are not changed
         assertEquals(Timestamp.SCHEMA.type(), transformedSchema.field("timestamp").schema().type());

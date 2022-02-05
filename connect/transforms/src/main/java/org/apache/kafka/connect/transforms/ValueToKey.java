@@ -83,7 +83,7 @@ public class ValueToKey<R extends ConnectRecord<R>> implements Transformation<R>
         if (keySchema == null) {
             final SchemaBuilder keySchemaBuilder = SchemaBuilder.struct();
             for (String field : fields) {
-                final Schema schema = FieldUtil.schemaFrom(value, field);
+                final Schema schema = FieldUtil.schemaFrom(value.schema(), field);
                 keySchemaBuilder.field(field, schema);
             }
             keySchema = keySchemaBuilder.build();
