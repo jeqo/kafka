@@ -22,6 +22,7 @@ import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.errors.DataException;
 
 import java.util.Map;
+import java.util.function.Function;
 
 public class FieldUtil {
 
@@ -52,6 +53,17 @@ public class FieldUtil {
         }
     }
 
+    @SuppressWarnings("unchecked")
+    public static void update(Map<String, Object> value, String path, Function<Object, Object> update) {
+        if (path.contains(".")) {
+            final String fieldName = path.substring(0, path.indexOf("."));
+            final String tail = path.substring(path.indexOf(".") + 1);
+            update((Map<String, Object>) value.get(fieldName), tail, update);
+        } else {
+            value.computeIfPresent(path, (s, o) -> update.apply(o));
+        }
+    }
+
     public static Object valueFrom(Struct value, String path) {
         if (path.contains(".")) {
             final String fieldName = path.substring(0, path.indexOf("."));
@@ -59,6 +71,16 @@ public class FieldUtil {
             return valueFrom(value.getStruct(fieldName), tail);
         } else {
             return value.get(path);
+        }
+    }
+
+    public static void update(Struct value, String path, Function<Object, Object> update) {
+        if (path.contains(".")) {
+            final String fieldName = path.substring(0, path.indexOf("."));
+            final String tail = path.substring(path.indexOf(".") + 1);
+            update(value.getStruct(fieldName), tail, update);
+        } else {
+            value.put(path, update.apply(value.get(path)));
         }
     }
 

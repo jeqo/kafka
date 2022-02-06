@@ -23,6 +23,7 @@ import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.data.Values;
 import org.apache.kafka.connect.errors.DataException;
+import org.apache.kafka.connect.transforms.util.FieldUtil;
 import org.apache.kafka.connect.transforms.util.NonEmptyListValidator;
 import org.apache.kafka.connect.transforms.util.SimpleConfig;
 
@@ -110,7 +111,7 @@ public abstract class MaskField<R extends ConnectRecord<R>> implements Transform
         final Map<String, Object> value = requireMap(operatingValue(record), PURPOSE);
         final HashMap<String, Object> updatedValue = new HashMap<>(value);
         for (String field : maskedFields) {
-            updatedValue.put(field, masked(value.get(field)));
+            FieldUtil.update(updatedValue, field, this::masked);
         }
         return newRecord(record, updatedValue);
     }
@@ -118,12 +119,51 @@ public abstract class MaskField<R extends ConnectRecord<R>> implements Transform
     private R applyWithSchema(R record) {
         final Struct value = requireStruct(operatingValue(record), PURPOSE);
         final Struct updatedValue = new Struct(value.schema());
-        for (Field field : value.schema().fields()) {
-            final Object origFieldValue = value.get(field);
-            updatedValue.put(field, maskedFields.contains(field.name()) ? masked(origFieldValue) : origFieldValue);
-        }
+        update(updatedValue, value, maskedFields);
         return newRecord(record, updatedValue);
     }
+
+    private void update(Struct value, Struct original, Set<String> fields) {
+        Map<String, Set<String>> others = castsEntries(fields);
+        for (Field field : value.schema().fields()) {
+            final Object origFieldValue = original.get(field);
+            if (others.containsKey(field.name())) {
+                Set<String> o = others.get(field.name());
+                if (o.isEmpty()) {
+                    value.put(field, masked(origFieldValue));
+                } else {
+                    Struct struct = new Struct(original.schema().field(field.name()).schema());
+                    update(struct, original.getStruct(field.name()), o);
+                    value.put(field.name(), struct);
+                }
+            } else {
+                value.put(field, origFieldValue);
+            }
+        }
+    }
+
+    private Map<String, Set<String>> castsEntries(Set<String> casts) {
+        final Map<String, Set<String>> entries = new HashMap<>();
+        for (String path: casts) {
+            if (path.contains(".")) {
+                final String fieldName = path.substring(0, path.indexOf("."));
+                final String tail = path.substring(path.indexOf(".") + 1);
+                entries.computeIfPresent(fieldName, (s, map) -> {
+                    map.add(tail);
+                    return map;
+                });
+                entries.computeIfAbsent(fieldName, s -> {
+                    Set<String> map = new HashSet<>();
+                    map.add(tail);
+                    return map;
+                });
+            } else {
+                entries.put(path, Collections.emptySet());
+            }
+        }
+        return entries;
+    }
+
 
     private Object masked(Object value) {
         if (value == null) {

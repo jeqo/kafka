@@ -44,23 +44,30 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 public class MaskFieldTest {
 
-    private static final Schema SCHEMA = SchemaBuilder.struct()
-            .field("magic", Schema.INT32_SCHEMA)
-            .field("bool", Schema.BOOLEAN_SCHEMA)
-            .field("byte", Schema.INT8_SCHEMA)
-            .field("short", Schema.INT16_SCHEMA)
-            .field("int", Schema.INT32_SCHEMA)
-            .field("long", Schema.INT64_SCHEMA)
-            .field("float", Schema.FLOAT32_SCHEMA)
-            .field("double", Schema.FLOAT64_SCHEMA)
-            .field("string", Schema.STRING_SCHEMA)
-            .field("date", org.apache.kafka.connect.data.Date.SCHEMA)
-            .field("time", Time.SCHEMA)
-            .field("timestamp", Timestamp.SCHEMA)
-            .field("decimal", Decimal.schema(0))
-            .field("array", SchemaBuilder.array(Schema.INT32_SCHEMA))
-            .field("map", SchemaBuilder.map(Schema.STRING_SCHEMA, Schema.STRING_SCHEMA))
-            .build();
+    private static final Schema SCHEMA;
+    private static final Schema NESTED_SCHEMA = SchemaBuilder.struct().field("key", Schema.STRING_SCHEMA).build();
+
+    static {
+        SCHEMA = SchemaBuilder.struct()
+                .field("magic", Schema.INT32_SCHEMA)
+                .field("bool", Schema.BOOLEAN_SCHEMA)
+                .field("byte", Schema.INT8_SCHEMA)
+                .field("short", Schema.INT16_SCHEMA)
+                .field("int", Schema.INT32_SCHEMA)
+                .field("long", Schema.INT64_SCHEMA)
+                .field("float", Schema.FLOAT32_SCHEMA)
+                .field("double", Schema.FLOAT64_SCHEMA)
+                .field("string", Schema.STRING_SCHEMA)
+                .field("date", org.apache.kafka.connect.data.Date.SCHEMA)
+                .field("time", Time.SCHEMA)
+                .field("timestamp", Timestamp.SCHEMA)
+                .field("decimal", Decimal.schema(0))
+                .field("array", SchemaBuilder.array(Schema.INT32_SCHEMA))
+                .field("map", SchemaBuilder.map(Schema.STRING_SCHEMA, Schema.STRING_SCHEMA))
+                .field("nested", NESTED_SCHEMA)
+                .build();
+    }
+
     private static final Map<String, Object> VALUES = new HashMap<>();
     private static final Struct VALUES_WITH_SCHEMA = new Struct(SCHEMA);
 
@@ -79,6 +86,9 @@ public class MaskFieldTest {
         VALUES.put("bigdec", new BigDecimal("42.0"));
         VALUES.put("list", singletonList(42));
         VALUES.put("map", Collections.singletonMap("key", "value"));
+        Map<String, Object> nested = new HashMap<>();
+        nested.put("key", "value");
+        VALUES.put("nested", nested);
 
         VALUES_WITH_SCHEMA.put("magic", 42);
         VALUES_WITH_SCHEMA.put("bool", true);
@@ -95,6 +105,7 @@ public class MaskFieldTest {
         VALUES_WITH_SCHEMA.put("decimal", new BigDecimal(42));
         VALUES_WITH_SCHEMA.put("array", Arrays.asList(1, 2, 3));
         VALUES_WITH_SCHEMA.put("map", Collections.singletonMap("what", "what"));
+        VALUES_WITH_SCHEMA.put("nested", new Struct(NESTED_SCHEMA).put("key", "value"));
     }
 
     private static MaskField<SinkRecord> transform(List<String> fields, String replacement) {
@@ -123,7 +134,7 @@ public class MaskFieldTest {
     @SuppressWarnings("unchecked")
     private static void checkReplacementSchemaless(List<String> maskFields, Object replacement) {
         SinkRecord record = record(null, VALUES);
-        final Map<String, Object> updatedValue = (Map) transform(maskFields, String.valueOf(replacement))
+        final Map<String, Object> updatedValue = (Map<String, Object>) transform(maskFields, String.valueOf(replacement))
                 .apply(record)
                 .value();
         for (String maskField : maskFields) {
@@ -131,11 +142,14 @@ public class MaskFieldTest {
         }
     }
 
-    @Test
+    @Test @SuppressWarnings("unchecked")
     public void testSchemaless() {
         final List<String> maskFields = new ArrayList<>(VALUES.keySet());
         maskFields.remove("magic");
-        @SuppressWarnings("unchecked") final Map<String, Object> updatedValue = (Map) transform(maskFields, null).apply(record(null, VALUES)).value();
+        maskFields.remove("nested");
+        maskFields.add("nested.key");
+        final Map<String, Object> updatedValue =
+            (Map<String, Object>) transform(maskFields, null).apply(record(null, VALUES)).value();
 
         assertEquals(42, updatedValue.get("magic"));
         assertEquals(false, updatedValue.get("bool"));
@@ -151,16 +165,18 @@ public class MaskFieldTest {
         assertEquals(BigDecimal.ZERO, updatedValue.get("bigdec"));
         assertEquals(Collections.emptyList(), updatedValue.get("list"));
         assertEquals(Collections.emptyMap(), updatedValue.get("map"));
+        assertEquals("", ((Map<String, Object>) updatedValue.get("nested")).get("key"));
     }
 
     @Test
     public void testWithSchema() {
         final List<String> maskFields = new ArrayList<>(SCHEMA.fields().size());
         for (Field field : SCHEMA.fields()) {
-            if (!field.name().equals("magic")) {
+            if (!field.name().equals("magic") && !field.name().equals("nested")) {
                 maskFields.add(field.name());
             }
         }
+        maskFields.add("nested.key");
 
         final Struct updatedValue = (Struct) transform(maskFields, null).apply(record(SCHEMA, VALUES_WITH_SCHEMA)).value();
 
