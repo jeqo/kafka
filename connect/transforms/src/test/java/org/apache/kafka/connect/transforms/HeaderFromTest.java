@@ -134,6 +134,270 @@ public class HeaderFromTest {
                     ')';
         }
     }
+    public static List<Arguments> schemalessNestedData() {
+        List<Arguments> result = new ArrayList<>();
+
+        for (Boolean testKeyTransform : asList(true, false)) {
+            Map<String, Object> map = new HashMap<>();
+            map.put("foo", "foo-value");
+            result.add(
+                Arguments.of(
+                    "copy nested with struct value",
+                    testKeyTransform,
+                    new RecordBuilder()
+                        .withField("field1", null, map)
+                        .withField("field2", STRING_SCHEMA, "field2-value")
+                        .addHeader("header1", STRING_SCHEMA, "existing-value"),
+                    singletonList("field1.foo"), singletonList("inserted1"), HeaderFrom.Operation.COPY,
+                    new RecordBuilder()
+                        .withField("field1", null, map)
+                        .withField("field2", STRING_SCHEMA, "field2-value")
+                        .addHeader("header1", STRING_SCHEMA, "existing-value")
+                        .addHeader("inserted1", STRING_SCHEMA, "foo-value")
+                ));
+            result.add(
+                Arguments.of(
+                    "move nested with struct value",
+                    testKeyTransform,
+                    new RecordBuilder()
+                        .withField("field1", null, map)
+                        .withField("field2", STRING_SCHEMA, "field2-value")
+                        .addHeader("header1", STRING_SCHEMA, "existing-value"),
+                    singletonList("field1.foo"), singletonList("inserted1"), HeaderFrom.Operation.MOVE,
+                    new RecordBuilder()
+                        // field1 got moved
+                        .withField("field1", null, new HashMap<>())
+                        .withField("field2", STRING_SCHEMA, "field2-value")
+                        .addHeader("header1", STRING_SCHEMA, "existing-value")
+                        .addHeader("inserted1", STRING_SCHEMA, "foo-value")
+                ));
+            result.add(
+                Arguments.of(
+                    "two headers from same field nested",
+                    testKeyTransform,
+                    new RecordBuilder()
+                        .withField("field1", null, map)
+                        .withField("field2", STRING_SCHEMA, "field2-value")
+                        .addHeader("header1", STRING_SCHEMA, "existing-value"),
+                    // two headers from the same field
+                    asList("field1.foo", "field1.foo"), asList("inserted1", "inserted2"), HeaderFrom.Operation.MOVE,
+                    new RecordBuilder()
+                        // field1 got moved
+                        .withField("field1", null, new HashMap<>())
+                        .withField("field2", STRING_SCHEMA, "field2-value")
+                        .addHeader("header1", STRING_SCHEMA, "existing-value")
+                        .addHeader("inserted1", STRING_SCHEMA, "foo-value")
+                        .addHeader("inserted2", STRING_SCHEMA, "foo-value")
+                ));
+            result.add(
+                Arguments.of(
+                    "two fields to same header",
+                    testKeyTransform,
+                    new RecordBuilder()
+                        .withField("field1", STRING_SCHEMA, "field1-value")
+                        .withField("field2", STRING_SCHEMA, "field2-value")
+                        .addHeader("header1", STRING_SCHEMA, "existing-value"),
+                    // two headers from the same field
+                    asList("field1", "field2"), asList("inserted1", "inserted1"), HeaderFrom.Operation.MOVE,
+                    new RecordBuilder()
+                        // field1 and field2 got moved
+                        .addHeader("header1", STRING_SCHEMA, "existing-value")
+                        .addHeader("inserted1", STRING_SCHEMA, "field1-value")
+                        .addHeader("inserted1", STRING_SCHEMA, "field2-value")
+                ));
+        }
+        return result;
+    }
+
+    public static List<Arguments> schemalessData() {
+        List<Arguments> result = new ArrayList<>();
+
+        for (Boolean testKeyTransform : asList(true, false)) {
+            result.add(
+                Arguments.of(
+                    "basic copy",
+                    testKeyTransform,
+                    new RecordBuilder()
+                        .withField("field1", STRING_SCHEMA, "field1-value")
+                        .withField("field2", STRING_SCHEMA, "field2-value")
+                        .addHeader("header1", STRING_SCHEMA, "existing-value"),
+                    singletonList("field1"), singletonList("inserted1"), HeaderFrom.Operation.COPY,
+                    new RecordBuilder()
+                        .withField("field1", STRING_SCHEMA, "field1-value")
+                        .withField("field2", STRING_SCHEMA, "field2-value")
+                        .addHeader("header1", STRING_SCHEMA, "existing-value")
+                        .addHeader("inserted1", STRING_SCHEMA, "field1-value")
+                ));
+            result.add(
+                Arguments.of(
+                    "basic move",
+                    testKeyTransform,
+                    new RecordBuilder()
+                        .withField("field1", STRING_SCHEMA, "field1-value")
+                        .withField("field2", STRING_SCHEMA, "field2-value")
+                        .addHeader("header1", STRING_SCHEMA, "existing-value"),
+                    singletonList("field1"), singletonList("inserted1"), HeaderFrom.Operation.MOVE,
+                    new RecordBuilder()
+                        // field1 got moved
+                        .withField("field2", STRING_SCHEMA, "field2-value")
+                        .addHeader("header1", STRING_SCHEMA, "existing-value")
+                        .addHeader("inserted1", STRING_SCHEMA, "field1-value")
+                ));
+            result.add(
+                Arguments.of(
+                    "copy with preexisting header",
+                    testKeyTransform,
+                    new RecordBuilder()
+                        .withField("field1", STRING_SCHEMA, "field1-value")
+                        .withField("field2", STRING_SCHEMA, "field2-value")
+                        .addHeader("inserted1", STRING_SCHEMA, "existing-value"),
+                    singletonList("field1"), singletonList("inserted1"), HeaderFrom.Operation.COPY,
+                    new RecordBuilder()
+                        .withField("field1", STRING_SCHEMA, "field1-value")
+                        .withField("field2", STRING_SCHEMA, "field2-value")
+                        .addHeader("inserted1", STRING_SCHEMA, "existing-value")
+                        .addHeader("inserted1", STRING_SCHEMA, "field1-value")
+                ));
+            result.add(
+                Arguments.of(
+                    "move with preexisting header",
+                    testKeyTransform,
+                    new RecordBuilder()
+                        .withField("field1", STRING_SCHEMA, "field1-value")
+                        .withField("field2", STRING_SCHEMA, "field2-value")
+                        .addHeader("inserted1", STRING_SCHEMA, "existing-value"),
+                    singletonList("field1"), singletonList("inserted1"), HeaderFrom.Operation.MOVE,
+                    new RecordBuilder()
+                        // field1 got moved
+                        .withField("field2", STRING_SCHEMA, "field2-value")
+                        .addHeader("inserted1", STRING_SCHEMA, "existing-value")
+                        .addHeader("inserted1", STRING_SCHEMA, "field1-value")
+                ));
+            Map<String, Object> map = new HashMap<>();
+            map.put("foo", "foo-value");
+            result.add(
+                Arguments.of(
+                    "copy with struct value",
+                    testKeyTransform,
+                    new RecordBuilder()
+                        .withField("field1", null, map)
+                        .withField("field2", STRING_SCHEMA, "field2-value")
+                        .addHeader("header1", STRING_SCHEMA, "existing-value"),
+                    singletonList("field1"), singletonList("inserted1"), HeaderFrom.Operation.COPY,
+                    new RecordBuilder()
+                        .withField("field1", null, map)
+                        .withField("field2", STRING_SCHEMA, "field2-value")
+                        .addHeader("header1", STRING_SCHEMA, "existing-value")
+                        .addHeader("inserted1", null, map)
+                ));
+            result.add(
+                Arguments.of(
+                    "move with struct value",
+                    testKeyTransform,
+                    new RecordBuilder()
+                        .withField("field1", null, map)
+                        .withField("field2", STRING_SCHEMA, "field2-value")
+                        .addHeader("header1", STRING_SCHEMA, "existing-value"),
+                    singletonList("field1"), singletonList("inserted1"), HeaderFrom.Operation.MOVE,
+                    new RecordBuilder()
+                        // field1 got moved
+                        .withField("field2", STRING_SCHEMA, "field2-value")
+                        .addHeader("header1", STRING_SCHEMA, "existing-value")
+                        .addHeader("inserted1", null, map)
+                ));
+            result.add(
+                Arguments.of(
+                    "two headers from same field",
+                    testKeyTransform,
+                    new RecordBuilder()
+                        .withField("field1", STRING_SCHEMA, "field1-value")
+                        .withField("field2", STRING_SCHEMA, "field2-value")
+                        .addHeader("header1", STRING_SCHEMA, "existing-value"),
+                    // two headers from the same field
+                    asList("field1", "field1"), asList("inserted1", "inserted2"), HeaderFrom.Operation.MOVE,
+                    new RecordBuilder()
+                        // field1 got moved
+                        .withField("field2", STRING_SCHEMA, "field2-value")
+                        .addHeader("header1", STRING_SCHEMA, "existing-value")
+                        .addHeader("inserted1", STRING_SCHEMA, "field1-value")
+                        .addHeader("inserted2", STRING_SCHEMA, "field1-value")
+                ));
+            result.add(
+                Arguments.of(
+                    "two fields to same header",
+                    testKeyTransform,
+                    new RecordBuilder()
+                        .withField("field1", STRING_SCHEMA, "field1-value")
+                        .withField("field2", STRING_SCHEMA, "field2-value")
+                        .addHeader("header1", STRING_SCHEMA, "existing-value"),
+                    // two headers from the same field
+                    asList("field1", "field2"), asList("inserted1", "inserted1"), HeaderFrom.Operation.MOVE,
+                    new RecordBuilder()
+                        // field1 and field2 got moved
+                        .addHeader("header1", STRING_SCHEMA, "existing-value")
+                        .addHeader("inserted1", STRING_SCHEMA, "field1-value")
+                        .addHeader("inserted1", STRING_SCHEMA, "field2-value")
+                ));
+        }
+        return result;
+    }
+
+    public static List<Arguments> nestedData() {
+        List<Arguments> result = new ArrayList<>();
+
+        for (Boolean testKeyTransform : asList(true, false)) {
+            Schema schema = new SchemaBuilder(Schema.Type.STRUCT).field("foo", STRING_SCHEMA).build();
+            Struct struct = new Struct(schema).put("foo", "foo-value");
+            result.add(
+                Arguments.of(
+                    "copy nested with struct value",
+                    testKeyTransform,
+                    new RecordBuilder()
+                        .withField("field1", schema, struct)
+                        .withField("field2", STRING_SCHEMA, "field2-value")
+                        .addHeader("header1", STRING_SCHEMA, "existing-value"),
+                    singletonList("field1.foo"), singletonList("inserted1"), HeaderFrom.Operation.COPY,
+                    new RecordBuilder()
+                        .withField("field1", schema, struct)
+                        .withField("field2", STRING_SCHEMA, "field2-value")
+                        .addHeader("header1", STRING_SCHEMA, "existing-value")
+                        .addHeader("inserted1", STRING_SCHEMA, "foo-value")
+                ));
+            result.add(
+                Arguments.of(
+                    "move nested with struct value",
+                    testKeyTransform,
+                    new RecordBuilder()
+                        .withField("field1", schema, struct)
+                        .withField("field2", STRING_SCHEMA, "field2-value")
+                        .addHeader("header1", STRING_SCHEMA, "existing-value"),
+                    singletonList("field1.foo"), singletonList("inserted1"), HeaderFrom.Operation.MOVE,
+                    new RecordBuilder()
+                        // field1 got moved
+                        .withField("field2", STRING_SCHEMA, "field2-value")
+                        .addHeader("header1", STRING_SCHEMA, "existing-value")
+                        .addHeader("inserted1", STRING_SCHEMA, "foo-value")
+                ));
+            result.add(
+                Arguments.of(
+                    "two headers from same field nested",
+                    testKeyTransform,
+                    new RecordBuilder()
+                        .withField("field1", schema, struct)
+                        .withField("field2", STRING_SCHEMA, "field2-value")
+                        .addHeader("header1", STRING_SCHEMA, "existing-value"),
+                    // two headers from the same field
+                    asList("field1.foo", "field1.foo"), asList("inserted1", "inserted2"), HeaderFrom.Operation.MOVE,
+                    new RecordBuilder()
+                        // field1 got moved
+                        .withField("field2", STRING_SCHEMA, "field2-value")
+                        .addHeader("header1", STRING_SCHEMA, "existing-value")
+                        .addHeader("inserted1", STRING_SCHEMA, "foo-value")
+                        .addHeader("inserted2", STRING_SCHEMA, "foo-value")
+                ));
+        }
+        return result;
+    }
 
     public static List<Arguments> data() {
 
@@ -278,7 +542,26 @@ public class HeaderFromTest {
     }
 
     @ParameterizedTest
-    @MethodSource("data")
+    @MethodSource("schemalessNestedData")
+    public void schemalessNested(String description,
+                                 boolean keyTransform,
+                                 RecordBuilder originalBuilder,
+                                 List<String> transformFields, List<String> headers1, HeaderFrom.Operation operation,
+                                 RecordBuilder expectedBuilder) {
+        HeaderFrom<SourceRecord> xform = keyTransform ? new HeaderFrom.Key<>() : new HeaderFrom.Value<>();
+
+        xform.configure(config(headers1, transformFields, operation));
+        ConnectHeaders headers = new ConnectHeaders();
+        headers.addString("existing", "existing-value");
+
+        SourceRecord originalRecord = originalBuilder.schemaless(keyTransform);
+        SourceRecord expectedRecord = expectedBuilder.schemaless(keyTransform);
+        SourceRecord xformed = xform.apply(originalRecord);
+        assertSameRecord(expectedRecord, xformed);
+    }
+
+    @ParameterizedTest
+    @MethodSource("schemalessData")
     public void schemaless(String description,
                            boolean keyTransform,
                            RecordBuilder originalBuilder,
@@ -292,6 +575,28 @@ public class HeaderFromTest {
 
         SourceRecord originalRecord = originalBuilder.schemaless(keyTransform);
         SourceRecord expectedRecord = expectedBuilder.schemaless(keyTransform);
+        SourceRecord xformed = xform.apply(originalRecord);
+        assertSameRecord(expectedRecord, xformed);
+    }
+
+    @ParameterizedTest
+    @MethodSource("nestedData")
+    public void withNestedSchema(String description,
+                                 boolean keyTransform,
+                                 RecordBuilder originalBuilder,
+                                 List<String> transformFields, List<String> headers1, HeaderFrom.Operation operation,
+                                 RecordBuilder expectedBuilder) {
+        HeaderFrom<SourceRecord> xform = keyTransform ? new HeaderFrom.Key<>() : new HeaderFrom.Value<>();
+        xform.configure(config(headers1, transformFields, operation));
+        ConnectHeaders headers = new ConnectHeaders();
+        headers.addString("existing", "existing-value");
+        Headers expect = headers.duplicate();
+        for (int i = 0; i < headers1.size(); i++) {
+            expect.add(headers1.get(i), originalBuilder.fieldValues.get(i), originalBuilder.fieldSchemas.get(i));
+        }
+
+        SourceRecord originalRecord = originalBuilder.withSchema(keyTransform);
+        SourceRecord expectedRecord = expectedBuilder.withSchema(keyTransform);
         SourceRecord xformed = xform.apply(originalRecord);
         assertSameRecord(expectedRecord, xformed);
     }

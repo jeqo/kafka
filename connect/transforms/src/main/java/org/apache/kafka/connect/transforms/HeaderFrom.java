@@ -28,11 +28,14 @@ import org.apache.kafka.connect.data.SchemaBuilder;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.header.Header;
 import org.apache.kafka.connect.header.Headers;
+import org.apache.kafka.connect.transforms.util.FieldUtil;
 import org.apache.kafka.connect.transforms.util.NonEmptyListValidator;
 import org.apache.kafka.connect.transforms.util.Requirements;
 import org.apache.kafka.connect.transforms.util.SchemaUtil;
 import org.apache.kafka.connect.transforms.util.SimpleConfig;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -102,7 +105,7 @@ public abstract class HeaderFrom<R extends ConnectRecord<R>> implements Transfor
 
     private Operation operation;
 
-    private Cache<Schema, Schema> moveSchemaCache = new SynchronizedCache<>(new LRUCache<>(16));
+    private final Cache<Schema, Schema> moveSchemaCache = new SynchronizedCache<>(new LRUCache<>(16));
 
     @Override
     public R apply(R record) {
@@ -121,33 +124,57 @@ public abstract class HeaderFrom<R extends ConnectRecord<R>> implements Transfor
         Struct value = Requirements.requireStruct(operatingValue, "header " + operation);
         final Schema updatedSchema;
         final Struct updatedValue;
+        Map<String, List<String>> join = mapEntryHeader(fields, headers);
         if (operation == Operation.MOVE) {
-            updatedSchema = moveSchema(operatingSchema);
+            updatedSchema = moveSchema(operatingSchema, join);
             updatedValue = new Struct(updatedSchema);
-            for (Field field : updatedSchema.fields()) {
-                updatedValue.put(field, value.get(field.name()));
-            }
+            moveValue(value, updatedValue, updatedSchema);
         } else {
             updatedSchema = operatingSchema;
             updatedValue = value;
         }
-        for (int i = 0; i < fields.size(); i++) {
-            String fieldName = fields.get(i);
-            String headerName = headers.get(i);
-            Object fieldValue = value.schema().field(fieldName) != null ? value.get(fieldName) : null;
-            Schema fieldSchema = operatingSchema.field(fieldName).schema();
-            updatedHeaders.add(headerName, fieldValue, fieldSchema);
-        }
+        copyValue(value, operatingSchema, updatedHeaders, join);
         return newRecord(record, updatedSchema, updatedValue, updatedHeaders);
     }
 
-    private Schema moveSchema(Schema operatingSchema) {
+    private void copyValue(Struct value, Schema operatingSchema, Headers updatedHeaders, Map<String, List<String>> join) {
+        for (Map.Entry<String, List<String>> entry : join.entrySet()) {
+            Object fieldValue = FieldUtil.valueFrom(value, entry.getKey());
+            Schema fieldSchema = FieldUtil.schemaFrom(operatingSchema, entry.getKey());
+            List<String> headers = entry.getValue();
+            for (String header : headers) {
+                updatedHeaders.add(header, fieldValue, fieldSchema);
+            }
+        }
+    }
+
+    private void moveValue(Struct value, Struct updatedValue, Schema updatedSchema) {
+        for (Field field : updatedSchema.fields()) {
+            Schema schema = field.schema();
+            if (schema.type() == Schema.Type.STRUCT) {
+                Struct struct = new Struct(schema);
+                moveValue(value.getStruct(field.name()), struct, schema);
+                updatedValue.put(field, struct);
+            } else {
+                updatedValue.put(field, value.get(field.name()));
+            }
+        }
+    }
+
+    private Schema moveSchema(Schema operatingSchema, Map<String, List<String>> fields) {
+        Map<String, Map<String, List<String>>> other = castsEntries(fields);
         Schema moveSchema = this.moveSchemaCache.get(operatingSchema);
         if (moveSchema == null) {
             final SchemaBuilder builder = SchemaUtil.copySchemaBasics(operatingSchema, SchemaBuilder.struct());
             for (Field field : operatingSchema.fields()) {
-                if (!fields.contains(field.name())) {
+                if (!other.containsKey(field.name())) {
                     builder.field(field.name(), field.schema());
+                }
+                if (other.containsKey(field.name())) {
+                    Map<String, List<String>> maps = other.get(field.name());
+                    if (!maps.isEmpty()) {
+                        moveSchema(field.schema(), other.get(field.name()));
+                    }
                 }
             }
             moveSchema = builder.build();
@@ -156,20 +183,74 @@ public abstract class HeaderFrom<R extends ConnectRecord<R>> implements Transfor
         return moveSchema;
     }
 
+    private Map<String, List<String>> mapEntryHeader(List<String> fields, List<String> headers) {
+        Map<String, List<String>> map = new HashMap<>();
+        for (int i = 0; i < fields.size(); i++) {
+            String header = headers.get(i);
+            map.computeIfPresent(fields.get(i), (s, strings) -> {
+                strings.add(header);
+                return strings;
+            });
+            map.computeIfAbsent(fields.get(i), s -> {
+                List<String> h = new ArrayList<>();
+                h.add(header);
+                return h;
+            });
+        }
+        return map;
+    }
+
+    private static Map<String, Map<String, List<String>>> castsEntries(Map<String, List<String>> casts) {
+        final Map<String, Map<String, List<String>>> entries = new HashMap<>();
+        for (String path: casts.keySet()) {
+            if (path.contains(".")) {
+                final String fieldName = path.substring(0, path.indexOf("."));
+                final String tail = path.substring(path.indexOf(".") + 1);
+                entries.computeIfPresent(fieldName, (s, map) -> {
+                    map.put(tail, casts.get(path));
+                    return map;
+                });
+                entries.computeIfAbsent(fieldName, s -> {
+                    Map<String, List<String>> map = new HashMap<>();
+                    map.put(tail, casts.get(path));
+                    return map;
+                });
+            } else {
+                entries.put(path, Collections.emptyMap());
+            }
+        }
+        return entries;
+    }
+
     private R applySchemaless(R record, Object operatingValue) {
         Headers updatedHeaders = record.headers().duplicate();
         Map<String, Object> value = Requirements.requireMap(operatingValue, "header " + operation);
-        Map<String, Object> updatedValue = new HashMap<>(value);
-        for (int i = 0; i < fields.size(); i++) {
-            String fieldName = fields.get(i);
-            Object fieldValue = value.get(fieldName);
-            String headerName = headers.get(i);
-            if (operation == Operation.MOVE) {
-                updatedValue.remove(fieldName);
-            }
-            updatedHeaders.add(headerName, fieldValue, null);
-        }
+        Map<String, List<String>> join = mapEntryHeader(fields, headers);
+        Map<String, Object> updatedValue = updateValue(join, updatedHeaders, value, new HashMap<>(value));
         return newRecord(record, null, updatedValue, updatedHeaders);
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> updateValue(Map<String, List<String>> entries, Headers updatedHeaders, Map<String, Object> value, Map<String, Object> updatedValue) {
+        Map<String, Map<String, List<String>>> join = castsEntries(entries);
+        for (Map.Entry<String, Map<String, List<String>>> entry : join.entrySet()) {
+            Map<String, List<String>> other = entry.getValue();
+            if (other.isEmpty()) {
+                Object fieldValue = value.get(entry.getKey());
+                List<String> strings = entries.get(entry.getKey());
+                for (String header : strings) {
+                    updatedHeaders.add(header, fieldValue, null);
+                }
+                if (operation == Operation.MOVE) {
+                    updatedValue.remove(entry.getKey());
+                }
+            } else {
+                Map<String, Object> o = new HashMap<>((Map<String, Object>) value.get(entry.getKey()));
+                Map<String, Object> o1 = new HashMap<>((Map<String, Object>) updatedValue.get(entry.getKey()));
+                updatedValue.put(entry.getKey(), updateValue(other, updatedHeaders, o, o1));
+            }
+        }
+        return updatedValue;
     }
 
     protected abstract Object operatingValue(R record);
