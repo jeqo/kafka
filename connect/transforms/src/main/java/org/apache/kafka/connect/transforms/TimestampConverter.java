@@ -32,6 +32,7 @@ import org.apache.kafka.connect.data.Time;
 import org.apache.kafka.connect.data.Timestamp;
 import org.apache.kafka.connect.errors.ConnectException;
 import org.apache.kafka.connect.errors.DataException;
+import org.apache.kafka.connect.transforms.util.FieldUtil;
 import org.apache.kafka.connect.transforms.util.SchemaUtil;
 import org.apache.kafka.connect.transforms.util.SimpleConfig;
 
@@ -338,45 +339,93 @@ public abstract class TimestampConverter<R extends ConnectRecord<R>> implements 
             return newRecord(record, updatedSchema, convertTimestamp(value, timestampTypeFromSchema(schema)));
         } else {
             final Struct value = requireStructOrNull(operatingValue(record), PURPOSE);
-            Schema updatedSchema = schemaUpdateCache.get(schema);
-            if (updatedSchema == null) {
-                SchemaBuilder builder = SchemaUtil.copySchemaBasics(schema, SchemaBuilder.struct());
-                for (Field field : schema.fields()) {
-                    if (field.name().equals(config.field)) {
-                        builder.field(field.name(), TRANSLATORS.get(config.type).typeSchema(field.schema().isOptional()));
-                    } else {
-                        builder.field(field.name(), field.schema());
-                    }
-                }
-                if (schema.isOptional())
-                    builder.optional();
-                if (schema.defaultValue() != null) {
-                    Struct updatedDefaultValue = applyValueWithSchema((Struct) schema.defaultValue(), builder);
-                    builder.defaultValue(updatedDefaultValue);
-                }
+            Schema updatedSchema = updateSchema(schema, config.field);
+//            Schema updatedSchema = schemaUpdateCache.get(schema);
+//            if (updatedSchema == null) {
+//                SchemaBuilder builder = SchemaUtil.copySchemaBasics(schema, SchemaBuilder.struct());
+//                for (Field field : schema.fields()) {
+//                    if (field.name().equals(config.field)) {
+//                        builder.field(field.name(), TRANSLATORS.get(config.type).typeSchema(field.schema().isOptional()));
+//                    } else {
+//                        builder.field(field.name(), field.schema());
+//                    }
+//                }
+//                if (schema.isOptional())
+//                    builder.optional();
+//                if (schema.defaultValue() != null) {
+//                    Struct updatedDefaultValue = applyValueWithSchema((Struct) schema.defaultValue(), builder);
+//                    builder.defaultValue(updatedDefaultValue);
+//                }
+//
+//                updatedSchema = builder.build();
+//                schemaUpdateCache.put(schema, updatedSchema);
+//            }
 
-                updatedSchema = builder.build();
-                schemaUpdateCache.put(schema, updatedSchema);
+            if (value == null) {
+                return null;
             }
-
-            Struct updatedValue = applyValueWithSchema(value, updatedSchema);
+            Struct updatedValue = applyValueWithSchema(value, updatedSchema, config.field);
             return newRecord(record, updatedSchema, updatedValue);
         }
     }
 
-    private Struct applyValueWithSchema(Struct value, Schema updatedSchema) {
-        if (value == null) {
-            return null;
+    //TODO not working yet
+    private Schema updateSchema(Schema schema, String path) {
+        Schema updatedSchema = schemaUpdateCache.get(schema);
+        if (updatedSchema == null) {
+            final SchemaBuilder builder = SchemaUtil.copySchemaBasics(schema, SchemaBuilder.struct());
+            String fieldName = path;
+            String tail = null;
+            if (path.contains(".")) {
+                fieldName = path.substring(0, path.indexOf("."));
+                tail = path.substring(path.indexOf(".") + 1);
+            }
+            for (Field field : schema.fields()) {
+                if (!fieldName.equals(field.name())) {
+                    builder.field(field.name(), field.schema());
+                } else {
+                    if (tail == null) {
+                        builder.field(field.name(), TRANSLATORS.get(config.type).typeSchema(field.schema().isOptional()));
+                    } else {
+                        updateSchema(field.schema(), tail);
+                    }
+                }
+            }
+
+            if (schema.isOptional())
+                builder.optional();
+            if (schema.defaultValue() != null) {
+                Struct updatedDefaultValue = applyValueWithSchema((Struct) schema.defaultValue(), builder, config.field);
+                builder.defaultValue(updatedDefaultValue);
+            }
+
+            updatedSchema = builder.build();
+            schemaUpdateCache.put(schema, updatedSchema);
+        }
+        return updatedSchema;
+    }
+
+    private Struct applyValueWithSchema(Struct value, Schema updatedSchema, String path) {
+        String fieldName = path;
+        String tail = null;
+        if (path.contains(".")) {
+            fieldName = path.substring(0, path.indexOf("."));
+            tail = path.substring(path.indexOf(".") + 1);
         }
         Struct updatedValue = new Struct(updatedSchema);
         for (Field field : value.schema().fields()) {
-            final Object updatedFieldValue;
-            if (field.name().equals(config.field)) {
-                updatedFieldValue = convertTimestamp(value.get(field), timestampTypeFromSchema(field.schema()));
+            if (!fieldName.equals(field.name())) {
+                final Object updatedFieldValue = value.get(field);
+                updatedValue.put(field.name(), updatedFieldValue);
             } else {
-                updatedFieldValue = value.get(field);
+                if (tail == null) {
+                    Object updatedFieldValue = convertTimestamp(value.get(field), timestampTypeFromSchema(field.schema()));
+                    updatedValue.put(field.name(), updatedFieldValue);
+                } else {
+                    Schema schema = value.getStruct(fieldName).schema();
+                    applyValueWithSchema(value.getStruct(fieldName), schema, tail);
+                }
             }
-            updatedValue.put(field.name(), updatedFieldValue);
         }
         return updatedValue;
     }
@@ -388,7 +437,7 @@ public abstract class TimestampConverter<R extends ConnectRecord<R>> implements 
         } else {
             final Map<String, Object> value = requireMap(rawValue, PURPOSE);
             final HashMap<String, Object> updatedValue = new HashMap<>(value);
-            updatedValue.put(config.field, convertTimestamp(value.get(config.field)));
+            FieldUtil.update(updatedValue, config.field, this::convertTimestamp);
             return newRecord(record, null, updatedValue);
         }
     }

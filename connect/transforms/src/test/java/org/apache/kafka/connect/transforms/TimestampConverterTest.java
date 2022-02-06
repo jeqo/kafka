@@ -500,6 +500,23 @@ public class TimestampConverterTest {
     }
 
     @Test
+    public void testSchemalessNestedFieldConversion() {
+        Map<String, String> config = new HashMap<>();
+        config.put(TimestampConverter.TARGET_TYPE_CONFIG, "Date");
+        config.put(TimestampConverter.FIELD_CONFIG, "nested.ts");
+        xformValue.configure(config);
+
+        Map<String, Object> nested = new HashMap<>();
+        nested.put("ts", DATE_PLUS_TIME.getTime());
+        Object value = Collections.singletonMap("nested", nested);
+        SourceRecord transformed = xformValue.apply(createRecordSchemaless(value));
+
+        assertNull(transformed.valueSchema());
+        @SuppressWarnings("unchecked") Map<String, Object> nestedV = (Map<String, Object>) transformed.value();
+        assertEquals(Collections.singletonMap("ts", DATE.getTime()), nestedV.get("nested"));
+    }
+
+    @Test
     public void testWithSchemaFieldConversion() {
         Map<String, String> config = new HashMap<>();
         config.put(TimestampConverter.TARGET_TYPE_CONFIG, "Timestamp");
@@ -526,6 +543,40 @@ public class TimestampConverterTest {
         assertEquals("test", ((Struct) transformed.value()).get("other"));
     }
 
+    @Test
+    public void testWithSchemaNestedFieldConversion() {
+        Map<String, String> config = new HashMap<>();
+        config.put(TimestampConverter.TARGET_TYPE_CONFIG, "Timestamp");
+        config.put(TimestampConverter.FIELD_CONFIG, "nested.ts");
+        xformValue.configure(config);
+
+        // ts field is a unix timestamp
+        Schema nestedSchema = SchemaBuilder.struct()
+            .field("ts", Schema.INT64_SCHEMA)
+            .build();
+        Schema structWithTimestampFieldSchema = SchemaBuilder.struct()
+            .field("nested", nestedSchema)
+            .field("other", Schema.STRING_SCHEMA)
+            .build();
+        Struct nested = new Struct(nestedSchema);
+        nested.put("ts", DATE_PLUS_TIME_UNIX);
+        Struct original = new Struct(structWithTimestampFieldSchema);
+        original.put("nested", nested);
+        original.put("other", "test");
+
+        SourceRecord transformed = xformValue.apply(createRecordWithSchema(structWithTimestampFieldSchema, original));
+
+        Schema expectedNestedSchema = SchemaBuilder.struct()
+            .field("ts", Timestamp.SCHEMA)
+            .build();
+        Schema expectedSchema = SchemaBuilder.struct()
+            .field("nested", expectedNestedSchema)
+            .field("other", Schema.STRING_SCHEMA)
+            .build();
+        assertEquals(expectedSchema, transformed.valueSchema());
+        assertEquals(DATE_PLUS_TIME.getTime(), ((Struct) ((Struct) transformed.value()).get("nested")).get("ts"));
+        assertEquals("test", ((Struct) transformed.value()).get("other"));
+    }
 
     // Validate Key implementation in addition to Value
 
