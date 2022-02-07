@@ -1473,12 +1473,6 @@ public class KStreamImpl<K, V> extends AbstractStream<K, V> implements KStream<K
     }
 
     @Override
-    public void process(final ProcessorSupplier<? super K, ? super V, Void, Void> processorSupplier,
-                        final String... stateStoreNames) {
-        process(processorSupplier, Named.as(builder.newProcessorName(PROCESSOR_NAME)), stateStoreNames);
-    }
-
-    @Override
     @Deprecated
     public void process(final org.apache.kafka.streams.processor.ProcessorSupplier<? super K, ? super V> processorSupplier,
                         final Named named,
@@ -1501,9 +1495,17 @@ public class KStreamImpl<K, V> extends AbstractStream<K, V> implements KStream<K
     }
 
     @Override
-    public void process(final ProcessorSupplier<? super K, ? super V, Void, Void> processorSupplier,
-                        final Named named,
-                        final String... stateStoreNames) {
+    public <KOut, VOut> KStream<KOut, VOut> process(
+        ProcessorSupplier<? super K, ? super V, KOut, VOut> processorSupplier,
+        String... stateStoreNames) {
+        return process(processorSupplier, Named.as(builder.newProcessorName(PROCESSOR_NAME)), stateStoreNames);
+    }
+
+    @Override
+    public <KOut, VOut> KStream<KOut, VOut> process(
+        ProcessorSupplier<? super K, ? super V, KOut, VOut> processorSupplier,
+        Named named,
+        String... stateStoreNames) {
         Objects.requireNonNull(processorSupplier, "processorSupplier can't be null");
         Objects.requireNonNull(named, "named can't be null");
         Objects.requireNonNull(stateStoreNames, "stateStoreNames can't be a null array");
@@ -1519,5 +1521,21 @@ public class KStreamImpl<K, V> extends AbstractStream<K, V> implements KStream<K
             stateStoreNames);
 
         builder.addGraphNode(graphNode, processNode);
+
+        return null; //FIXME
+    }
+
+    @Override
+    public <VOut> KStream<K, VOut> processValues(
+        ProcessorSupplier<? super K, ? super V, K, VOut> processorSupplier,
+        String... stateStoreNames) {
+        return null;
+    }
+
+    @Override
+    public <VOut> KStream<K, VOut> processValues(
+        ProcessorSupplier<? super K, ? super V, K, VOut> processorSupplier, Named named,
+        String... stateStoreNames) {
+        return null;
     }
 }

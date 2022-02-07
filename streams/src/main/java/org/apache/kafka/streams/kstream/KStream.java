@@ -4736,8 +4736,13 @@ public interface KStream<K, V> {
      * @see #foreach(ForeachAction)
      * @see #transform(TransformerSupplier, String...)
      */
-    void process(final ProcessorSupplier<? super K, ? super V, Void, Void> processorSupplier,
-                 final String... stateStoreNames);
+    <KOut, VOut> KStream<KOut, VOut> process(
+        final ProcessorSupplier<? super K, ? super V, KOut, VOut> processorSupplier,
+        final String... stateStoreNames);
+
+    <VOut> KStream<K, VOut> processValues(
+        final ProcessorSupplier<? super K, ? super V, K, VOut> processorSupplier,
+        final String... stateStoreNames);
 
     /**
      * Process all records in this stream, one record at a time, by applying a
@@ -4933,7 +4938,13 @@ public interface KStream<K, V> {
      * @see #foreach(ForeachAction)
      * @see #transform(TransformerSupplier, String...)
      */
-    void process(final ProcessorSupplier<? super K, ? super V, Void, Void> processorSupplier,
-                 final Named named,
-                 final String... stateStoreNames);
+    <KOut, VOut> KStream<KOut, VOut> process(
+        final ProcessorSupplier<? super K, ? super V, KOut, VOut> processorSupplier,
+        final Named named,
+        final String... stateStoreNames);
+
+    <VOut> KStream<K, VOut> processValues(
+        final ProcessorSupplier<? super K, ? super V, K, VOut> processorSupplier,
+        final Named named,
+        final String... stateStoreNames);
 }
