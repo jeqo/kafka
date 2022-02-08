@@ -1,6 +1,5 @@
 package org.apache.kafka.streams.kstream.internals;
 
-import org.apache.kafka.streams.errors.ProcessorStateException;
 import org.apache.kafka.streams.processor.api.ContextualProcessor;
 import org.apache.kafka.streams.processor.api.Processor;
 import org.apache.kafka.streams.processor.api.ProcessorContext;

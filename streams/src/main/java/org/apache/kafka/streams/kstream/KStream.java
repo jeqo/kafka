@@ -4839,7 +4839,7 @@ public interface KStream<K, V> {
      * @see #transform(TransformerSupplier, String...)
      */
     <KOut, VOut> KStream<KOut, VOut> process(
-        final ProcessorSupplier<? super K, ? super V, KOut, VOut> processorSupplier,
+        final ProcessorSupplier<? super K, ? super V, ? extends KOut, ? extends VOut> processorSupplier,
         final String... stateStoreNames);
 
     /**
@@ -4934,7 +4934,7 @@ public interface KStream<K, V> {
      * @see #transform(TransformerSupplier, String...)
      */
     <KOut, VOut> KStream<KOut, VOut> process(
-        final ProcessorSupplier<? super K, ? super V, KOut, VOut> processorSupplier,
+        final ProcessorSupplier<? super K, ? super V, ? extends KOut, ? extends VOut> processorSupplier,
         final Named named,
         final String... stateStoreNames);
 

@@ -1496,16 +1496,18 @@ public class KStreamImpl<K, V> extends AbstractStream<K, V> implements KStream<K
 
     @Override
     public <KOut, VOut> KStream<KOut, VOut> process(
-        ProcessorSupplier<? super K, ? super V, KOut, VOut> processorSupplier,
+        ProcessorSupplier<? super K, ? super V, ? extends KOut, ? extends VOut> processorSupplier,
         String... stateStoreNames) {
+
         return process(processorSupplier, Named.as(builder.newProcessorName(PROCESSOR_NAME)), stateStoreNames);
     }
 
     @Override
     public <KOut, VOut> KStream<KOut, VOut> process(
-        ProcessorSupplier<? super K, ? super V, KOut, VOut> processorSupplier,
+        ProcessorSupplier<? super K, ? super V, ? extends KOut, ? extends VOut> processorSupplier,
         Named named,
         String... stateStoreNames) {
+
         Objects.requireNonNull(processorSupplier, "processorSupplier can't be null");
         Objects.requireNonNull(named, "named can't be null");
         Objects.requireNonNull(stateStoreNames, "stateStoreNames can't be a null array");
@@ -1537,7 +1539,8 @@ public class KStreamImpl<K, V> extends AbstractStream<K, V> implements KStream<K
     public <VOut> KStream<K, VOut> processValues(
         ProcessorSupplier<K, V, K, VOut> processorSupplier,
         String... stateStoreNames) {
-        return null;
+
+        return processValues(processorSupplier, Named.as(builder.newProcessorName(PROCESSOR_NAME)), stateStoreNames);
     }
 
     @Override
@@ -1555,8 +1558,8 @@ public class KStreamImpl<K, V> extends AbstractStream<K, V> implements KStream<K
         }
 
         final String name = new NamedInternal(named).name();
-        final KStreamValueProcessorSupplier<K, V, VOut> supplier = new KStreamValueProcessorSupplier<>(processorSupplier);
-        final StatefulProcessorNode<K, V> processNode = new StatefulProcessorNode<>(
+        final KStreamValueProcessorSupplier<? super K, ? super V, ? extends VOut> supplier = new KStreamValueProcessorSupplier<>(processorSupplier);
+        final StatefulProcessorNode<? super K, ? super V> processNode = new StatefulProcessorNode<>(
             name,
             new ProcessorParameters<>(supplier, name),
             stateStoreNames);
