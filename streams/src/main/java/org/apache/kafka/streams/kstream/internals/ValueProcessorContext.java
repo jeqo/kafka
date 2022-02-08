@@ -1,3 +1,20 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.apache.kafka.streams.kstream.internals;
 
 import java.io.File;
@@ -21,7 +38,7 @@ public class ValueProcessorContext<KForward, VForward> implements ProcessorConte
 
     private KForward key;
 
-    public void setRecordKey(KForward initialKey) {
+    public void setRecordKey(final KForward initialKey) {
         this.key = initialKey;
     }
 
@@ -69,17 +86,17 @@ public class ValueProcessorContext<KForward, VForward> implements ProcessorConte
     }
 
     @Override
-    public <S extends StateStore> S getStateStore(String name) {
+    public <S extends StateStore> S getStateStore(final String name) {
         return delegate.getStateStore(name);
     }
 
     @Override
-    public Cancellable schedule(Duration interval, PunctuationType type, Punctuator callback) {
-        return schedule(interval, type, callback);
+    public Cancellable schedule(final Duration interval, final PunctuationType type, final Punctuator callback) {
+        return delegate.schedule(interval, type, callback);
     }
 
     @Override
-    public <K extends KForward, V extends VForward> void forward(Record<K, V> record) {
+    public <K extends KForward, V extends VForward> void forward(final Record<K, V> record) {
         if (key != null) {
             if (!record.key().equals(key)) {
                 throw new IllegalArgumentException("Key has changed while processing and requires processing.");
@@ -89,7 +106,7 @@ public class ValueProcessorContext<KForward, VForward> implements ProcessorConte
     }
 
     @Override
-    public <K extends KForward, V extends VForward> void forward(Record<K, V> record, String childName) {
+    public <K extends KForward, V extends VForward> void forward(final Record<K, V> record, final String childName) {
         if (key != null) {
             if (!record.key().equals(key)) {
                 throw new IllegalArgumentException("Key has changed while processing and requires processing.");
@@ -109,7 +126,7 @@ public class ValueProcessorContext<KForward, VForward> implements ProcessorConte
     }
 
     @Override
-    public Map<String, Object> appConfigsWithPrefix(String prefix) {
+    public Map<String, Object> appConfigsWithPrefix(final String prefix) {
         return delegate.appConfigsWithPrefix(prefix);
     }
 }

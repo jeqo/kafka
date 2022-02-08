@@ -1496,17 +1496,17 @@ public class KStreamImpl<K, V> extends AbstractStream<K, V> implements KStream<K
 
     @Override
     public <KOut, VOut> KStream<KOut, VOut> process(
-        ProcessorSupplier<? super K, ? super V, ? extends KOut, ? extends VOut> processorSupplier,
-        String... stateStoreNames) {
+        final ProcessorSupplier<? super K, ? super V, ? extends KOut, ? extends VOut> processorSupplier,
+        final String... stateStoreNames) {
 
         return process(processorSupplier, Named.as(builder.newProcessorName(PROCESSOR_NAME)), stateStoreNames);
     }
 
     @Override
     public <KOut, VOut> KStream<KOut, VOut> process(
-        ProcessorSupplier<? super K, ? super V, ? extends KOut, ? extends VOut> processorSupplier,
-        Named named,
-        String... stateStoreNames) {
+        final ProcessorSupplier<? super K, ? super V, ? extends KOut, ? extends VOut> processorSupplier,
+        final Named named,
+        final String... stateStoreNames) {
 
         Objects.requireNonNull(processorSupplier, "processorSupplier can't be null");
         Objects.requireNonNull(named, "named can't be null");
@@ -1537,17 +1537,17 @@ public class KStreamImpl<K, V> extends AbstractStream<K, V> implements KStream<K
 
     @Override
     public <VOut> KStream<K, VOut> processValues(
-        ProcessorSupplier<K, V, K, VOut> processorSupplier,
-        String... stateStoreNames) {
+        final ProcessorSupplier<K, V, K, VOut> processorSupplier,
+        final String... stateStoreNames) {
 
         return processValues(processorSupplier, Named.as(builder.newProcessorName(PROCESSOR_NAME)), stateStoreNames);
     }
 
     @Override
     public <VOut> KStream<K, VOut> processValues(
-        ProcessorSupplier<K, V, K, VOut> processorSupplier,
-        Named named,
-        String... stateStoreNames) {
+        final ProcessorSupplier<K, V, K, VOut> processorSupplier,
+        final Named named,
+        final String... stateStoreNames) {
 
         Objects.requireNonNull(processorSupplier, "processorSupplier can't be null");
         Objects.requireNonNull(named, "named can't be null");
