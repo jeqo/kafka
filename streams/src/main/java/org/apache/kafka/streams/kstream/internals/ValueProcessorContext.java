@@ -109,7 +109,7 @@ public class ValueProcessorContext<KForward, VForward> implements ProcessorConte
     public <K extends KForward, V extends VForward> void forward(final Record<K, V> record, final String childName) {
         if (key != null) {
             if (!record.key().equals(key)) {
-                throw new IllegalArgumentException("Key has changed while processing and requires processing.");
+                throw new IllegalArgumentException("Key has changed while processing the record and requires enforcing repartitioning.");
             }
         }
         delegate.forward(record, childName);
