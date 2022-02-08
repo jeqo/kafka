@@ -1,0 +1,51 @@
+package org.apache.kafka.streams.kstream.internals;
+
+import org.apache.kafka.streams.errors.ProcessorStateException;
+import org.apache.kafka.streams.processor.api.ContextualProcessor;
+import org.apache.kafka.streams.processor.api.Processor;
+import org.apache.kafka.streams.processor.api.ProcessorContext;
+import org.apache.kafka.streams.processor.api.ProcessorSupplier;
+import org.apache.kafka.streams.processor.api.Record;
+
+public class KStreamValueProcessorSupplier<KIn, VIn, VOut> implements ProcessorSupplier<KIn, VIn, KIn, VOut> {
+    private final ProcessorSupplier<KIn, VIn, KIn, VOut> processorSupplier;
+
+    public KStreamValueProcessorSupplier(ProcessorSupplier<KIn, VIn, KIn, VOut> processorSupplier) {
+        this.processorSupplier = processorSupplier;
+    }
+
+    @Override
+    public Processor<KIn, VIn, KIn, VOut> get() {
+        return new KStreamValueProcessor<>(processorSupplier.get());
+    }
+
+    public static class KStreamValueProcessor<KIn, VIn, VOut> extends ContextualProcessor<KIn, VIn, KIn, VOut> {
+        private final Processor<KIn, VIn, KIn, VOut> processor;
+
+        private ValueProcessorContext<KIn, VOut> processorContext;
+
+        public KStreamValueProcessor(Processor<KIn, VIn, KIn, VOut> processor) {
+            this.processor = processor;
+        }
+
+        @Override
+        public void init(ProcessorContext<KIn, VOut> context) {
+            super.init(context);
+            this.processorContext = new ValueProcessorContext<>(context);
+            processor.init(processorContext);
+        }
+
+        @Override
+        public void process(Record<KIn, VIn> record) {
+            processorContext.setRecordKey(record.key());
+            processor.process(record);
+            processorContext.clearRecordKey();
+        }
+
+        @Override
+        public void close() {
+            processor.close();
+            super.close();
+        }
+    }
+}

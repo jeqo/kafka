@@ -1522,20 +1522,55 @@ public class KStreamImpl<K, V> extends AbstractStream<K, V> implements KStream<K
 
         builder.addGraphNode(graphNode, processNode);
 
-        return null; //FIXME
+        // cannot inherit key and value serde
+        return new KStreamImpl<>(
+            name,
+            null,
+            null,
+            subTopologySourceNodes,
+            true,
+            processNode,
+            builder);
     }
 
     @Override
     public <VOut> KStream<K, VOut> processValues(
-        ProcessorSupplier<? super K, ? super V, K, VOut> processorSupplier,
+        ProcessorSupplier<K, V, K, VOut> processorSupplier,
         String... stateStoreNames) {
         return null;
     }
 
     @Override
     public <VOut> KStream<K, VOut> processValues(
-        ProcessorSupplier<? super K, ? super V, K, VOut> processorSupplier, Named named,
+        ProcessorSupplier<K, V, K, VOut> processorSupplier,
+        Named named,
         String... stateStoreNames) {
-        return null;
+
+        Objects.requireNonNull(processorSupplier, "processorSupplier can't be null");
+        Objects.requireNonNull(named, "named can't be null");
+        Objects.requireNonNull(stateStoreNames, "stateStoreNames can't be a null array");
+        ApiUtils.checkSupplier(processorSupplier);
+        for (final String stateStoreName : stateStoreNames) {
+            Objects.requireNonNull(stateStoreName, "stateStoreNames can't be null");
+        }
+
+        final String name = new NamedInternal(named).name();
+        final KStreamValueProcessorSupplier<K, V, VOut> supplier = new KStreamValueProcessorSupplier<>(processorSupplier);
+        final StatefulProcessorNode<K, V> processNode = new StatefulProcessorNode<>(
+            name,
+            new ProcessorParameters<>(supplier, name),
+            stateStoreNames);
+
+        builder.addGraphNode(graphNode, processNode);
+
+        // cannot inherit key and value serde
+        return new KStreamImpl<>(
+            name,
+            keySerde,
+            null,
+            subTopologySourceNodes,
+            repartitionRequired,
+            processNode,
+            builder);
     }
 }

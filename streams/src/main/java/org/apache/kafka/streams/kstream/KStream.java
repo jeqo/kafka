@@ -4644,106 +4644,6 @@ public interface KStream<K, V> {
     void process(final org.apache.kafka.streams.processor.ProcessorSupplier<? super K, ? super V> processorSupplier,
                  final String... stateStoreNames);
 
-
-    /**
-     * Process all records in this stream, one record at a time, by applying a {@link Processor} (provided by the given
-     * {@link ProcessorSupplier}).
-     * Attaching a state store makes this a stateful record-by-record operation (cf. {@link #foreach(ForeachAction)}).
-     * If you choose not to attach one, this operation is similar to the stateless {@link #foreach(ForeachAction)}
-     * but allows access to the {@code ProcessorContext} and record metadata.
-     * This is essentially mixing the Processor API into the DSL, and provides all the functionality of the PAPI.
-     * Furthermore, via {@link org.apache.kafka.streams.processor.Punctuator#punctuate(long)} the processing progress
-     * can be observed and additional periodic actions can be performed.
-     * Note that this is a terminal operation that returns void.
-     * <p>
-     * In order for the processor to use state stores, the stores must be added to the topology and connected to the
-     * processor using at least one of two strategies (though it's not required to connect global state stores; read-only
-     * access to global state stores is available by default).
-     * <p>
-     * The first strategy is to manually add the {@link StoreBuilder}s via {@link Topology#addStateStore(StoreBuilder, String...)},
-     * and specify the store names via {@code stateStoreNames} so they will be connected to the processor.
-     * <pre>{@code
-     * // create store
-     * StoreBuilder<KeyValueStore<String,String>> keyValueStoreBuilder =
-     *         Stores.keyValueStoreBuilder(Stores.persistentKeyValueStore("myProcessorState"),
-     *                 Serdes.String(),
-     *                 Serdes.String());
-     * // add store
-     * builder.addStateStore(keyValueStoreBuilder);
-     *
-     * KStream outputStream = inputStream.processor(new ProcessorSupplier() {
-     *     public Processor get() {
-     *         return new MyProcessor();
-     *     }
-     * }, "myProcessorState");
-     * }</pre>
-     * The second strategy is for the given {@link ProcessorSupplier} to implement {@link ConnectedStoreProvider#stores()},
-     * which provides the {@link StoreBuilder}s to be automatically added to the topology and connected to the processor.
-     * <pre>{@code
-     * class MyProcessorSupplier implements ProcessorSupplier {
-     *     // supply processor
-     *     Processor get() {
-     *         return new MyProcessor();
-     *     }
-     *
-     *     // provide store(s) that will be added and connected to the associated processor
-     *     // the store name from the builder ("myProcessorState") is used to access the store later via the ProcessorContext
-     *     Set<StoreBuilder> stores() {
-     *         StoreBuilder<KeyValueStore<String, String>> keyValueStoreBuilder =
-     *                   Stores.keyValueStoreBuilder(Stores.persistentKeyValueStore("myProcessorState"),
-     *                   Serdes.String(),
-     *                   Serdes.String());
-     *         return Collections.singleton(keyValueStoreBuilder);
-     *     }
-     * }
-     *
-     * ...
-     *
-     * KStream outputStream = inputStream.process(new MyProcessorSupplier());
-     * }</pre>
-     * <p>
-     * With either strategy, within the {@link Processor}, the state is obtained via the {@link ProcessorContext}.
-     * To trigger periodic actions via {@link org.apache.kafka.streams.processor.Punctuator#punctuate(long) punctuate()},
-     * a schedule must be registered.
-     * <pre>{@code
-     * class MyProcessor implements Processor {
-     *     private StateStore state;
-     *
-     *     void init(ProcessorContext context) {
-     *         this.state = context.getStateStore("myProcessorState");
-     *         // punctuate each second, can access this.state
-     *         context.schedule(Duration.ofSeconds(1), PunctuationType.WALL_CLOCK_TIME, new Punctuator(..));
-     *     }
-     *
-     *     void process(K key, V value) {
-     *         // can access this.state
-     *     }
-     *
-     *     void close() {
-     *         // can access this.state
-     *     }
-     * }
-     * }</pre>
-     * Even if any upstream operation was key-changing, no auto-repartition is triggered.
-     * If repartitioning is required, a call to {@link #repartition()} should be performed before {@code process()}.
-     *
-     * @param processorSupplier an instance of {@link ProcessorSupplier} that generates a newly constructed {@link Processor}
-     *                          The supplier should always generate a new instance. Creating a single {@link Processor} object
-     *                          and returning the same object reference in {@link ProcessorSupplier#get()} is a
-     *                          violation of the supplier pattern and leads to runtime exceptions.
-     * @param stateStoreNames     the names of the state stores used by the processor; not required if the supplier
-     *                            implements {@link ConnectedStoreProvider#stores()}
-     * @see #foreach(ForeachAction)
-     * @see #transform(TransformerSupplier, String...)
-     */
-    <KOut, VOut> KStream<KOut, VOut> process(
-        final ProcessorSupplier<? super K, ? super V, KOut, VOut> processorSupplier,
-        final String... stateStoreNames);
-
-    <VOut> KStream<K, VOut> processValues(
-        final ProcessorSupplier<? super K, ? super V, K, VOut> processorSupplier,
-        final String... stateStoreNames);
-
     /**
      * Process all records in this stream, one record at a time, by applying a
      * {@link org.apache.kafka.streams.processor.Processor} (provided by the given
@@ -4933,6 +4833,101 @@ public interface KStream<K, V> {
      *                          The supplier should always generate a new instance. Creating a single {@link Processor} object
      *                          and returning the same object reference in {@link ProcessorSupplier#get()} is a
      *                          violation of the supplier pattern and leads to runtime exceptions.
+     * @param stateStoreNames     the names of the state stores used by the processor; not required if the supplier
+     *                            implements {@link ConnectedStoreProvider#stores()}
+     * @see #foreach(ForeachAction)
+     * @see #transform(TransformerSupplier, String...)
+     */
+    <KOut, VOut> KStream<KOut, VOut> process(
+        final ProcessorSupplier<? super K, ? super V, KOut, VOut> processorSupplier,
+        final String... stateStoreNames);
+
+    /**
+     * Process all records in this stream, one record at a time, by applying a {@link Processor} (provided by the given
+     * {@link ProcessorSupplier}).
+     * Attaching a state store makes this a stateful record-by-record operation (cf. {@link #foreach(ForeachAction)}).
+     * If you choose not to attach one, this operation is similar to the stateless {@link #foreach(ForeachAction)}
+     * but allows access to the {@code ProcessorContext} and record metadata.
+     * This is essentially mixing the Processor API into the DSL, and provides all the functionality of the PAPI.
+     * Furthermore, via {@link org.apache.kafka.streams.processor.Punctuator#punctuate(long)} the processing progress
+     * can be observed and additional periodic actions can be performed.
+     * Note that this is a terminal operation that returns void.
+     * <p>
+     * In order for the processor to use state stores, the stores must be added to the topology and connected to the
+     * processor using at least one of two strategies (though it's not required to connect global state stores; read-only
+     * access to global state stores is available by default).
+     * <p>
+     * The first strategy is to manually add the {@link StoreBuilder}s via {@link Topology#addStateStore(StoreBuilder, String...)},
+     * and specify the store names via {@code stateStoreNames} so they will be connected to the processor.
+     * <pre>{@code
+     * // create store
+     * StoreBuilder<KeyValueStore<String,String>> keyValueStoreBuilder =
+     *         Stores.keyValueStoreBuilder(Stores.persistentKeyValueStore("myProcessorState"),
+     *                 Serdes.String(),
+     *                 Serdes.String());
+     * // add store
+     * builder.addStateStore(keyValueStoreBuilder);
+     *
+     * KStream outputStream = inputStream.processor(new ProcessorSupplier() {
+     *     public Processor get() {
+     *         return new MyProcessor();
+     *     }
+     * }, "myProcessorState");
+     * }</pre>
+     * The second strategy is for the given {@link ProcessorSupplier} to implement {@link ConnectedStoreProvider#stores()},
+     * which provides the {@link StoreBuilder}s to be automatically added to the topology and connected to the processor.
+     * <pre>{@code
+     * class MyProcessorSupplier implements ProcessorSupplier {
+     *     // supply processor
+     *     Processor get() {
+     *         return new MyProcessor();
+     *     }
+     *
+     *     // provide store(s) that will be added and connected to the associated processor
+     *     // the store name from the builder ("myProcessorState") is used to access the store later via the ProcessorContext
+     *     Set<StoreBuilder> stores() {
+     *         StoreBuilder<KeyValueStore<String, String>> keyValueStoreBuilder =
+     *                   Stores.keyValueStoreBuilder(Stores.persistentKeyValueStore("myProcessorState"),
+     *                   Serdes.String(),
+     *                   Serdes.String());
+     *         return Collections.singleton(keyValueStoreBuilder);
+     *     }
+     * }
+     *
+     * ...
+     *
+     * KStream outputStream = inputStream.process(new MyProcessorSupplier());
+     * }</pre>
+     * <p>
+     * With either strategy, within the {@link Processor}, the state is obtained via the {@link ProcessorContext}.
+     * To trigger periodic actions via {@link org.apache.kafka.streams.processor.Punctuator#punctuate(long) punctuate()},
+     * a schedule must be registered.
+     * <pre>{@code
+     * class MyProcessor implements Processor {
+     *     private StateStore state;
+     *
+     *     void init(ProcessorContext context) {
+     *         this.state = context.getStateStore("myProcessorState");
+     *         // punctuate each second, can access this.state
+     *         context.schedule(Duration.ofSeconds(1), PunctuationType.WALL_CLOCK_TIME, new Punctuator(..));
+     *     }
+     *
+     *     void process(K key, V value) {
+     *         // can access this.state
+     *     }
+     *
+     *     void close() {
+     *         // can access this.state
+     *     }
+     * }
+     * }</pre>
+     * Even if any upstream operation was key-changing, no auto-repartition is triggered.
+     * If repartitioning is required, a call to {@link #repartition()} should be performed before {@code process()}.
+     *
+     * @param processorSupplier an instance of {@link ProcessorSupplier} that generates a newly constructed {@link Processor}
+     *                          The supplier should always generate a new instance. Creating a single {@link Processor} object
+     *                          and returning the same object reference in {@link ProcessorSupplier#get()} is a
+     *                          violation of the supplier pattern and leads to runtime exceptions.
      * @param named             a {@link Named} config used to name the processor in the topology
      * @param stateStoreNames   the names of the state store used by the processor
      * @see #foreach(ForeachAction)
@@ -4944,7 +4939,11 @@ public interface KStream<K, V> {
         final String... stateStoreNames);
 
     <VOut> KStream<K, VOut> processValues(
-        final ProcessorSupplier<? super K, ? super V, K, VOut> processorSupplier,
+        final ProcessorSupplier<K, V, K, VOut> processorSupplier,
+        final String... stateStoreNames);
+
+    <VOut> KStream<K, VOut> processValues(
+        final ProcessorSupplier<K, V, K, VOut> processorSupplier,
         final Named named,
         final String... stateStoreNames);
 }
