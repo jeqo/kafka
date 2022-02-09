@@ -32,7 +32,7 @@ import org.apache.kafka.streams.processor.api.ProcessorContext;
 import org.apache.kafka.streams.processor.api.Record;
 import org.apache.kafka.streams.processor.api.RecordMetadata;
 
-public class ValueProcessorContext<KForward, VForward> implements ProcessorContext<KForward, VForward> {
+class ValueProcessorContext<KForward, VForward> implements ProcessorContext<KForward, VForward> {
 
     final ProcessorContext<KForward, VForward> delegate;
 
@@ -98,8 +98,8 @@ public class ValueProcessorContext<KForward, VForward> implements ProcessorConte
     @Override
     public <K extends KForward, V extends VForward> void forward(final Record<K, V> record) {
         if (key != null) {
-            if (!record.key().equals(key)) {
-                throw new IllegalArgumentException("Key has changed while processing and requires processing.");
+            if (record.key() != key) {
+                throw new IllegalArgumentException("Key has changed while processing the record and requires enforcing repartitioning.");
             }
         }
         delegate.forward(record);
@@ -108,7 +108,7 @@ public class ValueProcessorContext<KForward, VForward> implements ProcessorConte
     @Override
     public <K extends KForward, V extends VForward> void forward(final Record<K, V> record, final String childName) {
         if (key != null) {
-            if (!record.key().equals(key)) {
+            if (record.key() != key) {
                 throw new IllegalArgumentException("Key has changed while processing the record and requires enforcing repartitioning.");
             }
         }
