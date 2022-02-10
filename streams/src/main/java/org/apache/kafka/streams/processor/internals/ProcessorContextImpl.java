@@ -23,6 +23,7 @@ import org.apache.kafka.common.header.internals.RecordHeaders;
 import org.apache.kafka.common.utils.Bytes;
 import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.streams.errors.StreamsException;
+import org.apache.kafka.streams.header.StreamHeaders;
 import org.apache.kafka.streams.processor.Cancellable;
 import org.apache.kafka.streams.processor.PunctuationType;
 import org.apache.kafka.streams.processor.Punctuator;
@@ -189,7 +190,8 @@ public class ProcessorContextImpl extends AbstractProcessorContext<Object, Objec
             key,
             value,
             timestamp(),
-            headers()
+            StreamHeaders.wrap(headers()),
+            recordMetadata()
         );
         forward(toForward);
     }
@@ -203,7 +205,7 @@ public class ProcessorContextImpl extends AbstractProcessorContext<Object, Objec
             key,
             value,
             toInternal.hasTimestamp() ? toInternal.timestamp() : timestamp(),
-            toInternal.hasHeaders() ? toInternal.headers() : headers()
+            toInternal.hasHeaders() ? StreamHeaders.wrap(toInternal.headers()) : StreamHeaders.wrap(headers())
         );
         forward(toForward, toInternal.child());
     }
@@ -245,7 +247,7 @@ public class ProcessorContextImpl extends AbstractProcessorContext<Object, Objec
                     recordContext.offset(),
                     recordContext.partition(),
                     recordContext.topic(),
-                    record.headers());
+                    record.headers().unwrap());
             }
 
             if (childName == null) {

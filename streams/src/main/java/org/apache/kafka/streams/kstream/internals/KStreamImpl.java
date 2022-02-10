@@ -35,8 +35,7 @@ import org.apache.kafka.streams.kstream.Named;
 import org.apache.kafka.streams.kstream.Predicate;
 import org.apache.kafka.streams.kstream.Printed;
 import org.apache.kafka.streams.kstream.Produced;
-import org.apache.kafka.streams.kstream.RecordValue;
-import org.apache.kafka.streams.kstream.RecordValueSerde;
+import org.apache.kafka.streams.kstream.RecordSerde;
 import org.apache.kafka.streams.kstream.Repartitioned;
 import org.apache.kafka.streams.kstream.RecordHeadersMapper;
 import org.apache.kafka.streams.kstream.StreamJoined;
@@ -65,6 +64,7 @@ import org.apache.kafka.streams.processor.api.ProcessorSupplier;
 import org.apache.kafka.streams.processor.StreamPartitioner;
 import org.apache.kafka.streams.processor.TopicNameExtractor;
 import org.apache.kafka.streams.kstream.ForeachProcessor;
+import org.apache.kafka.streams.processor.api.Record;
 import org.apache.kafka.streams.processor.internals.InternalTopicProperties;
 import org.apache.kafka.streams.processor.internals.StaticTopicNameExtractor;
 import org.apache.kafka.streams.state.KeyValueStore;
@@ -324,17 +324,17 @@ public class KStreamImpl<K, V> extends AbstractStream<K, V> implements KStream<K
     }
 
     @Override
-    public KStream<K, RecordValue<V>> mapRecordValue() {
-        return mapRecordValue(NamedInternal.empty());
+    public KStream<K, Record<K, V>> mapValueToRecord() {
+        return mapValueToRecord(NamedInternal.empty());
     }
 
     @Override
-    public KStream<K, RecordValue<V>> mapRecordValue(final Named named) {
+    public KStream<K, Record<K, V>> mapValueToRecord(final Named named) {
         Objects.requireNonNull(named, "named can't be null");
 
         final String name = new NamedInternal(named).orElseGenerateWithPrefix(builder, MAPRECORDVALUE_NAME);
         final ProcessorParameters<? super K, ? super V, ?, ?> processorParameters =
-            new ProcessorParameters<>(new KStreamMapRecordValue<>(), name);
+            new ProcessorParameters<>(new KStreamMapValueToRecord<>(), name);
         final ProcessorGraphNode<? super K, ? super V> mapValuesProcessorNode =
             new ProcessorGraphNode<>(name, processorParameters);
         mapValuesProcessorNode.setValueChangingOperation(true);
@@ -345,7 +345,7 @@ public class KStreamImpl<K, V> extends AbstractStream<K, V> implements KStream<K
         return new KStreamImpl<>(
             name,
             keySerde,
-            new RecordValueSerde<>(valueSerde),
+            new RecordSerde<>(keySerde, valueSerde),
             subTopologySourceNodes,
             repartitionRequired,
             mapValuesProcessorNode,

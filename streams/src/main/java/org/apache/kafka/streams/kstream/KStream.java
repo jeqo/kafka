@@ -30,6 +30,7 @@ import org.apache.kafka.streams.processor.api.ProcessorSupplier;
 import org.apache.kafka.streams.processor.api.ProcessorContext;
 import org.apache.kafka.streams.processor.StreamPartitioner;
 import org.apache.kafka.streams.processor.TopicNameExtractor;
+import org.apache.kafka.streams.processor.api.Record;
 import org.apache.kafka.streams.state.KeyValueStore;
 import org.apache.kafka.streams.state.StoreBuilder;
 
@@ -397,14 +398,14 @@ public interface KStream<K, V> {
      *
      * @return org.apache.kafka.streams.kstream.RecordValue
      */
-    KStream<K, RecordValue<V>> mapRecordValue(final Named named);
+    KStream<K, Record<K, V>> mapValueToRecord(final Named named);
 
-    KStream<K, RecordValue<V>> mapRecordValue();
+    KStream<K, Record<K, V>> mapValueToRecord();
 
     /**
      * Set headers to the record crossing the stream.
      *
-     * If existing headers are needed for this calculation, see {@link KStream#mapRecordValue()}
+     * If existing headers are needed for this calculation, see {@link KStream#mapValueToRecord()}
      *
      * @param action to map from K/V to Record headers.
      * @param named

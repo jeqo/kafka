@@ -16,11 +16,11 @@
  */
 package org.apache.kafka.streams.processor.api;
 
-import org.apache.kafka.common.header.Headers;
-import org.apache.kafka.common.header.internals.RecordHeaders;
+import java.util.Optional;
 import org.apache.kafka.streams.errors.StreamsException;
 
 import java.util.Objects;
+import org.apache.kafka.streams.header.Headers;
 
 /**
  * A data class representing an incoming record for processing in a {@link Processor}
@@ -35,11 +35,15 @@ import java.util.Objects;
  * @param <K> The type of the key
  * @param <V> The type of the value
  */
-public class Record<K, V> {
+public class Record<K, V> implements RecordMetadata {
     private final K key;
     private final V value;
     private final long timestamp;
     private final Headers headers;
+
+    private final String topic;
+    private final int partition;
+    private final long offset;
 
     /**
      * The full constructor, specifying all the attributes of the record.
@@ -56,7 +60,8 @@ public class Record<K, V> {
      * @throws IllegalArgumentException if the timestamp is negative.
      * @see ProcessorContext#forward(Record)
      */
-    public Record(final K key, final V value, final long timestamp, final Headers headers) {
+     public Record(final K key, final V value, final long timestamp, final Headers headers, final String topic, final int partition, final long offset) {
+
         this.key = key;
         this.value = value;
         if (timestamp < 0) {
@@ -66,7 +71,22 @@ public class Record<K, V> {
             );
         }
         this.timestamp = timestamp;
-        this.headers = new RecordHeaders(headers);
+        this.headers = headers;
+
+        this.topic = topic;
+        this.partition = partition;
+        this.offset = offset;
+    }
+
+    public Record(final K key, final V value, final long timestamp, final Headers headers, final Optional<RecordMetadata> recordMetadata) {
+        this(key, value, timestamp, headers,
+            recordMetadata.map(RecordMetadata::topic).orElse(null),
+            recordMetadata.map(RecordMetadata::partition).orElse(-1),
+            recordMetadata.map(RecordMetadata::offset).orElse(-1L));
+    }
+
+    public Record(final K key, final V value, final long timestamp, final Headers headers) {
+        this(key, value, timestamp, headers, Optional.empty());
     }
 
     /**
@@ -121,7 +141,7 @@ public class Record<K, V> {
      * @return A new Record instance with all the same attributes (except that the key is replaced).
      */
     public <NewK> Record<NewK, V> withKey(final NewK key) {
-        return new Record<>(key, value, timestamp, headers);
+        return new Record<>(key, value, timestamp, headers, recordMetadata());
     }
 
     /**
@@ -134,7 +154,7 @@ public class Record<K, V> {
      * @return A new Record instance with all the same attributes (except that the value is replaced).
      */
     public <NewV> Record<K, NewV> withValue(final NewV value) {
-        return new Record<>(key, value, timestamp, headers);
+        return new Record<>(key, value, timestamp, headers, recordMetadata());
     }
 
     /**
@@ -146,7 +166,7 @@ public class Record<K, V> {
      * @return A new Record instance with all the same attributes (except that the timestamp is replaced).
      */
     public Record<K, V> withTimestamp(final long timestamp) {
-        return new Record<>(key, value, timestamp, headers);
+        return new Record<>(key, value, timestamp, headers, recordMetadata());
     }
 
     /**
@@ -162,7 +182,7 @@ public class Record<K, V> {
      * @return A new Record instance with all the same attributes (except that the headers are replaced).
      */
     public Record<K, V> withHeaders(final Headers headers) {
-        return new Record<>(key, value, timestamp, headers);
+        return new Record<>(key, value, timestamp, headers, recordMetadata());
     }
 
     @Override
@@ -183,11 +203,52 @@ public class Record<K, V> {
         return timestamp == record.timestamp &&
             Objects.equals(key, record.key) &&
             Objects.equals(value, record.value) &&
-            Objects.equals(headers, record.headers);
+            Objects.equals(headers, record.headers) &&
+            Objects.equals(topic, record.topic) &&
+            partition == record.partition &&
+            offset == record.offset;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(key, value, timestamp, headers);
+        return Objects.hash(key, value, timestamp, headers, topic, partition, offset);
+    }
+
+    @Override
+    public String topic() {
+        return topic;
+    }
+
+    @Override
+    public int partition() {
+        return partition;
+    }
+
+    @Override
+    public long offset() {
+        return offset;
+    }
+
+    Optional<RecordMetadata> recordMetadata() {
+        if (topic != null) {
+            return Optional.of(new RecordMetadata() {
+                @Override
+                public String topic() {
+                    return topic;
+                }
+
+                @Override
+                public int partition() {
+                    return partition;
+                }
+
+                @Override
+                public long offset() {
+                    return offset;
+                }
+            });
+        } else  {
+            return Optional.empty();
+        }
     }
 }

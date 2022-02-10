@@ -23,32 +23,35 @@ import java.nio.ByteBuffer;
 import org.apache.kafka.common.InvalidRecordException;
 import org.apache.kafka.common.header.Header;
 import org.apache.kafka.common.header.internals.RecordHeader;
-import org.apache.kafka.common.record.Record;
 import org.apache.kafka.common.serialization.Deserializer;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serializer;
 import org.apache.kafka.common.utils.ByteUtils;
 import org.apache.kafka.common.utils.Utils;
+import org.apache.kafka.streams.header.Headers;
+import org.apache.kafka.streams.processor.api.Record;
 
-public class RecordValueSerde<V> implements Serde<RecordValue<V>> {
+public class RecordSerde<K, V> implements Serde<Record<K, V>> {
 
+    final Serde<K> keySerde;
     final Serde<V> valueSerde;
 
-    public RecordValueSerde(final Serde<V> valueSerde) {
+    public RecordSerde(Serde<K> keySerde, final Serde<V> valueSerde) {
+        this.keySerde = keySerde;
         this.valueSerde = valueSerde;
     }
 
     @Override
-    public Serializer<RecordValue<V>> serializer() {
+    public Serializer<Record<K, V>> serializer() {
         return new RecordValueSerializer<>(valueSerde.serializer());
     }
 
     @Override
-    public Deserializer<RecordValue<V>> deserializer() {
+    public Deserializer<Record<K, V>> deserializer() {
         return new RecordValueDeserializer<>(valueSerde.deserializer());
     }
 
-    static class RecordValueSerializer<V> implements Serializer<RecordValue<V>> {
+    static class RecordValueSerializer<K, V> implements Serializer<Record<K, V>> {
 
         final Serializer<V> valueSerializer;
 
@@ -57,7 +60,7 @@ public class RecordValueSerde<V> implements Serde<RecordValue<V>> {
         }
 
         @Override
-        public byte[] serialize(final String topic, final RecordValue<V> data) {
+        public byte[] serialize(final String topic, final Record<K, V> data) {
             try (final ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
                 try (final DataOutputStream buffer = new DataOutputStream(outputStream)) {
                     // write value
@@ -106,7 +109,7 @@ public class RecordValueSerde<V> implements Serde<RecordValue<V>> {
         }
     }
 
-    static class RecordValueDeserializer<V> implements Deserializer<RecordValue<V>> {
+    static class RecordValueDeserializer<K, V> implements Deserializer<Record<K, V>> {
 
         final Deserializer<V> valueDeserializer;
 
@@ -115,7 +118,7 @@ public class RecordValueSerde<V> implements Serde<RecordValue<V>> {
         }
 
         @Override
-        public RecordValue<V> deserialize(final String t, final byte[] data) {
+        public Record<K, V> deserialize(final String t, final byte[] data) {
             final ByteBuffer buffer = ByteBuffer.wrap(data);
 
             // read value
@@ -152,12 +155,14 @@ public class RecordValueSerde<V> implements Serde<RecordValue<V>> {
             }
             final Header[] headers;
             if (numHeaders == 0) {
-                headers = Record.EMPTY_HEADERS;
+                headers = org.apache.kafka.common.record.Record.EMPTY_HEADERS;
             } else {
                 headers = readHeaders(buffer, numHeaders);
             }
 
-            return new RecordValue<>(topic, partition, offset, value, timestamp, headers);
+            K key = null;
+            Headers h = null;
+            return new Record<>(key, value, timestamp, h, topic, partition, offset);
         }
 
         private Header[] readHeaders(final ByteBuffer buffer, final int numHeaders) {

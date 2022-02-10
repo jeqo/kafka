@@ -16,36 +16,26 @@
  */
 package org.apache.kafka.streams.kstream.internals;
 
-import org.apache.kafka.streams.kstream.RecordValue;
 import org.apache.kafka.streams.processor.api.ContextualProcessor;
 import org.apache.kafka.streams.processor.api.Processor;
 import org.apache.kafka.streams.processor.api.ProcessorSupplier;
 import org.apache.kafka.streams.processor.api.Record;
 
-class KStreamMapRecordValue<K, V> implements ProcessorSupplier<K, V, K, RecordValue<V>> {
+class KStreamMapValueToRecord<K, V> implements ProcessorSupplier<K, V, K, Record<K, V>> {
 
-    public KStreamMapRecordValue() {
+    public KStreamMapValueToRecord() {
     }
 
     @Override
-    public Processor<K, V, K, RecordValue<V>> get() {
-        return new KStreamMapProcessor();
+    public Processor<K, V, K, Record<K, V>> get() {
+        return new KStreamMapValueToRecordProcessor();
     }
 
-    private class KStreamMapProcessor extends ContextualProcessor<K, V, K, RecordValue<V>> {
+    private class KStreamMapValueToRecordProcessor extends ContextualProcessor<K, V, K, Record<K, V>> {
 
         @Override
         public void process(final Record<K, V> record) {
-            final RecordValue<V> newValue = context().recordMetadata()
-                .map(meta -> new RecordValue<>(
-                    meta.topic(),
-                    meta.partition(),
-                    meta.offset(),
-                    record.value(),
-                    record.timestamp(),
-                    record.headers()))
-                .orElse(new RecordValue<>(record.value(), record.timestamp(), record.headers()));
-            context().forward(record.withValue(newValue));
+            context().forward(record.withValue(record));
         }
     }
 }
