@@ -35,7 +35,7 @@ public class RecordSerde<K, V> implements Serde<Record<K, V>> {
     final Serde<K> keySerde;
     final Serde<V> valueSerde;
 
-    public static <K, V> RecordSerde<K, V> with(Serde<K> keySerde, Serde<V> valueSerde) {
+    public static <K, V> RecordSerde<K, V> with(final Serde<K> keySerde, final Serde<V> valueSerde) {
         return new RecordSerde<>(keySerde, valueSerde);
     }
 
