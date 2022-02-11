@@ -23,7 +23,7 @@ import org.apache.kafka.common.header.internals.RecordHeaders;
 import org.apache.kafka.common.utils.Bytes;
 import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.streams.errors.StreamsException;
-import org.apache.kafka.streams.header.StreamHeaders;
+import org.apache.kafka.streams.processor.api.header.StreamHeaders;
 import org.apache.kafka.streams.processor.Cancellable;
 import org.apache.kafka.streams.processor.PunctuationType;
 import org.apache.kafka.streams.processor.Punctuator;
@@ -241,7 +241,8 @@ public class ProcessorContextImpl extends AbstractProcessorContext<Object, Objec
             // too much about heterogeneous applications, in which the upstream processor is
             // implementing the new API and the downstream one is implementing the old API.
             // So, this seems like a fine compromise for now.
-            if (recordContext != null && (record.timestamp() != timestamp() || record.headers() != headers())) {
+            if (recordContext != null &&
+                (record.timestamp() != timestamp() || record.headers().unwrap().equals(headers()))) {
                 recordContext = new ProcessorRecordContext(
                     record.timestamp(),
                     recordContext.offset(),

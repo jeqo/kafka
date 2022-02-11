@@ -28,7 +28,6 @@ import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serializer;
 import org.apache.kafka.common.utils.ByteUtils;
 import org.apache.kafka.common.utils.Utils;
-import org.apache.kafka.streams.header.Headers;
 import org.apache.kafka.streams.processor.api.Record;
 
 public class RecordSerde<K, V> implements Serde<Record<K, V>> {
@@ -43,19 +42,21 @@ public class RecordSerde<K, V> implements Serde<Record<K, V>> {
 
     @Override
     public Serializer<Record<K, V>> serializer() {
-        return new RecordValueSerializer<>(valueSerde.serializer());
+        return new RecordSerializer<>(keySerde.serializer(), valueSerde.serializer());
     }
 
     @Override
     public Deserializer<Record<K, V>> deserializer() {
-        return new RecordValueDeserializer<>(valueSerde.deserializer());
+        return new RecordDeserializer<>(keySerde.deserializer(), valueSerde.deserializer());
     }
 
-    static class RecordValueSerializer<K, V> implements Serializer<Record<K, V>> {
+    static class RecordSerializer<K, V> implements Serializer<Record<K, V>> {
 
+        final Serializer<K> keySerializer;
         final Serializer<V> valueSerializer;
 
-        RecordValueSerializer(final Serializer<V> valueSerializer) {
+        RecordSerializer(Serializer<K> keySerializer, final Serializer<V> valueSerializer) {
+            this.keySerializer = keySerializer;
             this.valueSerializer = valueSerializer;
         }
 
@@ -63,6 +64,11 @@ public class RecordSerde<K, V> implements Serde<Record<K, V>> {
         public byte[] serialize(final String topic, final Record<K, V> data) {
             try (final ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
                 try (final DataOutputStream buffer = new DataOutputStream(outputStream)) {
+                    // write key
+                    final byte[] keyBytes = keySerializer.serialize(topic, data.key());
+                    ByteUtils.writeVarint(keyBytes.length, buffer);
+                    buffer.write(keyBytes);
+
                     // write value
                     final byte[] valueBytes = valueSerializer.serialize(topic, data.value());
                     ByteUtils.writeVarint(valueBytes.length, buffer);
@@ -109,17 +115,32 @@ public class RecordSerde<K, V> implements Serde<Record<K, V>> {
         }
     }
 
-    static class RecordValueDeserializer<K, V> implements Deserializer<Record<K, V>> {
+    static class RecordDeserializer<K, V> implements Deserializer<Record<K, V>> {
 
+        final Deserializer<K> keyDeserializer;
         final Deserializer<V> valueDeserializer;
 
-        RecordValueDeserializer(final Deserializer<V> valueDeserializer) {
+        RecordDeserializer(final Deserializer<K> keyDeserializer, final Deserializer<V> valueDeserializer) {
+            this.keyDeserializer = keyDeserializer;
             this.valueDeserializer = valueDeserializer;
         }
 
         @Override
         public Record<K, V> deserialize(final String t, final byte[] data) {
             final ByteBuffer buffer = ByteBuffer.wrap(data);
+
+            // read key
+            final int keySize = ByteUtils.readVarint(buffer);
+            if (keySize < 0) {
+                throw new IllegalArgumentException(""); //TODO
+            }
+            final ByteBuffer keyBuffer = buffer.slice();
+            keyBuffer.limit(keySize);
+            buffer.position(buffer.position() + keySize);
+            final byte[] keySerialized = new byte[keyBuffer.remaining()];
+            keyBuffer.get(keySerialized);
+            keyBuffer.clear();
+            final K key = keyDeserializer.deserialize(t, keySerialized);
 
             // read value
             final int valueSize = ByteUtils.readVarint(buffer);
@@ -160,9 +181,7 @@ public class RecordSerde<K, V> implements Serde<Record<K, V>> {
                 headers = readHeaders(buffer, numHeaders);
             }
 
-            K key = null;
-            Headers h = null;
-            return new Record<>(key, value, timestamp, h, topic, partition, offset);
+            return new Record<>(key, value, timestamp, headers, topic, partition, offset);
         }
 
         private Header[] readHeaders(final ByteBuffer buffer, final int numHeaders) {

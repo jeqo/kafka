@@ -33,6 +33,7 @@ import org.apache.kafka.streams.Topology;
 import org.apache.kafka.streams.TopologyTestDriver;
 import org.apache.kafka.streams.TopologyWrapper;
 import org.apache.kafka.streams.KeyValue;
+import org.apache.kafka.streams.processor.api.header.StreamHeader;
 import org.apache.kafka.streams.processor.StreamPartitioner;
 import org.apache.kafka.streams.processor.TimestampExtractor;
 import org.apache.kafka.streams.processor.api.Processor;
@@ -1721,7 +1722,7 @@ public class ProcessorTopologyTest {
         public void process(final Record<String, String> record) {
             // making a copy of headers for safety.
             final Record<String, String> toForward = record.withHeaders(record.headers());
-            toForward.headers().add(HEADER);
+            toForward.headers().add(StreamHeader.wrap(HEADER));
             context.forward(toForward);
         }
     }

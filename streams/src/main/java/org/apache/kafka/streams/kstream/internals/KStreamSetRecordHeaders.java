@@ -16,7 +16,7 @@
  */
 package org.apache.kafka.streams.kstream.internals;
 
-import org.apache.kafka.streams.header.Headers;
+import org.apache.kafka.streams.processor.api.header.Headers;
 import org.apache.kafka.streams.kstream.RecordHeadersMapper;
 import org.apache.kafka.streams.processor.api.ContextualProcessor;
 import org.apache.kafka.streams.processor.api.Processor;

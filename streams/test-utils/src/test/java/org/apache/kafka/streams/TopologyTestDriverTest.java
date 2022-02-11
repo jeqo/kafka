@@ -240,7 +240,7 @@ public abstract class TopologyTestDriverTest {
             processedRecords.add(new TTDTestRecord(
                 record.key(),
                 record.value(),
-                record.headers(),
+                record.headers().unwrap(),
                 record.timestamp(),
                 context.recordMetadata().map(RecordMetadata::offset).orElse(-1L),
                 context.recordMetadata().map(RecordMetadata::topic).orElse(null)

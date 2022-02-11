@@ -17,8 +17,8 @@
 package org.apache.kafka.streams.kstream;
 
 import java.util.Objects;
-import org.apache.kafka.streams.header.Headers;
-import org.apache.kafka.streams.header.StreamHeaders;
+import org.apache.kafka.streams.processor.api.header.Headers;
+import org.apache.kafka.streams.processor.api.header.StreamHeaders;
 
 /**
  * Record value plus metadata (read-only) representation.

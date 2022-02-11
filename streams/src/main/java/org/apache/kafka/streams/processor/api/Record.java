@@ -20,7 +20,8 @@ import java.util.Optional;
 import org.apache.kafka.streams.errors.StreamsException;
 
 import java.util.Objects;
-import org.apache.kafka.streams.header.Headers;
+import org.apache.kafka.streams.processor.api.header.Headers;
+import org.apache.kafka.streams.processor.api.header.StreamHeaders;
 
 /**
  * A data class representing an incoming record for processing in a {@link Processor}
@@ -60,7 +61,10 @@ public class Record<K, V> implements RecordMetadata {
      * @throws IllegalArgumentException if the timestamp is negative.
      * @see ProcessorContext#forward(Record)
      */
-     public Record(final K key, final V value, final long timestamp, final Headers headers, final String topic, final int partition, final long offset) {
+    public Record(final K key, final V value,
+        final long timestamp,
+        final Headers headers,
+        final String topic, final int partition, final long offset) {
 
         this.key = key;
         this.value = value;
@@ -78,14 +82,66 @@ public class Record<K, V> implements RecordMetadata {
         this.offset = offset;
     }
 
-    public Record(final K key, final V value, final long timestamp, final Headers headers, final Optional<RecordMetadata> recordMetadata) {
+    public Record(final K key, final V value,
+        final long timestamp,
+        final org.apache.kafka.common.header.Headers headers,
+        final String topic, final int partition, final long offset) {
+
+        this(key, value, timestamp, StreamHeaders.wrap(headers), topic, partition, offset);
+    }
+
+    public Record(final K key, final V value,
+        final long timestamp,
+        final org.apache.kafka.common.header.Header[] headers,
+        final String topic, final int partition, final long offset) {
+
+        this(key, value, timestamp, StreamHeaders.wrap(headers), topic, partition, offset);
+    }
+
+    public Record(final K key, final V value,
+        final long timestamp,
+        final org.apache.kafka.common.header.Header[] headers,
+        final Optional<RecordMetadata> recordMetadata) {
+
+        this(key, value, timestamp, StreamHeaders.wrap(headers),
+            recordMetadata.map(RecordMetadata::topic).orElse(null),
+            recordMetadata.map(RecordMetadata::partition).orElse(-1),
+            recordMetadata.map(RecordMetadata::offset).orElse(-1L));
+    }
+
+    public Record(final K key, final V value,
+        final long timestamp,
+        final org.apache.kafka.common.header.Headers headers,
+        final Optional<RecordMetadata> recordMetadata) {
+
+        this(key, value, timestamp, StreamHeaders.wrap(headers),
+            recordMetadata.map(RecordMetadata::topic).orElse(null),
+            recordMetadata.map(RecordMetadata::partition).orElse(-1),
+            recordMetadata.map(RecordMetadata::offset).orElse(-1L));
+    }
+
+    public Record(final K key, final V value,
+        final long timestamp,
+        final Headers headers,
+        final Optional<RecordMetadata> recordMetadata) {
+
         this(key, value, timestamp, headers,
             recordMetadata.map(RecordMetadata::topic).orElse(null),
             recordMetadata.map(RecordMetadata::partition).orElse(-1),
             recordMetadata.map(RecordMetadata::offset).orElse(-1L));
     }
 
-    public Record(final K key, final V value, final long timestamp, final Headers headers) {
+    public Record(final K key, final V value,
+        final long timestamp,
+        final org.apache.kafka.common.header.Headers headers) {
+
+        this(key, value, timestamp, StreamHeaders.wrap(headers), Optional.empty());
+    }
+
+    public Record(final K key, final V value,
+        final long timestamp,
+        final Headers headers) {
+
         this(key, value, timestamp, headers, Optional.empty());
     }
 
@@ -100,7 +156,7 @@ public class Record<K, V> implements RecordMetadata {
      * @throws IllegalArgumentException if the timestamp is negative.
      */
     public Record(final K key, final V value, final long timestamp) {
-        this(key, value, timestamp, null);
+        this(key, value, timestamp, (Headers) null);
     }
 
     /**
@@ -182,6 +238,10 @@ public class Record<K, V> implements RecordMetadata {
      * @return A new Record instance with all the same attributes (except that the headers are replaced).
      */
     public Record<K, V> withHeaders(final Headers headers) {
+        return new Record<>(key, value, timestamp, headers, recordMetadata());
+    }
+
+    public Record<K, V> withHeaders(final org.apache.kafka.common.header.Headers headers) {
         return new Record<>(key, value, timestamp, headers, recordMetadata());
     }
 

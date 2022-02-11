@@ -16,7 +16,7 @@
  */
 package org.apache.kafka.streams.kstream;
 
-import org.apache.kafka.streams.header.Headers;
+import org.apache.kafka.streams.processor.api.header.Headers;
 
 /**
  * Function to map Key Value pair into {@link Headers}.
