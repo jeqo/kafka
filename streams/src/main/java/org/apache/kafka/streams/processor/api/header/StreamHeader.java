@@ -55,12 +55,12 @@ public class StreamHeader implements Header {
     }
 
     @Override
-    public boolean equals(Object obj) {
+    public boolean equals(final Object obj) {
         if (obj == this) {
             return true;
         }
         if (obj instanceof Header) {
-            Header that = (Header) obj;
+            final Header that = (Header) obj;
             return Objects.equals(this.key, that.key()) && Arrays.equals(this.value(), that.value());
         }
         return false;
