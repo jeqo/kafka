@@ -17,6 +17,7 @@
 package org.apache.kafka.streams.processor.api.header;
 
 import java.util.Arrays;
+import java.util.Objects;
 import org.apache.kafka.common.utils.Utils;
 
 public class StreamHeader implements Header {
@@ -46,6 +47,23 @@ public class StreamHeader implements Header {
     @Override
     public String valueAsUtf8() {
         return Utils.utf8(value);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(key, Arrays.hashCode(value));
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (obj == this) {
+            return true;
+        }
+        if (obj instanceof Header) {
+            Header that = (Header) obj;
+            return Objects.equals(this.key, that.key()) && Arrays.equals(this.value(), that.value());
+        }
+        return false;
     }
 
     @Override
