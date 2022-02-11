@@ -35,7 +35,7 @@ public class RecordSerde<K, V> implements Serde<Record<K, V>> {
     final Serde<K> keySerde;
     final Serde<V> valueSerde;
 
-    public RecordSerde(Serde<K> keySerde, final Serde<V> valueSerde) {
+    public RecordSerde(final Serde<K> keySerde, final Serde<V> valueSerde) {
         this.keySerde = keySerde;
         this.valueSerde = valueSerde;
     }
@@ -55,7 +55,7 @@ public class RecordSerde<K, V> implements Serde<Record<K, V>> {
         final Serializer<K> keySerializer;
         final Serializer<V> valueSerializer;
 
-        RecordSerializer(Serializer<K> keySerializer, final Serializer<V> valueSerializer) {
+        RecordSerializer(final Serializer<K> keySerializer, final Serializer<V> valueSerializer) {
             this.keySerializer = keySerializer;
             this.valueSerializer = valueSerializer;
         }
