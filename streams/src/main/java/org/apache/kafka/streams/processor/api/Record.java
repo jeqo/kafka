@@ -20,6 +20,7 @@ import java.util.Optional;
 import org.apache.kafka.streams.errors.StreamsException;
 
 import java.util.Objects;
+import org.apache.kafka.streams.processor.api.header.Header;
 import org.apache.kafka.streams.processor.api.header.Headers;
 import org.apache.kafka.streams.processor.api.header.StreamHeaders;
 
@@ -37,6 +38,8 @@ import org.apache.kafka.streams.processor.api.header.StreamHeaders;
  * @param <V> The type of the value
  */
 public class Record<K, V> implements RecordMetadata {
+    public static final Header[] EMPTY_HEADERS = new Header[0];
+
     private final K key;
     private final V value;
     private final long timestamp;
@@ -133,6 +136,13 @@ public class Record<K, V> implements RecordMetadata {
 
     public Record(final K key, final V value,
         final long timestamp,
+        final org.apache.kafka.common.header.Header[] headers) {
+
+        this(key, value, timestamp, StreamHeaders.wrap(headers), Optional.empty());
+    }
+
+    public Record(final K key, final V value,
+        final long timestamp,
         final org.apache.kafka.common.header.Headers headers) {
 
         this(key, value, timestamp, StreamHeaders.wrap(headers), Optional.empty());
@@ -156,7 +166,7 @@ public class Record<K, V> implements RecordMetadata {
      * @throws IllegalArgumentException if the timestamp is negative.
      */
     public Record(final K key, final V value, final long timestamp) {
-        this(key, value, timestamp, (Headers) null);
+        this(key, value, timestamp, org.apache.kafka.common.record.Record.EMPTY_HEADERS);
     }
 
     /**
