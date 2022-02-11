@@ -35,7 +35,11 @@ public class RecordSerde<K, V> implements Serde<Record<K, V>> {
     final Serde<K> keySerde;
     final Serde<V> valueSerde;
 
-    public RecordSerde(final Serde<K> keySerde, final Serde<V> valueSerde) {
+    public static <K, V> RecordSerde<K, V> with(Serde<K> keySerde, Serde<V> valueSerde) {
+        return new RecordSerde<>(keySerde, valueSerde);
+    }
+
+    RecordSerde(final Serde<K> keySerde, final Serde<V> valueSerde) {
         this.keySerde = keySerde;
         this.valueSerde = valueSerde;
     }
@@ -88,7 +92,7 @@ public class RecordSerde<K, V> implements Serde<Record<K, V>> {
                     for (final Header header : headers) {
                         final String headerKey = header.key();
                         if (headerKey == null) {
-                            throw new IllegalArgumentException(
+                            throw new InvalidRecordException(
                                 "Invalid null header key found in headers");
                         }
 
@@ -110,7 +114,7 @@ public class RecordSerde<K, V> implements Serde<Record<K, V>> {
                     return outputStream.toByteArray();
                 }
             } catch (final IOException e) {
-                throw new RuntimeException(e); //TODO check what to do here
+                throw new InvalidRecordException("Found error when serializing record", e);
             }
         }
     }
@@ -132,7 +136,7 @@ public class RecordSerde<K, V> implements Serde<Record<K, V>> {
             // read key
             final int keySize = ByteUtils.readVarint(buffer);
             if (keySize < 0) {
-                throw new IllegalArgumentException(""); //TODO
+                throw new InvalidRecordException("Invalid record key size " + keySize);
             }
             final ByteBuffer keyBuffer = buffer.slice();
             keyBuffer.limit(keySize);
@@ -145,7 +149,7 @@ public class RecordSerde<K, V> implements Serde<Record<K, V>> {
             // read value
             final int valueSize = ByteUtils.readVarint(buffer);
             if (valueSize < 0) {
-                throw new IllegalArgumentException(""); //TODO
+                throw new InvalidRecordException("Invalid record value size " + valueSize);
             }
             final ByteBuffer valueBuffer = buffer.slice();
             valueBuffer.limit(valueSize);
@@ -158,7 +162,7 @@ public class RecordSerde<K, V> implements Serde<Record<K, V>> {
             // read record metadata
             final int topicSize = ByteUtils.readVarint(buffer);
             if (topicSize < 0) {
-                throw new IllegalArgumentException(""); //TODO
+                throw new InvalidRecordException("Invalid negative topic name size " + topicSize);
             }
             final ByteBuffer topicBuffer = buffer.slice();
             topicBuffer.limit(topicSize);

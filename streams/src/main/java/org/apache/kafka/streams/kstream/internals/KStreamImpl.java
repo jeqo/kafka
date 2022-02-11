@@ -345,7 +345,7 @@ public class KStreamImpl<K, V> extends AbstractStream<K, V> implements KStream<K
         return new KStreamImpl<>(
             name,
             keySerde,
-            new RecordSerde<>(keySerde, valueSerde),
+            RecordSerde.with(keySerde, valueSerde),
             subTopologySourceNodes,
             repartitionRequired,
             mapValuesProcessorNode,
