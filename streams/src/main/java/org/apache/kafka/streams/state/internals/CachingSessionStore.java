@@ -115,7 +115,8 @@ class CachingSessionStore
                             binaryKey.get(),
                             new Change<>(newValueBytes, sendOldValues ? oldValueBytes : null),
                             entry.entry().context().timestamp(),
-                            entry.entry().context().headers()));
+                            entry.entry().context().headers(),
+                            context.recordMetadata()));
                 } finally {
                     context.setRecordContext(current);
                 }

@@ -132,7 +132,8 @@ class CachingWindowStore
                             binaryWindowKey,
                             new Change<>(rawNewValue, sendOldValues ? rawOldValue : null),
                             entry.entry().context().timestamp(),
-                            entry.entry().context().headers()));
+                            entry.entry().context().headers(),
+                            context.recordMetadata()));
                 } finally {
                     context.setRecordContext(current);
                 }

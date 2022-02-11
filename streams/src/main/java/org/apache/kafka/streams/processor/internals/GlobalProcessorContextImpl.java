@@ -83,7 +83,7 @@ public class GlobalProcessorContextImpl extends AbstractProcessorContext<Object,
 
     @Override
     public <KIn, VIn> void forward(final KIn key, final VIn value) {
-        forward(new Record<>(key, value, timestamp(), headers()));
+        forward(new Record<>(key, value, timestamp(), headers(), recordMetadata()));
     }
 
     /**
