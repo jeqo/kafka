@@ -4939,11 +4939,11 @@ public interface KStream<K, V> {
         final String... stateStoreNames);
 
     <VOut> KStream<K, VOut> processValues(
-        final ProcessorSupplier<K, V, K, VOut> processorSupplier,
+        final ProcessorSupplier<K, V, Void, VOut> processorSupplier,
         final String... stateStoreNames);
 
     <VOut> KStream<K, VOut> processValues(
-        final ProcessorSupplier<K, V, K, VOut> processorSupplier,
+        final ProcessorSupplier<K, V, Void, VOut> processorSupplier,
         final Named named,
         final String... stateStoreNames);
 }

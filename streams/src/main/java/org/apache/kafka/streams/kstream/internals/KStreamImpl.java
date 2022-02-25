@@ -1537,7 +1537,7 @@ public class KStreamImpl<K, V> extends AbstractStream<K, V> implements KStream<K
 
     @Override
     public <VOut> KStream<K, VOut> processValues(
-        final ProcessorSupplier<K, V, K, VOut> processorSupplier,
+        final ProcessorSupplier<K, V, Void, VOut> processorSupplier,
         final String... stateStoreNames) {
 
         return processValues(processorSupplier, Named.as(builder.newProcessorName(PROCESSOR_NAME)), stateStoreNames);
@@ -1545,7 +1545,7 @@ public class KStreamImpl<K, V> extends AbstractStream<K, V> implements KStream<K
 
     @Override
     public <VOut> KStream<K, VOut> processValues(
-        final ProcessorSupplier<K, V, K, VOut> processorSupplier,
+        final ProcessorSupplier<K, V, Void, VOut> processorSupplier,
         final Named named,
         final String... stateStoreNames) {
 

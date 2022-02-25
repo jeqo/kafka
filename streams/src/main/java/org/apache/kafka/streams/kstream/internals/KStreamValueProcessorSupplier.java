@@ -24,9 +24,9 @@ import org.apache.kafka.streams.processor.api.ProcessorSupplier;
 import org.apache.kafka.streams.processor.api.Record;
 
 class KStreamValueProcessorSupplier<KIn, VIn, VOut> implements ProcessorSupplier<KIn, VIn, KIn, VOut> {
-    private final ProcessorSupplier<KIn, VIn, KIn, VOut> processorSupplier;
+    private final ProcessorSupplier<KIn, VIn, Void, VOut> processorSupplier;
 
-    public KStreamValueProcessorSupplier(final ProcessorSupplier<KIn, VIn, KIn, VOut> processorSupplier) {
+    public KStreamValueProcessorSupplier(final ProcessorSupplier<KIn, VIn, Void, VOut> processorSupplier) {
         this.processorSupplier = processorSupplier;
     }
 
@@ -36,11 +36,11 @@ class KStreamValueProcessorSupplier<KIn, VIn, VOut> implements ProcessorSupplier
     }
 
     static class KStreamValueProcessor<KIn, VIn, VOut> extends ContextualProcessor<KIn, VIn, KIn, VOut> {
-        private final Processor<KIn, VIn, KIn, VOut> processor;
+        private final Processor<KIn, VIn, Void, VOut> processor;
 
         private ValueProcessorContext<KIn, VOut> processorContext;
 
-        public KStreamValueProcessor(final Processor<KIn, VIn, KIn, VOut> processor) {
+        public KStreamValueProcessor(final Processor<KIn, VIn, Void, VOut> processor) {
             this.processor = processor;
         }
 
