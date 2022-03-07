@@ -24,9 +24,12 @@ import org.apache.kafka.common.utils.LogContext;
 import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.streams.errors.TopologyException;
 import org.apache.kafka.streams.errors.UnknownTopologyException;
+import org.apache.kafka.streams.internals.StreamsConfigUtils;
+import org.apache.kafka.streams.internals.StreamsConfigUtils.ProcessingMode;
 import org.apache.kafka.streams.processor.StateStore;
 import org.apache.kafka.streams.processor.TaskId;
 import org.apache.kafka.streams.processor.internals.InternalTopologyBuilder.TopicsInfo;
+import org.apache.kafka.streams.processor.internals.namedtopology.NamedTopology;
 import org.apache.kafka.streams.processor.internals.namedtopology.TopologyConfig.TaskConfig;
 
 import java.util.ArrayList;
@@ -50,6 +53,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -65,7 +69,9 @@ public class TopologyMetadata {
     private static final Pattern EMPTY_ZERO_LENGTH_PATTERN = Pattern.compile("");
 
     private final StreamsConfig config;
+    private final ProcessingMode processingMode;
     private final TopologyVersion version;
+    private final TaskExecutionMetadata taskExecutionMetadata;
 
     private final ConcurrentNavigableMap<String, InternalTopologyBuilder> builders; // Keep sorted by topology name for readability
 
@@ -93,32 +99,40 @@ public class TopologyMetadata {
 
     public TopologyMetadata(final InternalTopologyBuilder builder,
                             final StreamsConfig config) {
-        version = new TopologyVersion();
+        this.version = new TopologyVersion();
+        this.processingMode = StreamsConfigUtils.processingMode(config);
         this.config = config;
+
         builders = new ConcurrentSkipListMap<>();
         if (builder.hasNamedTopology()) {
             builders.put(builder.topologyName(), builder);
         } else {
             builders.put(UNNAMED_TOPOLOGY, builder);
         }
+        this.taskExecutionMetadata = new TaskExecutionMetadata(builders.keySet());
     }
 
     public TopologyMetadata(final ConcurrentNavigableMap<String, InternalTopologyBuilder> builders,
                             final StreamsConfig config) {
         this.version = new TopologyVersion();
+        this.processingMode = StreamsConfigUtils.processingMode(config);
         this.config = config;
         this.log = LoggerFactory.getLogger(getClass());
-
 
         this.builders = builders;
         if (builders.isEmpty()) {
             log.info("Created an empty KafkaStreams app with no topology");
         }
+        this.taskExecutionMetadata = new TaskExecutionMetadata(builders.keySet());
     }
 
     // Need to (re)set the log here to pick up the `processId` part of the clientId in the prefix
     public void setLog(final LogContext logContext) {
         log = logContext.logger(getClass());
+    }
+    
+    public ProcessingMode processingMode() {
+        return processingMode;
     }
 
     public long topologyVersion() {
@@ -148,6 +162,10 @@ public class TopologyMetadata {
     public void unregisterThread(final String threadName) {
         threadVersions.remove(threadName);
         maybeNotifyTopologyVersionWaitersAndUpdateThreadsTopologyVersion(threadName);
+    }
+
+    public TaskExecutionMetadata taskExecutionMetadata() {
+        return taskExecutionMetadata;
     }
 
     public void maybeNotifyTopologyVersionWaitersAndUpdateThreadsTopologyVersion(final String threadName) {
@@ -533,6 +551,13 @@ public class TopologyMetadata {
         } else {
             return builder;
         }
+    }
+
+    public Collection<NamedTopology> getAllNamedTopologies() {
+        return builders.values()
+            .stream()
+            .map(InternalTopologyBuilder::namedTopology)
+            .collect(Collectors.toSet());
     }
 
 
