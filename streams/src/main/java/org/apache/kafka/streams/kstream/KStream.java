@@ -4951,4 +4951,7 @@ public interface KStream<K, V> {
     <VOut> KStream<K, VOut> processValues(final FixedKeyProcessorSupplier<? super K, ? super V, VOut> processorSupplier,
                        final Named named,
                        final String... stateStoreNames);
+
+    <VOut> KStream<K, VOut> processValues(final FixedKeyProcessorSupplier<? super K, ? super V, VOut> processorSupplier,
+        final String... stateStoreNames);
 }

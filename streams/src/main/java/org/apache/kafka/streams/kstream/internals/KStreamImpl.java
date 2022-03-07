@@ -1536,46 +1536,53 @@ public class KStreamImpl<K, V> extends AbstractStream<K, V> implements KStream<K
             builder);
     }
 
+//    @Override
+//    public <VOut> KStream<K, VOut> processValues(
+//        final ProcessorSupplier<K, V, Void, VOut> processorSupplier,
+//        final String... stateStoreNames) {
+//
+//        return processValues(processorSupplier, Named.as(builder.newProcessorName(PROCESSOR_NAME)), stateStoreNames);
+//    }
+//
+//    @Override
+//    public <VOut> KStream<K, VOut> processValues(
+//        final ProcessorSupplier<K, V, Void, VOut> processorSupplier,
+//        final Named named,
+//        final String... stateStoreNames) {
+//
+//        Objects.requireNonNull(processorSupplier, "processorSupplier can't be null");
+//        Objects.requireNonNull(named, "named can't be null");
+//        Objects.requireNonNull(stateStoreNames, "stateStoreNames can't be a null array");
+//        ApiUtils.checkSupplier(processorSupplier);
+//        for (final String stateStoreName : stateStoreNames) {
+//            Objects.requireNonNull(stateStoreName, "stateStoreNames can't be null");
+//        }
+//
+//        final String name = new NamedInternal(named).name();
+//        final KStreamValueProcessorSupplier<? super K, ? super V, ? extends VOut> supplier = new KStreamValueProcessorSupplier<>(processorSupplier);
+//        final StatefulProcessorNode<? super K, ? super V> processNode = new StatefulProcessorNode<>(
+//            name,
+//            new ProcessorParameters<>(supplier, name),
+//            stateStoreNames);
+//
+//        builder.addGraphNode(graphNode, processNode);
+//
+//        // cannot inherit key and value serde
+//        return new KStreamImpl<>(
+//            name,
+//            keySerde,
+//            null,
+//            subTopologySourceNodes,
+//            repartitionRequired,
+//            processNode,
+//            builder);
+//    }
+
     @Override
-    public <VOut> KStream<K, VOut> processValues(
-        final ProcessorSupplier<K, V, Void, VOut> processorSupplier,
+    public <VOut> KStream<K, VOut> processValues(final FixedKeyProcessorSupplier<? super K, ? super V, VOut> processorSupplier,
         final String... stateStoreNames) {
 
         return processValues(processorSupplier, Named.as(builder.newProcessorName(PROCESSOR_NAME)), stateStoreNames);
-    }
-
-    @Override
-    public <VOut> KStream<K, VOut> processValues(
-        final ProcessorSupplier<K, V, Void, VOut> processorSupplier,
-        final Named named,
-        final String... stateStoreNames) {
-
-        Objects.requireNonNull(processorSupplier, "processorSupplier can't be null");
-        Objects.requireNonNull(named, "named can't be null");
-        Objects.requireNonNull(stateStoreNames, "stateStoreNames can't be a null array");
-        ApiUtils.checkSupplier(processorSupplier);
-        for (final String stateStoreName : stateStoreNames) {
-            Objects.requireNonNull(stateStoreName, "stateStoreNames can't be null");
-        }
-
-        final String name = new NamedInternal(named).name();
-        final KStreamValueProcessorSupplier<? super K, ? super V, ? extends VOut> supplier = new KStreamValueProcessorSupplier<>(processorSupplier);
-        final StatefulProcessorNode<? super K, ? super V> processNode = new StatefulProcessorNode<>(
-            name,
-            new ProcessorParameters<>(supplier, name),
-            stateStoreNames);
-
-        builder.addGraphNode(graphNode, processNode);
-
-        // cannot inherit key and value serde
-        return new KStreamImpl<>(
-            name,
-            keySerde,
-            null,
-            subTopologySourceNodes,
-            repartitionRequired,
-            processNode,
-            builder);
     }
 
     @Override
@@ -1607,6 +1614,4 @@ public class KStreamImpl<K, V> extends AbstractStream<K, V> implements KStream<K
             processNode,
             builder);
     }
-
-
 }
