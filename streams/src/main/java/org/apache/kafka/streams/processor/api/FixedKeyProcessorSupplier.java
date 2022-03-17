@@ -41,7 +41,7 @@ public interface FixedKeyProcessorSupplier<KIn, VIn, VOut> extends ConnectedStor
 
     /**
      * Return a newly constructed {@link Processor} instance.
-     * The supplier should always generate a new instance each time {@link  FixedKeyProcessorSupplier#get()} gets called.
+     * The supplier should always generate a new instance each time {@link FixedKeyProcessorSupplier#get()} gets called.
      * <p>
      * Creating a single {@link Processor} object and returning the same object reference in {@link FixedKeyProcessorSupplier#get()}
      * is a violation of the supplier pattern and leads to runtime exceptions.

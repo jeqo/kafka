@@ -27,7 +27,6 @@ import java.time.Duration;
  *
  * @param <KIn> the type of input keys
  * @param <VIn> the type of input values
- * @param <KOut> the type of output keys
  * @param <VOut> the type of output values
  */
 public interface FixedKeyProcessor<KIn, VIn, VOut> {

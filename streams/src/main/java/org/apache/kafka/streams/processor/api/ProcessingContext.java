@@ -33,7 +33,7 @@ import java.util.Optional;
 /**
  * Processor context interface.
  */
-public interface ProcessingContext {
+interface ProcessingContext {
 
     /**
      * Return the application id.
