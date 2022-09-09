@@ -1,17 +1,45 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.apache.kafka.connect.transforms.util;
-
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+import org.apache.kafka.connect.data.Field;
+import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
 
 public class FieldPath {
 
-    final String[] path;
+    private static final Map<String, FieldPath> PATHS_CACHE = new ConcurrentHashMap<>();
+    private final String[] path;
+
+    public static FieldPath from(String pathText) {
+        if (PATHS_CACHE.containsKey(pathText)) {
+            return PATHS_CACHE.get(pathText);
+        } else {
+            final FieldPath fieldPath = new FieldPath(pathText);
+            PATHS_CACHE.put(pathText, fieldPath);
+            return fieldPath;
+        }
+    }
 
     public FieldPath(String path) {
         if (path == null || path.isEmpty()) {
@@ -66,30 +94,44 @@ public class FieldPath {
         }
     }
 
-    public Optional<Object> valueAt(Struct struct) {
+    public Field fieldAt(Schema schema) {
+        Schema current = schema;
+        for (int i = 0; i < path.length; i++) {
+            if (current == null) return null;
+            if (i == path.length - 1) { // get value
+                return current.field(path[i]);
+            } else { // iterate
+                current = current.field(path[i]).schema();
+            }
+        }
+        return null;
+    }
+
+    public Object valueAt(Struct struct) {
         Struct current = struct;
         for (int i = 0; i < path.length; i++) {
-            if (current == null) return Optional.empty();
+            if (current == null) return null;
             if (i == path.length - 1) { // get value
-                return Optional.ofNullable(current.get(path[i]));
+                return current.get(path[i]);
             } else { // iterate
                 current = current.getStruct(path[i]);
             }
         }
-        return Optional.empty();
+        return null;
     }
 
-    public Optional<Object> valueAt(Map<String, Object> map) {
+    @SuppressWarnings("unchecked")
+    public Object valueAt(Map<String, Object> map) {
         Map<String, Object> current = new HashMap<>(map);
         for (int i = 0; i < path.length; i++) {
-            if (current == null) return Optional.empty();
+            if (current == null) return null;
             if (i == path.length - 1) {
-                return Optional.ofNullable(current.get(path[i]));
+                return current.get(path[i]);
             } else {
                 current = (Map<String, Object>) current.get(path[i]);
             }
         }
-        throw new UnsupportedOperationException("not implemented yet");
+        return null;
     }
 
     private String checkIncompleteBackticksPair(String field) {

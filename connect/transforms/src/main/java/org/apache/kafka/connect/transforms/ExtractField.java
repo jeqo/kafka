@@ -21,6 +21,8 @@ import org.apache.kafka.connect.connector.ConnectRecord;
 import org.apache.kafka.connect.data.Field;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
+import org.apache.kafka.connect.transforms.util.FieldPath;
+import org.apache.kafka.connect.transforms.util.FieldSyntaxVersion;
 import org.apache.kafka.connect.transforms.util.SimpleConfig;
 
 import java.util.Map;
@@ -39,16 +41,22 @@ public abstract class ExtractField<R extends ConnectRecord<R>> implements Transf
     private static final String FIELD_CONFIG = "field";
 
     public static final ConfigDef CONFIG_DEF = new ConfigDef()
-            .define(FIELD_CONFIG, ConfigDef.Type.STRING, ConfigDef.NO_DEFAULT_VALUE, ConfigDef.Importance.MEDIUM, "Field name to extract.");
+            .define(FIELD_CONFIG, ConfigDef.Type.STRING, ConfigDef.NO_DEFAULT_VALUE, ConfigDef.Importance.MEDIUM, "Field name to extract.")
+            .define(FIELD_SYNTAX_VERSION_CONFIG, ConfigDef.Type.STRING, FIELD_SYNTAX_VERSION_DEFAULT_VALUE, ConfigDef.Importance.HIGH, FIELD_SYNTAX_VERSION_DOC);
 
     private static final String PURPOSE = "field extraction";
 
     private String fieldName;
+    private FieldSyntaxVersion syntaxVersion;
 
     @Override
     public void configure(Map<String, ?> props) {
         final SimpleConfig config = new SimpleConfig(CONFIG_DEF, props);
         fieldName = config.getString(FIELD_CONFIG);
+        syntaxVersion = FieldSyntaxVersion.valueOf(config.getString(FIELD_SYNTAX_VERSION_CONFIG));
+        if (FieldSyntaxVersion.v2 == syntaxVersion) {
+            FieldPath.from(fieldName);
+        }
     }
 
     @Override
@@ -56,16 +64,16 @@ public abstract class ExtractField<R extends ConnectRecord<R>> implements Transf
         final Schema schema = operatingSchema(record);
         if (schema == null) {
             final Map<String, Object> value = requireMapOrNull(operatingValue(record), PURPOSE);
-            return newRecord(record, null, value == null ? null : value.get(fieldName));
+            return newRecord(record, null, value == null ? null : syntaxVersion.valueAtMap(value, fieldName));
         } else {
             final Struct value = requireStructOrNull(operatingValue(record), PURPOSE);
-            Field field = schema.field(fieldName);
+            Field field = syntaxVersion.fieldAtSchema(schema, fieldName);
 
             if (field == null) {
                 throw new IllegalArgumentException("Unknown field: " + fieldName);
             }
 
-            return newRecord(record, field.schema(), value == null ? null : value.get(fieldName));
+            return newRecord(record, field.schema(), value == null ? null : syntaxVersion.valueAtStruct(value, fieldName));
         }
     }
 

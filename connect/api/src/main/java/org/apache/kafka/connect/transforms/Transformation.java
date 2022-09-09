@@ -16,11 +16,14 @@
  */
 package org.apache.kafka.connect.transforms;
 
+import java.util.Map;
+import java.util.function.BiFunction;
 import org.apache.kafka.common.Configurable;
 import org.apache.kafka.common.config.ConfigDef;
 import org.apache.kafka.connect.connector.ConnectRecord;
 
 import java.io.Closeable;
+import org.apache.kafka.connect.data.Struct;
 
 /**
  * Single message transformation for Kafka Connect record types.
@@ -28,6 +31,11 @@ import java.io.Closeable;
  * Connectors can be configured with transformations to make lightweight message-at-a-time modifications.
  */
 public interface Transformation<R extends ConnectRecord<R>> extends Configurable, Closeable {
+
+    String FIELD_SYNTAX_VERSION_CONFIG = "";
+    String FIELD_SYNTAX_VERSION_DOC = "";
+
+    String FIELD_SYNTAX_VERSION_DEFAULT_VALUE = "v1";
 
     /**
      * Apply transformation to the {@code record} and return another record object (which may be {@code record} itself) or {@code null},
