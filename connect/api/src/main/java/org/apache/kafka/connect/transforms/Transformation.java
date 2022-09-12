@@ -16,14 +16,11 @@
  */
 package org.apache.kafka.connect.transforms;
 
-import java.util.Map;
-import java.util.function.BiFunction;
 import org.apache.kafka.common.Configurable;
 import org.apache.kafka.common.config.ConfigDef;
 import org.apache.kafka.connect.connector.ConnectRecord;
 
 import java.io.Closeable;
-import org.apache.kafka.connect.data.Struct;
 
 /**
  * Single message transformation for Kafka Connect record types.
