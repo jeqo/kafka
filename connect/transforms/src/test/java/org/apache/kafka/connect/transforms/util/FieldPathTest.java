@@ -30,4 +30,11 @@ class FieldPathTest {
     @Test void testNullPath() {
         assertArrayEquals(EMPTY_PATH, FieldPath.from(null).path());
     }
+
+    @Test void testWithoutDots() {
+        assertArrayEquals(new String[] {"foobarbaz"}, FieldPath.from("foobarbaz").path());
+    }
+    @Test void testWithoutWrappingBackticks() {
+        assertArrayEquals(new String[] {"foo`bar`baz"}, FieldPath.from("foo`bar`baz").path());
+    }
 }
