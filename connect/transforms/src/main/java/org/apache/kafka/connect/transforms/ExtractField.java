@@ -46,17 +46,14 @@ public abstract class ExtractField<R extends ConnectRecord<R>> implements Transf
 
     private static final String PURPOSE = "field extraction";
 
-    private String fieldName;
+    private FieldPath fieldPath;
     private FieldSyntaxVersion syntaxVersion;
 
     @Override
     public void configure(Map<String, ?> props) {
         final SimpleConfig config = new SimpleConfig(CONFIG_DEF, props);
-        fieldName = config.getString(FIELD_CONFIG);
         syntaxVersion = FieldSyntaxVersion.valueOf(config.getString(FIELD_SYNTAX_VERSION_CONFIG));
-        if (FieldSyntaxVersion.v2 == syntaxVersion) {
-            FieldPath.from(fieldName);
-        }
+        fieldPath = FieldPath.from(config.getString(FIELD_CONFIG), syntaxVersion);
     }
 
     @Override
@@ -64,16 +61,16 @@ public abstract class ExtractField<R extends ConnectRecord<R>> implements Transf
         final Schema schema = operatingSchema(record);
         if (schema == null) {
             final Map<String, Object> value = requireMapOrNull(operatingValue(record), PURPOSE);
-            return newRecord(record, null, value == null ? null : syntaxVersion.valueAtMap(value, fieldName));
+            return newRecord(record, null, value == null ? null : fieldPath.valueAt(value));
         } else {
             final Struct value = requireStructOrNull(operatingValue(record), PURPOSE);
-            Field field = syntaxVersion.fieldAtSchema(schema, fieldName);
+            Field field = fieldPath.fieldAt(schema);
 
             if (field == null) {
-                throw new IllegalArgumentException("Unknown field: " + fieldName);
+                throw new IllegalArgumentException("Unknown field: " + fieldPath);
             }
 
-            return newRecord(record, field.schema(), value == null ? null : syntaxVersion.valueAtStruct(value, fieldName));
+            return newRecord(record, field.schema(), value == null ? null : fieldPath.valueAt(value));
         }
     }
 
