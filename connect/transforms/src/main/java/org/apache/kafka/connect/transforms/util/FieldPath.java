@@ -28,10 +28,14 @@ import org.apache.kafka.connect.data.Struct;
 
 /**
  * Represents a path to a field within a structure within a Connect key/value (e.g. Struct or
- * Map<String, Object>). It follows a dotted notation to represent nested values. If field names
- * contain dots, can be escaped by wrapping field names with backticks. If field names contain dots
- * at wrapping positions (beginning or end of path, before or after dots), then backticks need to be
- * escaped by backslash. <br/> Paths are calculated once and cached for further access.
+ * Map<String, Object>).
+ * <ul>
+ * <li>It follows a dotted notation to represent nested values.</li>
+ * <li>If field names contain dots, can be escaped by wrapping field names with backticks.</li>
+ * <li>If field names contain dots at wrapping positions (beginning or end of path, before or after dots), then backticks need to be
+ * escaped by backslash.</li>
+ * </ul>
+ * Paths are calculated once and cached for further access.
  */
 public class FieldPath {
 
@@ -45,10 +49,16 @@ public class FieldPath {
 
     private final String[] path;
 
+    /**
+     * If version is V2, then paths are cached for further access.
+     *
+     * @param pathText field path expression
+     * @param version  field syntax version
+     */
     public static FieldPath from(String pathText, FieldSyntaxVersion version) {
-        if (pathText == null || pathText.isEmpty()) { // empty path
+        if (pathText == null || pathText.isEmpty() || version.equals(FieldSyntaxVersion.V1)) {
             return new FieldPath(pathText, version);
-        } else { // cache
+        } else {
             if (PATHS_CACHE.containsKey(pathText)) {
                 return PATHS_CACHE.get(pathText);
             } else {
@@ -152,6 +162,9 @@ public class FieldPath {
         return s.toString();
     }
 
+    /**
+     * Access field at the current path within a schema {@code Schema}
+     */
     public Field fieldAt(Schema schema) {
         Schema current = schema;
         if (path.length == 1) {
@@ -171,6 +184,9 @@ public class FieldPath {
         return null;
     }
 
+    /**
+     * Access value at the current path within a schema-based {@code Struct}
+     */
     public Object valueAt(Struct struct) {
         Struct current = struct;
         if (path.length == 1) {
@@ -190,6 +206,9 @@ public class FieldPath {
         return null;
     }
 
+    /**
+     * Access value at the current path within a schemaless {@code Map<String, Object>}
+     */
     @SuppressWarnings("unchecked")
     public Object valueAt(Map<String, Object> map) {
         Map<String, Object> current = new HashMap<>(map);
@@ -210,6 +229,9 @@ public class FieldPath {
         return null;
     }
 
+    /**
+     * Get a copy of the path steps
+     */
     public String[] path() {
         return Arrays.copyOf(path, path.length);
     }
