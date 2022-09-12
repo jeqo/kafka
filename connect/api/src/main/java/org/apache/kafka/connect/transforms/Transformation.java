@@ -32,7 +32,7 @@ public interface Transformation<R extends ConnectRecord<R>> extends Configurable
     String FIELD_SYNTAX_VERSION_CONFIG = "";
     String FIELD_SYNTAX_VERSION_DOC = "";
 
-    String FIELD_SYNTAX_VERSION_DEFAULT_VALUE = "v1";
+    String FIELD_SYNTAX_VERSION_DEFAULT_VALUE = "V1";
 
     /**
      * Apply transformation to the {@code record} and return another record object (which may be {@code record} itself) or {@code null},
