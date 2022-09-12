@@ -23,8 +23,8 @@ import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
 
 public enum FieldSyntaxVersion {
-    v1("v1", Map::get, Struct::get, Schema::field),
-    v2("v2",
+    V1("V1", Map::get, Struct::get, Schema::field),
+    V2("V2",
         (map, s) -> new FieldPath(s).valueAt(map),
         (struct, s) -> FieldPath.from(s).valueAt(struct),
         (schema, s) -> FieldPath.from(s).fieldAt(schema));
