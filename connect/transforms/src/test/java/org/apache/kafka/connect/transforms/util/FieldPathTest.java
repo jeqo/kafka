@@ -16,6 +16,8 @@
  */
 package org.apache.kafka.connect.transforms.util;
 
+import static org.apache.kafka.connect.transforms.util.FieldSyntaxVersion.V1;
+import static org.apache.kafka.connect.transforms.util.FieldSyntaxVersion.V2;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 
 import org.junit.jupiter.api.Test;
@@ -23,18 +25,47 @@ import org.junit.jupiter.api.Test;
 class FieldPathTest {
     final static String[] EMPTY_PATH = new String[]{};
 
+    @Test void shouldHandleV1WithDotsAndBacktickPair() {
+        assertArrayEquals(new String[] {"foo.bar.baz"}, FieldPath.from("foo.bar.baz", V1).path());
+        assertArrayEquals(new String[] {"foo.`bar.baz`"}, FieldPath.from("foo.`bar.baz`", V1).path());
+    }
+
     @Test void testEmptyPath() {
-        assertArrayEquals(EMPTY_PATH, FieldPath.from("").path());
+        assertArrayEquals(EMPTY_PATH, FieldPath.from("", V2).path());
     }
 
     @Test void testNullPath() {
-        assertArrayEquals(EMPTY_PATH, FieldPath.from(null).path());
+        assertArrayEquals(EMPTY_PATH, FieldPath.from(null, V2).path());
     }
 
     @Test void testWithoutDots() {
-        assertArrayEquals(new String[] {"foobarbaz"}, FieldPath.from("foobarbaz").path());
+        assertArrayEquals(new String[] {"foobarbaz"}, FieldPath.from("foobarbaz", V2).path());
     }
     @Test void testWithoutWrappingBackticks() {
-        assertArrayEquals(new String[] {"foo`bar`baz"}, FieldPath.from("foo`bar`baz").path());
+        assertArrayEquals(new String[] {"foo`bar`baz"}, FieldPath.from("foo`bar`baz", V2).path());
+    }
+
+    @Test void shouldBuildPathWhenIncludesDots() {
+        assertArrayEquals(new String[] {"foo", "bar", "baz"}, FieldPath.from("foo.bar.baz", V2).path());
+    }
+
+    @Test void shouldBuildPathWhenIncludesDotsAndBacktickPair() {
+        assertArrayEquals(new String[] {"foo", "bar.baz"}, FieldPath.from("foo.`bar.baz`", V2).path());
+        assertArrayEquals(new String[] {"foo", "bar", "baz"}, FieldPath.from("foo.`bar`.baz", V2).path());
+    }
+
+    @Test void shouldBuildPathAndIgnoreBackticksThatAreNotWrapping() {
+        assertArrayEquals(new String[] {"foo", "ba`r.baz"}, FieldPath.from("foo.`ba`r.baz`", V2).path());
+        assertArrayEquals(new String[] {"foo", "ba`r", "baz"}, FieldPath.from("foo.ba`r.baz", V2).path());
+    }
+
+    @Test void shouldBuildPathAndEscapeBackticks() {
+        assertArrayEquals(new String[] {"foo", "bar`.`baz"}, FieldPath.from("foo.`bar\\`.\\`baz`", V2).path());
+        assertArrayEquals(new String[] {"foo", "bar\\`.`baz"}, FieldPath.from("foo.`bar\\\\`.\\`baz`", V2).path());
+    }
+
+    @Test void shouldBuildPathWithoutWrappingBackticks() {
+        assertArrayEquals(new String[] {"foo", "`bar`", "baz"}, FieldPath.from("foo.``bar``.baz", V2).path());
+        assertArrayEquals(new String[] {"`foo.bar.baz`"}, FieldPath.from("``foo.bar.baz``", V2).path());
     }
 }
