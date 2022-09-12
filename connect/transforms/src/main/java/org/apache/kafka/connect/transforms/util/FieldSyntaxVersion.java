@@ -16,43 +16,19 @@
  */
 package org.apache.kafka.connect.transforms.util;
 
-import java.util.Map;
-import java.util.function.BiFunction;
-import org.apache.kafka.connect.data.Field;
-import org.apache.kafka.connect.data.Schema;
-import org.apache.kafka.connect.data.Struct;
-
 public enum FieldSyntaxVersion {
-    V1("V1", Map::get, Struct::get, Schema::field),
-    V2("V2",
-        (map, s) -> new FieldPath(s).valueAt(map),
-        (struct, s) -> FieldPath.from(s).valueAt(struct),
-        (schema, s) -> FieldPath.from(s).fieldAt(schema));
+    /**
+     * No support for nested fields.
+     */
+    V1("V1"),
+    /**
+     * Support for nested fields using dotted notation with backtick pairs to wrap field names that include dots.
+     */
+    V2("V2");
 
     public final String name;
-    private final BiFunction<Map<String, Object>, String, Object> valueAtMap;
-    private final BiFunction<Struct, String, Object> valueAtStruct;
-    private final BiFunction<Schema, String, Field> fieldAtSchema;
 
-    FieldSyntaxVersion(final String name,
-        BiFunction<Map<String, Object>, String, Object> valueAtMap,
-        BiFunction<Struct, String, Object> valueAtStruct,
-        BiFunction<Schema, String, Field> fieldAtStruct) {
+    FieldSyntaxVersion(final String name) {
         this.name = name;
-        this.valueAtMap = valueAtMap;
-        this.valueAtStruct = valueAtStruct;
-        this.fieldAtSchema = fieldAtStruct;
-    }
-
-    public Object valueAtMap(Map<String, Object> map, String fieldName) {
-        return valueAtMap.apply(map, fieldName);
-    }
-
-    public Object valueAtStruct(Struct struct, String fieldName) {
-        return valueAtStruct.apply(struct, fieldName);
-    }
-
-    public Field fieldAtSchema(Schema schema, String fieldName) {
-        return fieldAtSchema.apply(schema, fieldName);
     }
 }
