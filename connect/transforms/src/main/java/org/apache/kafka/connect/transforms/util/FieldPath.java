@@ -238,9 +238,7 @@ public class FieldPath {
 
     @Override
     public String toString() {
-        return new StringJoiner(", ", FieldPath.class.getSimpleName() + "[", "]")
-            .add("path=" + Arrays.toString(path))
-            .toString();
+        return "path=" + Arrays.toString(path);
     }
 
     @Override
