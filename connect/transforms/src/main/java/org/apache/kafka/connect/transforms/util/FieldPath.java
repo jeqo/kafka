@@ -21,14 +21,21 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.StringJoiner;
 import org.apache.kafka.connect.data.Field;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
 
 public class FieldPath {
 
-    private static final Map<String, FieldPath> PATHS_CACHE = new ConcurrentHashMap<>();
+    private static final String BACKTICK = "`";
+    private static final String DOT = ".";
+    public static final char BACKTICK_CHAR = '`';
+    public static final char DOT_CHAR = '.';
+    public static final char BACKSLASH_CHAR = '\\';
+
+    private static final Map<String, FieldPath> PATHS_CACHE = new HashMap<>();
+
     private final String[] path;
 
     public static FieldPath from(String pathText) {
@@ -41,57 +48,85 @@ public class FieldPath {
         }
     }
 
-    public FieldPath(String path) {
-        if (path == null || path.isEmpty()) {
+    FieldPath(String path) {
+        if (path == null || path.isEmpty()) { // empty path
             this.path = new String[] {};
         } else {
-            if (!path.contains(".")) {
+            if (!path.contains(DOT) &&
+                !(path.startsWith(BACKTICK) && path.endsWith(BACKTICK))) { // does not need path steps
                 this.path = new String[] {path};
             } else {
-                List<String> fields = new ArrayList<>();
+                // track fields in path steps
+                List<String> steps = new ArrayList<>();
+                // reuse string bits, will shrink as path is built
                 StringBuilder s = new StringBuilder(path);
+
                 while (s.length() > 0) {
-                    if (s.charAt(0) == '`') { // opening backtick pair
+                    if (s.charAt(0) == BACKTICK_CHAR) { // has opening backtick pair
                         s.deleteCharAt(0);
+
+                        // find backtick pair
                         int idx = 0;
-                        int lastIdx = s.length() - 1;
-                        while (idx <= lastIdx) {
-                            final int atBacktick = s.indexOf("`", idx);
-                            if (atBacktick == -1) {
+                        while (idx >= 0) {
+                            idx = s.indexOf(BACKTICK, idx);
+                            if (idx == -1) {
                                 throw new IllegalArgumentException(
-                                    "incomplete backtick pair at " + s);
+                                    "Incomplete backtick pair at [...]`" + s);
                             }
-                            if (atBacktick != lastIdx) { // non-global backtick
-                                if (s.charAt(atBacktick + 1) != '.') { // not wrapping
-                                    idx = atBacktick + 1; // move index forward and keep searching
-                                } else if (s.charAt(atBacktick - 1) == '\\') { // escaped
-                                    idx = atBacktick + 1; // move index forward and keep searching
-                                } else {
-                                    fields.add(checkIncompleteBackticksPair(s.substring(0, atBacktick))); // get field
-                                    idx = lastIdx + 1; // go out
-                                    s.delete(0, atBacktick + 2); // rm backtick and dot
+                            if (idx != s.length() - 1) { // non-global backtick
+                                if (s.charAt(idx + 1) != DOT_CHAR ||
+                                    s.charAt(idx - 1) == BACKSLASH_CHAR) { // not wrapped or escaped
+                                    idx++; // move index forward and keep searching
+                                } else { // it's end pair
+                                    steps.add(checkIncompleteBacktickPair(s.substring(0, idx)));
+                                    s.delete(0, idx + 2); // rm backtick and dot
+                                    break;
                                 }
                             } else { // global backtick
-                                fields.add(checkIncompleteBackticksPair(s.substring(0, atBacktick))); // get within backticks
-                                idx = lastIdx + 1; // go out
-                                s.delete(0, atBacktick + 1);
+                                steps.add(checkIncompleteBacktickPair(s.substring(0, idx)));
+                                s.delete(0, s.length());
+                                break;
                             }
                         }
-                    } else {
-                        // by dots
-                        final int atDot = s.indexOf(".");
-                        if (atDot > 0) { // get and move forward
-                            fields.add(checkIncompleteBackticksPair(s.substring(0, atDot)));
+                    } else { // by dots
+                        final int atDot = s.indexOf(DOT);
+                        if (atDot > 0) { // get step and move forward
+                            steps.add(checkIncompleteBacktickPair(s.substring(0, atDot)));
                             s.delete(0, atDot + 1);
                         } else { // add all
-                            fields.add(checkIncompleteBackticksPair(s.toString()));
+                            steps.add(checkIncompleteBacktickPair(s.toString()));
                             s.delete(0, s.length());
                         }
                     }
                 }
-                this.path = fields.toArray(new String[0]);
+
+                this.path = steps.toArray(new String[0]);
             }
         }
+    }
+
+    private String checkIncompleteBacktickPair(String field) {
+        StringBuilder s = new StringBuilder(field);
+        int idx = 0;
+        while (idx >= 0) {
+            idx = s.indexOf(BACKTICK, idx + 1);
+            if (idx >= 1 && s.length() > 2) {
+                if (s.charAt(idx - 1) == DOT_CHAR
+                    || (idx < s.length() - 1 && s.charAt(idx + 1) == DOT_CHAR
+                    && s.charAt(idx - 1) != BACKSLASH_CHAR)) {
+                    throw new IllegalArgumentException("Incomplete backtick pair at [...]" + field);
+                }
+                if (s.charAt(idx - 1) == BACKSLASH_CHAR) { // escape backtick
+                    if (s.charAt(idx + 1) == DOT_CHAR || // before a dot
+                        s.charAt(idx - 2) == DOT_CHAR || // after a dot
+                        (idx == 1 && s.charAt(0) == BACKSLASH_CHAR) // at the beginning
+                        || idx == s.length() - 1) { // at the end
+                        s.deleteCharAt(idx - 1);
+                    }
+                }
+            }
+        }
+        return s.toString();
     }
 
     public Field fieldAt(Schema schema) {
@@ -134,26 +169,32 @@ public class FieldPath {
         return null;
     }
 
-    private String checkIncompleteBackticksPair(String field) {
-        StringBuilder s = new StringBuilder(field);
-        int idx = 0;
-        while (idx >= 0) {
-            idx = s.indexOf("`", idx + 1);
-            if (idx >= 1 && s.length() > 2) {
-                if (s.charAt(idx - 1) == '.' || (idx < s.length() - 1 && s.charAt(idx + 1) == '.' && s.charAt(idx - 1) != '\\')) {
-                    throw new IllegalArgumentException("incomplete backtick pair at " + field);
-                }
-                if (s.charAt(idx - 1) == '\\') {
-                    if (s.charAt(idx + 1) == '.' || // before a dot
-                        s.charAt(idx - 2) == '.' || // after a dot
-                        (idx == 1 && s.charAt(0) == '\\') // at the beginning
-                        || idx == s.length() - 1) { // at the end
-                        s.deleteCharAt(idx - 1);
-                    }
-                }
-            }
+    public String[] path() {
+        return Arrays.copyOf(path, path.length);
+    }
+
+    @Override
+    public String toString() {
+        return new StringJoiner(", ", FieldPath.class.getSimpleName() + "[", "]")
+            .add("path=" + Arrays.toString(path))
+            .toString();
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
         }
-        return s.toString();
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        FieldPath fieldPath = (FieldPath) o;
+        return Arrays.equals(path, fieldPath.path);
+    }
+
+    @Override
+    public int hashCode() {
+        return Arrays.hashCode(path);
     }
 
     public static void main(String[] args) {
