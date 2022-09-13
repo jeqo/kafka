@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.kafka.connect.transforms.util;
+package org.apache.kafka.connect.transforms;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -24,8 +24,10 @@ import java.util.Map;
 import java.util.function.BiConsumer;
 import org.apache.kafka.connect.data.Field;
 import org.apache.kafka.connect.data.Schema;
+import org.apache.kafka.connect.data.Schema.Type;
 import org.apache.kafka.connect.data.SchemaBuilder;
 import org.apache.kafka.connect.data.Struct;
+import org.apache.kafka.connect.transforms.util.SchemaUtil;
 
 /**
  * Represents a path to a field within a structure within a Connect key/value (e.g. Struct or
@@ -246,21 +248,26 @@ public class FieldPath {
         }
     }
 
-    public Schema updateSchemaAt(Schema operatingSchema, BiConsumer<SchemaBuilder, Field> change) {
-        final SchemaBuilder builder = SchemaUtil.copySchemaBasics(operatingSchema, SchemaBuilder.struct());
-        return updateSchema(operatingSchema, builder, 0, change);
+    public Schema updateSchemaAt(Schema schema, BiConsumer<SchemaBuilder, Field> change) {
+        final SchemaBuilder builder = SchemaUtil.copySchemaBasics(schema, SchemaBuilder.struct());
+        return updateSchema(schema, builder, 0, change);
     }
 
-    private Schema updateSchema(Schema operatingSchema, SchemaBuilder builder, int i, BiConsumer<SchemaBuilder, Field> change) {
+    private Schema updateSchema(Schema operatingSchema, SchemaBuilder builder, int step, BiConsumer<SchemaBuilder, Field> change) {
+        if (operatingSchema.isOptional()) builder.optional();
+//        if (schema.defaultValue() != null) {
+//            Struct updatedDefaultValue = applyValueWithSchema((Struct) schema.defaultValue(), builder);
+//            builder.defaultValue(updatedDefaultValue);
+//        }
         for (Field field : operatingSchema.fields()) {
-            if (i < path.length) {
-                if (!path[i].contains(field.name())) {
+            if (step < path.length) {
+                if (!path[step].equals(field.name())) {
                     builder.field(field.name(), field.schema());
                 } else {
-                    if (i == path.length - 1) {
+                    if (step == path.length - 1) {
                         change.accept(builder, field);
                     } else {
-                        builder.field(field.name(), updateSchema(field.schema(), SchemaBuilder.struct(), i + 1, change));
+                        builder.field(field.name(), updateSchema(field.schema(), SchemaBuilder.struct(), step + 1, change));
                     }
                 }
             } else {
@@ -270,10 +277,57 @@ public class FieldPath {
         return builder.build();
     }
 
-    /**
-     * Get a copy of the path steps
-     */
-    public String[] path() {
+    public Map<String, Object> updateValueAt(Map<String, Object> value, TriConsumer<Map<String, Object>, String, Object> change) {
+        return updateValue(value, 0, change);
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> updateValue(Map<String, Object> value, int step, TriConsumer<Map<String, Object>, String, Object> change) {
+        Map<String, Object> updated = new HashMap<>(value);
+        for (Map.Entry<String, Object> entry : value.entrySet()) {
+            if (step < path.length) {
+                if (path[step].equals(entry.getKey())) {
+                    if (step == path.length - 1) {
+                        change.accept(updated, path[step], entry.getValue());
+                    } else {
+                        if (entry.getValue() instanceof Map) {
+                            updated.put(
+                                entry.getKey(),
+                                updateValue((Map<String, Object>) entry.getValue(), step + 1, change));
+                        }
+                    }
+                }
+            }
+        }
+        return updated;
+    }
+
+    public Struct updateValueAt(Struct value, Schema schema, TriConsumer<Struct, Field, Object> change) {
+        return updateValue(value, schema, 0, change);
+    }
+
+    private Struct updateValue(Struct value, Schema schema, int step, TriConsumer<Struct, Field, Object> change) {
+        Struct updated = new Struct(schema);
+        for (Field field : schema.fields()) {
+            if (step < path.length) {
+                if (path[step].equals(field.name())) {
+                    if (step == path.length - 1) {
+                        change.accept(updated, field, value.get(field.name()));
+                    } else {
+                        if (field.schema().type() == Type.STRUCT) {
+                            updated.put(field, updateValue(value.getStruct(field.name()), field.schema(), step + 1, change));
+                        }
+                    }
+                } else {
+                    updated.put(field, value.get(field));
+                }
+            }
+        }
+        return updated;
+    }
+
+    // For testing
+    String[] path() {
         return Arrays.copyOf(path, path.length);
     }
 
@@ -297,5 +351,18 @@ public class FieldPath {
     @Override
     public int hashCode() {
         return Arrays.hashCode(path);
+    }
+
+    public String last() {
+        return path[path.length - 1];
+    }
+
+    public boolean isEmpty() {
+        return path.length == 0;
+    }
+
+    @FunctionalInterface
+    interface TriConsumer<T, U, V> {
+        void accept(T t, U u, V v);
     }
 }

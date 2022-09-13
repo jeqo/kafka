@@ -21,8 +21,6 @@ import org.apache.kafka.connect.connector.ConnectRecord;
 import org.apache.kafka.connect.data.Field;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
-import org.apache.kafka.connect.transforms.util.FieldPath;
-import org.apache.kafka.connect.transforms.util.FieldSyntaxVersion;
 import org.apache.kafka.connect.transforms.util.SimpleConfig;
 
 import java.util.Map;
