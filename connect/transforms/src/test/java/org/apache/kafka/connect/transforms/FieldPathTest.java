@@ -114,7 +114,8 @@ class FieldPathTest {
         final Struct value = new Struct(schema).put("foo", new Struct(barSchema).put("bar", 42));
 
         final Struct updated = FieldPath.from("foo.bar", FieldSyntaxVersion.V2)
-            .updateValueAt(value, schema, (s, f, v) -> s.put(f, ((Integer) v) * 2));
+            .updateValueAt(schema, value, schema,
+                (oldField, updatedField, s, v) -> s.put(updatedField, ((Integer) v) * 2));
         assertEquals(84, updated.getStruct("foo").getInt32("bar"));
     }
 }
