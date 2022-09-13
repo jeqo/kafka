@@ -255,6 +255,7 @@ public class FieldPath {
 
     private Schema updateSchema(Schema operatingSchema, SchemaBuilder builder, int step, BiConsumer<SchemaBuilder, Field> change) {
         if (operatingSchema.isOptional()) builder.optional();
+        // TODO: how to handle default values generally? Needed by TimestampConverter
 //        if (schema.defaultValue() != null) {
 //            Struct updatedDefaultValue = applyValueWithSchema((Struct) schema.defaultValue(), builder);
 //            builder.defaultValue(updatedDefaultValue);
@@ -277,18 +278,18 @@ public class FieldPath {
         return builder.build();
     }
 
-    public Map<String, Object> updateValueAt(Map<String, Object> value, TriConsumer<Map<String, Object>, String, Object> change) {
+    public Map<String, Object> updateValueAt(Map<String, Object> value, MapValueUpdater change) {
         return updateValue(value, 0, change);
     }
 
     @SuppressWarnings("unchecked")
-    private Map<String, Object> updateValue(Map<String, Object> value, int step, TriConsumer<Map<String, Object>, String, Object> change) {
+    private Map<String, Object> updateValue(Map<String, Object> value, int step, MapValueUpdater change) {
         Map<String, Object> updated = new HashMap<>(value);
         for (Map.Entry<String, Object> entry : value.entrySet()) {
             if (step < path.length) {
                 if (path[step].equals(entry.getKey())) {
                     if (step == path.length - 1) {
-                        change.accept(updated, path[step], entry.getValue());
+                        change.apply(updated, path[step], entry.getValue());
                     } else {
                         if (entry.getValue() instanceof Map) {
                             updated.put(
@@ -302,20 +303,25 @@ public class FieldPath {
         return updated;
     }
 
-    public Struct updateValueAt(Struct value, Schema schema, TriConsumer<Struct, Field, Object> change) {
-        return updateValue(value, schema, 0, change);
+    public Struct updateValueAt(Schema schema, Struct value, Schema updatedSchema, StructValueUpdater change) {
+        return updateValue(schema, value, updatedSchema, 0, change);
     }
 
-    private Struct updateValue(Struct value, Schema schema, int step, TriConsumer<Struct, Field, Object> change) {
-        Struct updated = new Struct(schema);
+    private Struct updateValue(Schema schema, Struct value, Schema updateSchema, int step, StructValueUpdater change) {
+        Struct updated = new Struct(updateSchema);
         for (Field field : schema.fields()) {
             if (step < path.length) {
                 if (path[step].equals(field.name())) {
                     if (step == path.length - 1) {
-                        change.accept(updated, field, value.get(field.name()));
+                        change.apply(field, updateSchema.field(field.name()), updated, value.get(field.name()));
                     } else {
                         if (field.schema().type() == Type.STRUCT) {
-                            updated.put(field, updateValue(value.getStruct(field.name()), field.schema(), step + 1, change));
+                            updated.put(
+                                field,
+                                updateValue(field.schema(), value.getStruct(field.name()),
+                                updateSchema.field(field.name()).schema(),
+                                step + 1,
+                                change));
                         }
                     }
                 } else {
@@ -362,7 +368,12 @@ public class FieldPath {
     }
 
     @FunctionalInterface
-    interface TriConsumer<T, U, V> {
-        void accept(T t, U u, V v);
+    interface StructValueUpdater {
+        void apply(Field oldField, Field updatedField, Struct updated, Object value);
+    }
+
+    @FunctionalInterface
+    interface MapValueUpdater {
+        void apply(Map<String, Object> map, String fieldName, Object value);
     }
 }
