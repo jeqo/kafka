@@ -19,7 +19,10 @@ package org.apache.kafka.connect.transforms.util;
 import static org.apache.kafka.connect.transforms.util.FieldSyntaxVersion.V1;
 import static org.apache.kafka.connect.transforms.util.FieldSyntaxVersion.V2;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import org.apache.kafka.connect.data.Schema;
+import org.apache.kafka.connect.data.SchemaBuilder;
 import org.junit.jupiter.api.Test;
 
 class FieldPathTest {
@@ -67,5 +70,31 @@ class FieldPathTest {
     @Test void shouldBuildPathWithoutWrappingBackticks() {
         assertArrayEquals(new String[] {"foo", "`bar`", "baz"}, FieldPath.from("foo.``bar``.baz", V2).path());
         assertArrayEquals(new String[] {"`foo.bar.baz`"}, FieldPath.from("``foo.bar.baz``", V2).path());
+    }
+
+    @Test void shouldFilterSchemaFields() {
+        Schema schema = SchemaBuilder.struct().field("foo",
+            SchemaBuilder.struct().field("bar", Schema.STRING_SCHEMA)
+                .field("baz", Schema.INT32_SCHEMA))
+            .build();
+        Schema result = FieldPath.from("foo.baz", V2).updateSchemaAt(schema, (builder, field) -> {
+            // ignore field
+        });
+        assertEquals(result.fields().size(), 1);
+        assertEquals(result.field("foo").schema().fields().size(), 1);
+        assertEquals(result.field("foo").schema().fields().get(0).name(), "bar");
+    }
+
+    @Test void shouldRenameSchemaFields() {
+        Schema schema = SchemaBuilder.struct().field("foo",
+                SchemaBuilder.struct().field("bar", Schema.STRING_SCHEMA)
+                    .field("baz", Schema.INT32_SCHEMA))
+            .build();
+        Schema result = FieldPath.from("foo.baz", V2)
+            .updateSchemaAt(schema, (builder, field) -> builder.field("other", field.schema()));
+        assertEquals(result.fields().size(), 1);
+        assertEquals(result.field("foo").schema().fields().size(), 2);
+        assertEquals(result.field("foo").schema().fields().get(0).name(), "bar");
+        assertEquals(result.field("foo").schema().fields().get(1).name(), "other");
     }
 }

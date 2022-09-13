@@ -41,7 +41,7 @@ public class ExtractFieldTest {
     }
 
     @Test
-    public void withSchemaless() {
+    public void schemaless() {
         xform.configure(Collections.singletonMap("field", "magic"));
 
         final SinkRecord record = new SinkRecord("test", 0, null, Collections.singletonMap("magic", 42), null, null, 0);
@@ -52,7 +52,7 @@ public class ExtractFieldTest {
     }
 
     @Test
-    public void withNestedSchemaless() {
+    public void schemalessAndNestedPath() {
         Map<String, String> configs = new HashMap<>();
         configs.put(Transformation.FIELD_SYNTAX_VERSION_CONFIG, FieldSyntaxVersion.V2.name());
         configs.put("field", "magic.foo");
@@ -92,7 +92,7 @@ public class ExtractFieldTest {
     }
 
     @Test
-    public void withNestedSchema() {
+    public void withSchemaAndNestedPath() {
         Map<String, String> configs = new HashMap<>();
         configs.put(Transformation.FIELD_SYNTAX_VERSION_CONFIG, FieldSyntaxVersion.V2.name());
         configs.put("field", "magic.foo");

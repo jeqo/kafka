@@ -21,9 +21,10 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.StringJoiner;
+import java.util.function.BiConsumer;
 import org.apache.kafka.connect.data.Field;
 import org.apache.kafka.connect.data.Schema;
+import org.apache.kafka.connect.data.SchemaBuilder;
 import org.apache.kafka.connect.data.Struct;
 
 /**
@@ -166,10 +167,10 @@ public class FieldPath {
      * Access field at the current path within a schema {@code Schema}
      */
     public Field fieldAt(Schema schema) {
-        Schema current = schema;
         if (path.length == 1) {
-            return current.field(path[0]);
+            return schema.field(path[0]);
         } else {
+            Schema current = schema;
             for (int i = 0; i < path.length; i++) {
                 if (current == null) {
                     return null;
@@ -188,10 +189,10 @@ public class FieldPath {
      * Access value at the current path within a schema-based {@code Struct}
      */
     public Object valueAt(Struct struct) {
-        Struct current = struct;
         if (path.length == 1) {
-            return current.get(path[0]);
+            return struct.get(path[0]);
         } else {
+            Struct current = struct;
             for (int i = 0; i < path.length; i++) {
                 if (current == null) {
                     return null;
@@ -211,10 +212,10 @@ public class FieldPath {
      */
     @SuppressWarnings("unchecked")
     public Object valueAt(Map<String, Object> map) {
-        Map<String, Object> current = new HashMap<>(map);
         if (path.length == 1) {
-            return current.get(path[0]);
+            return map.get(path[0]);
         } else {
+            Map<String, Object> current = map;
             for (int i = 0; i < path.length; i++) {
                 if (current == null) {
                     return null;
@@ -227,6 +228,46 @@ public class FieldPath {
             }
         }
         return null;
+    }
+
+    @SuppressWarnings("unchecked")
+    public void deleteFieldAt(Map<String, Object> map) {
+        if (path.length == 1) {
+            map.remove(path[0]);
+        } else {
+            Map<String, Object> current = map;
+            for (int i = 0; i < path.length; i++) {
+                if (i == path.length - 1) {
+                    current.remove(path[i]);
+                } else {
+                    current = (Map<String, Object>) current.get(path[i]);
+                }
+            }
+        }
+    }
+
+    public Schema updateSchemaAt(Schema operatingSchema, BiConsumer<SchemaBuilder, Field> change) {
+        final SchemaBuilder builder = SchemaUtil.copySchemaBasics(operatingSchema, SchemaBuilder.struct());
+        return updateSchema(operatingSchema, builder, 0, change);
+    }
+
+    private Schema updateSchema(Schema operatingSchema, SchemaBuilder builder, int i, BiConsumer<SchemaBuilder, Field> change) {
+        for (Field field : operatingSchema.fields()) {
+            if (i < path.length) {
+                if (!path[i].contains(field.name())) {
+                    builder.field(field.name(), field.schema());
+                } else {
+                    if (i == path.length - 1) {
+                        change.accept(builder, field);
+                    } else {
+                        builder.field(field.name(), updateSchema(field.schema(), SchemaBuilder.struct(), i + 1, change));
+                    }
+                }
+            } else {
+                builder.field(field.name(), field.schema());
+            }
+        }
+        return builder.build();
     }
 
     /**

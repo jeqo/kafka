@@ -47,12 +47,11 @@ public abstract class ExtractField<R extends ConnectRecord<R>> implements Transf
     private static final String PURPOSE = "field extraction";
 
     private FieldPath fieldPath;
-    private FieldSyntaxVersion syntaxVersion;
 
     @Override
     public void configure(Map<String, ?> props) {
         final SimpleConfig config = new SimpleConfig(CONFIG_DEF, props);
-        syntaxVersion = FieldSyntaxVersion.valueOf(config.getString(FIELD_SYNTAX_VERSION_CONFIG));
+        FieldSyntaxVersion syntaxVersion = FieldSyntaxVersion.valueOf(config.getString(FIELD_SYNTAX_VERSION_CONFIG));
         fieldPath = FieldPath.from(config.getString(FIELD_CONFIG), syntaxVersion);
     }
 
