@@ -24,91 +24,152 @@ import java.util.Map;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.SchemaBuilder;
 import org.apache.kafka.connect.data.Struct;
+import org.apache.kafka.connect.transforms.util.SchemaUtil;
 import org.junit.jupiter.api.Test;
 
 class FieldPathTest {
     final static String[] EMPTY_PATH = new String[]{};
 
-    @Test void shouldHandleV1WithDotsAndBacktickPair() {
+    @Test void shouldBuildV1WithDotsAndBacktickPair() {
         assertArrayEquals(new String[] {"foo.bar.baz"}, FieldPath.from("foo.bar.baz", FieldSyntaxVersion.V1).path());
         assertArrayEquals(new String[] {"foo.`bar.baz`"}, FieldPath.from("foo.`bar.baz`", FieldSyntaxVersion.V1).path());
     }
 
-    @Test void testEmptyPath() {
+    @Test void shouldBuildV2WithEmptyPath() {
         assertArrayEquals(EMPTY_PATH, FieldPath.from("", FieldSyntaxVersion.V2).path());
     }
 
-    @Test void testNullPath() {
+    @Test void shouldBuildV2WithNullPath() {
         assertArrayEquals(EMPTY_PATH, FieldPath.from(null, FieldSyntaxVersion.V2).path());
     }
 
-    @Test void testWithoutDots() {
+    @Test void shouldBuildV2WithoutDots() {
         assertArrayEquals(new String[] {"foobarbaz"}, FieldPath.from("foobarbaz", FieldSyntaxVersion.V2).path());
     }
-    @Test void testWithoutWrappingBackticks() {
+    @Test void shouldBuildV2WithoutWrappingBackticks() {
         assertArrayEquals(new String[] {"foo`bar`baz"}, FieldPath.from("foo`bar`baz", FieldSyntaxVersion.V2).path());
     }
 
-    @Test void shouldBuildPathWhenIncludesDots() {
+    @Test void shouldBuildV2WhenIncludesDots() {
         assertArrayEquals(new String[] {"foo", "bar", "baz"}, FieldPath.from("foo.bar.baz", FieldSyntaxVersion.V2).path());
     }
 
-    @Test void shouldBuildPathWhenIncludesDotsAndBacktickPair() {
+    @Test void shouldBuildV2WhenIncludesDotsAndBacktickPair() {
         assertArrayEquals(new String[] {"foo", "bar.baz"}, FieldPath.from("foo.`bar.baz`", FieldSyntaxVersion.V2).path());
         assertArrayEquals(new String[] {"foo", "bar", "baz"}, FieldPath.from("foo.`bar`.baz", FieldSyntaxVersion.V2).path());
     }
 
-    @Test void shouldBuildPathAndIgnoreBackticksThatAreNotWrapping() {
+    @Test void shouldBuildV2AndIgnoreBackticksThatAreNotWrapping() {
         assertArrayEquals(new String[] {"foo", "ba`r.baz"}, FieldPath.from("foo.`ba`r.baz`", FieldSyntaxVersion.V2).path());
         assertArrayEquals(new String[] {"foo", "ba`r", "baz"}, FieldPath.from("foo.ba`r.baz", FieldSyntaxVersion.V2).path());
     }
 
-    @Test void shouldBuildPathAndEscapeBackticks() {
+    @Test void shouldBuildV2AndEscapeBackticks() {
         assertArrayEquals(new String[] {"foo", "bar`.`baz"}, FieldPath.from("foo.`bar\\`.\\`baz`", FieldSyntaxVersion.V2).path());
         assertArrayEquals(new String[] {"foo", "bar\\`.`baz"}, FieldPath.from("foo.`bar\\\\`.\\`baz`", FieldSyntaxVersion.V2).path());
     }
 
-    @Test void shouldBuildPathWithoutWrappingBackticks() {
+    @Test void shouldBuildV2WithBackticksWrappingBackticks() {
         assertArrayEquals(new String[] {"foo", "`bar`", "baz"}, FieldPath.from("foo.``bar``.baz", FieldSyntaxVersion.V2).path());
         assertArrayEquals(new String[] {"`foo.bar.baz`"}, FieldPath.from("``foo.bar.baz``", FieldSyntaxVersion.V2).path());
     }
 
-    @Test void shouldFilterSchemaFields() {
+    @Test void shouldFilterSchemaV1Fields() {
+        Schema schema = SchemaBuilder.struct().field("foo", Schema.STRING_SCHEMA)
+            .field("bar", Schema.STRING_SCHEMA)
+            .field("baz", Schema.INT32_SCHEMA)
+            .build();
+
+        SchemaBuilder updated = SchemaUtil.copySchemaBasics(schema, SchemaBuilder.struct());
+        Schema result = FieldPath.from("foo", FieldSyntaxVersion.V1)
+            .updateSchemaAt(schema, updated, (builder, field) -> {
+                // ignore field
+            });
+
+        assertEquals(2, result.fields().size());
+        assertEquals("bar", result.fields().get(0).name());
+        assertEquals("baz", result.fields().get(1).name());
+    }
+    @Test void shouldFilterSchemaV2Fields() {
         Schema schema = SchemaBuilder.struct().field("foo",
             SchemaBuilder.struct().field("bar", Schema.STRING_SCHEMA)
                 .field("baz", Schema.INT32_SCHEMA))
             .build();
-        Schema result = FieldPath.from("foo.baz", FieldSyntaxVersion.V2).updateSchemaAt(schema, (builder, field) -> {
-            // ignore field
-        });
-        assertEquals(result.fields().size(), 1);
-        assertEquals(result.field("foo").schema().fields().size(), 1);
-        assertEquals(result.field("foo").schema().fields().get(0).name(), "bar");
+
+        SchemaBuilder updated = SchemaUtil.copySchemaBasics(schema, SchemaBuilder.struct());
+        Schema result = FieldPath.from("foo.baz", FieldSyntaxVersion.V2)
+            .updateSchemaAt(schema, updated, (builder, field) -> {
+                // ignore field
+            });
+
+        assertEquals(1, result.fields().size());
+        assertEquals(1, result.field("foo").schema().fields().size());
+        assertEquals("bar", result.field("foo").schema().fields().get(0).name());
     }
 
-    @Test void shouldRenameSchemaFields() {
+    @Test void shouldRenameSchemaV1Fields() {
+        Schema schema = SchemaBuilder.struct().field("foo", Schema.STRING_SCHEMA)
+            .field("bar", Schema.STRING_SCHEMA)
+            .field("baz", Schema.INT32_SCHEMA)
+            .build();
+
+        SchemaBuilder updated = SchemaUtil.copySchemaBasics(schema, SchemaBuilder.struct());
+        Schema result = FieldPath.from("foo", FieldSyntaxVersion.V1)
+            .updateSchemaAt(schema, updated, (builder, field) -> builder.field("other", field.schema()));
+
+        assertEquals(3, result.fields().size());
+        assertEquals("other", result.fields().get(0).name());
+        assertEquals("bar", result.fields().get(1).name());
+        assertEquals("baz", result.fields().get(2).name());
+    }
+
+    @Test void shouldRenameSchemaV2Fields() {
         Schema schema = SchemaBuilder.struct().field("foo",
                 SchemaBuilder.struct().field("bar", Schema.STRING_SCHEMA)
                     .field("baz", Schema.INT32_SCHEMA))
             .build();
+
+        SchemaBuilder updated = SchemaUtil.copySchemaBasics(schema, SchemaBuilder.struct());
         Schema result = FieldPath.from("foo.baz", FieldSyntaxVersion.V2)
-            .updateSchemaAt(schema, (builder, field) -> builder.field("other", field.schema()));
-        assertEquals(result.fields().size(), 1);
-        assertEquals(result.field("foo").schema().fields().size(), 2);
-        assertEquals(result.field("foo").schema().fields().get(0).name(), "bar");
-        assertEquals(result.field("foo").schema().fields().get(1).name(), "other");
+            .updateSchemaAt(schema, updated, (builder, field) -> builder.field("other", field.schema()));
+
+        assertEquals(1, result.fields().size());
+        assertEquals(2, result.field("foo").schema().fields().size());
+        assertEquals("bar", result.field("foo").schema().fields().get(0).name());
+        assertEquals("other", result.field("foo").schema().fields().get(1).name());
+    }
+
+    @Test void shouldUpdateValueV1FromSchemaless() {
+        final Map<String, Object> value = Collections.singletonMap("foo", 42);
+
+        final Map<String, Object> updated = FieldPath.from("foo", FieldSyntaxVersion.V1)
+            .updateValueAt(value, (map, f, v) -> map.put(f, ((Integer) v) * 2));
+
+        assertEquals(84, updated.get("foo"));
     }
 
     @SuppressWarnings("unchecked")
-    @Test void shouldUpdateNestedValueFromSchemaless() {
+    @Test void shouldUpdateNestedValueV2FromSchemaless() {
         final Map<String, Object> value = Collections.singletonMap("foo", Collections.singletonMap("bar", 42));
 
         final Map<String, Object> updated = FieldPath.from("foo.bar", FieldSyntaxVersion.V2)
             .updateValueAt(value, (map, f, v) -> map.put(f, ((Integer) v) * 2));
+
         assertEquals(84, ((Map<String, Object>) updated.get("foo")).get("bar"));
     }
 
-    @Test void shouldUpdateNestedValueWithSchema() {
+    @Test void shouldUpdateValueV1WithSchema() {
+        final Schema schema = SchemaBuilder.struct().field("foo", Schema.INT32_SCHEMA).build();
+        final Struct value = new Struct(schema).put("foo", 42);
+
+        final Struct updated = FieldPath.from("foo", FieldSyntaxVersion.V1)
+            .updateValueAt(schema, value, schema,
+                (oldField, updatedField, s, v) -> s.put(updatedField, ((Integer) v) * 2));
+
+        assertEquals(84, updated.getInt32("foo"));
+    }
+
+    @Test void shouldUpdateNestedValueV2WithSchema() {
         final SchemaBuilder barSchema = SchemaBuilder.struct().field("bar", Schema.INT32_SCHEMA);
         final Schema schema = SchemaBuilder.struct().field("foo", barSchema).build();
         final Struct value = new Struct(schema).put("foo", new Struct(barSchema).put("bar", 42));
@@ -116,6 +177,7 @@ class FieldPathTest {
         final Struct updated = FieldPath.from("foo.bar", FieldSyntaxVersion.V2)
             .updateValueAt(schema, value, schema,
                 (oldField, updatedField, s, v) -> s.put(updatedField, ((Integer) v) * 2));
+
         assertEquals(84, updated.getStruct("foo").getInt32("bar"));
     }
 }
