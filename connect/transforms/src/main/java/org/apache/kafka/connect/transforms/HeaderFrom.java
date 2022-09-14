@@ -165,7 +165,7 @@ public abstract class HeaderFrom<R extends ConnectRecord<R>> implements Transfor
             Object fieldValue = fieldPath.valueAt(value);
             String headerName = headers.get(i);
             if (operation == Operation.MOVE) {
-                fieldPath.deleteFieldAt(updatedValue);
+                updatedValue = fieldPath.updateValueAt(updatedValue, (map, fieldName, v) -> map.remove(fieldName));
             }
             updatedHeaders.add(headerName, fieldValue, null);
         }

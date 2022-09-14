@@ -16,18 +16,19 @@
  */
 package org.apache.kafka.connect.transforms;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.function.BiConsumer;
 import org.apache.kafka.connect.data.Field;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Schema.Type;
 import org.apache.kafka.connect.data.SchemaBuilder;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.transforms.util.SchemaUtil;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.function.BiConsumer;
 
 /**
  * Represents a path to a field within a structure within a Connect key/value (e.g. Struct or
@@ -77,22 +78,24 @@ public class FieldPath {
             this.path = new String[] {};
         } else {
             switch (version) {
-                case V1:
+                case V1: // backward compatibility
                     this.path = new String[] {path};
                     break;
                 case V2:
+                    // if no dots or wrapping backticks are used, then return path with single step
                     if (!path.contains(DOT)
                         && !(path.startsWith(BACKTICK) && path.endsWith(
-                        BACKTICK))) { // does not need path steps
+                        BACKTICK))) {
                         this.path = new String[] {path};
                     } else {
-                        // track fields in path steps
-                        List<String> steps = new ArrayList<>();
-                        // reuse string bits, will shrink as path is built
-                        StringBuilder s = new StringBuilder(path);
+                        // prepare for tracking path steps
+                        final List<String> steps = new ArrayList<>();
+                        final StringBuilder s = new StringBuilder(
+                            path); // avoid creating new string on changes
 
-                        while (s.length() > 0) {
-                            if (s.charAt(0) == BACKTICK_CHAR) { // has opening backtick pair
+                        while (s.length() > 0) { // until path is traverse
+                            // process backtick pair if any
+                            if (s.charAt(0) == BACKTICK_CHAR) {
                                 s.deleteCharAt(0);
 
                                 // find backtick pair
@@ -120,7 +123,7 @@ public class FieldPath {
                                         break;
                                     }
                                 }
-                            } else { // by dots
+                            } else { // process path dots
                                 final int atDot = s.indexOf(DOT);
                                 if (atDot > 0) { // get step and move forward
                                     steps.add(checkIncompleteBacktickPair(s.substring(0, atDot)));
@@ -142,7 +145,7 @@ public class FieldPath {
     }
 
     private String checkIncompleteBacktickPair(String field) {
-        StringBuilder s = new StringBuilder(field);
+        final StringBuilder s = new StringBuilder(field);
         int idx = 0;
         while (idx >= 0) {
             idx = s.indexOf(BACKTICK, idx + 1);
@@ -232,34 +235,21 @@ public class FieldPath {
         return null;
     }
 
-    @SuppressWarnings("unchecked")
-    public void deleteFieldAt(Map<String, Object> map) {
-        if (path.length == 1) {
-            map.remove(path[0]);
-        } else {
-            Map<String, Object> current = map;
-            for (int i = 0; i < path.length; i++) {
-                if (i == path.length - 1) {
-                    current.remove(path[i]);
-                } else {
-                    current = (Map<String, Object>) current.get(path[i]);
-                }
-            }
-        }
-    }
-
     public Schema updateSchemaAt(Schema schema, BiConsumer<SchemaBuilder, Field> change) {
-        final SchemaBuilder builder = SchemaUtil.copySchemaBasics(schema, SchemaBuilder.struct());
-        return updateSchema(schema, builder, 0, change);
+        SchemaBuilder updated = SchemaUtil.copySchemaBasics(schema, SchemaBuilder.struct());
+        return updateSchema(schema, updated, 0, change);
     }
 
-    private Schema updateSchema(Schema operatingSchema, SchemaBuilder builder, int step, BiConsumer<SchemaBuilder, Field> change) {
-        if (operatingSchema.isOptional()) builder.optional();
-        // TODO: how to handle default values generally? Needed by TimestampConverter
-//        if (schema.defaultValue() != null) {
-//            Struct updatedDefaultValue = applyValueWithSchema((Struct) schema.defaultValue(), builder);
-//            builder.defaultValue(updatedDefaultValue);
-//        }
+    public Schema updateSchemaAt(Schema schema, SchemaBuilder updated,
+        BiConsumer<SchemaBuilder, Field> change) {
+        return updateSchema(schema, updated, 0, change);
+    }
+
+    private Schema updateSchema(Schema operatingSchema, SchemaBuilder builder, int step,
+        BiConsumer<SchemaBuilder, Field> change) {
+        if (operatingSchema.isOptional()) {
+            builder.optional();
+        }
         for (Field field : operatingSchema.fields()) {
             if (step < path.length) {
                 if (!path[step].equals(field.name())) {

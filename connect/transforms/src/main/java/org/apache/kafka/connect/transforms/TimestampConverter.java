@@ -25,11 +25,13 @@ import org.apache.kafka.common.config.ConfigException;
 import org.apache.kafka.common.utils.Utils;
 import org.apache.kafka.connect.connector.ConnectRecord;
 import org.apache.kafka.connect.data.Schema;
+import org.apache.kafka.connect.data.SchemaBuilder;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.data.Time;
 import org.apache.kafka.connect.data.Timestamp;
 import org.apache.kafka.connect.errors.ConnectException;
 import org.apache.kafka.connect.errors.DataException;
+import org.apache.kafka.connect.transforms.util.SchemaUtil;
 import org.apache.kafka.connect.transforms.util.SimpleConfig;
 
 import java.text.ParseException;
@@ -376,8 +378,19 @@ public abstract class TimestampConverter<R extends ConnectRecord<R>> implements 
             final Struct value = requireStructOrNull(operatingValue(record), PURPOSE);
             Schema updatedSchema = schemaUpdateCache.get(schema);
             if (updatedSchema == null) {
+                SchemaBuilder updated = SchemaUtil.copySchemaBasics(schema, SchemaBuilder.struct());
+                // TODO: how to handle default values generally? Seen at TimestampConverter so far.
+                //   are other SMTs considering default values when changing default values?
+                if (schema.defaultValue() != null) {
+                    Struct updatedDefaultValue = applyValueWithSchema(
+                        (Struct) schema.defaultValue(), updated);
+                    updated.defaultValue(updatedDefaultValue);
+                }
+                // what if the default value is in a root or nested field?
+
                 updatedSchema = config.field.updateSchemaAt(
                     schema,
+                    updated,
                     (builder, field) -> builder.field(
                         field.name(),
                         TRANSLATORS.get(config.type).typeSchema(field.schema().isOptional())));
