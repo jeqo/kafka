@@ -16,22 +16,26 @@
  */
 package org.apache.kafka.connect.transforms;
 
-import java.util.stream.Collectors;
 import org.apache.kafka.common.cache.Cache;
 import org.apache.kafka.common.cache.LRUCache;
 import org.apache.kafka.common.cache.SynchronizedCache;
 import org.apache.kafka.common.config.ConfigDef;
 import org.apache.kafka.common.config.ConfigException;
 import org.apache.kafka.connect.connector.ConnectRecord;
-import org.apache.kafka.connect.data.Field;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.header.Header;
 import org.apache.kafka.connect.header.Headers;
+import org.apache.kafka.connect.transforms.field.FieldPath;
+import org.apache.kafka.connect.transforms.field.FieldPaths;
+import org.apache.kafka.connect.transforms.field.FieldSyntaxVersion;
+import org.apache.kafka.connect.transforms.field.MapFieldAndValue;
+import org.apache.kafka.connect.transforms.field.StructFieldAndValue;
 import org.apache.kafka.connect.transforms.util.NonEmptyListValidator;
 import org.apache.kafka.connect.transforms.util.Requirements;
 import org.apache.kafka.connect.transforms.util.SimpleConfig;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -97,13 +101,41 @@ public abstract class HeaderFrom<R extends ConnectRecord<R>> implements Transfor
         }
     }
 
-    private List<FieldPath> fieldPaths;
+    private FieldPaths fieldPaths;
 
-    private List<String> headers;
+    private Map<String, List<FieldPath>> headersMap;
 
     private Operation operation;
 
     private final Cache<Schema, Schema> moveSchemaCache = new SynchronizedCache<>(new LRUCache<>(16));
+
+    @Override
+    public void configure(Map<String, ?> props) {
+        final SimpleConfig config = new SimpleConfig(CONFIG_DEF, props);
+        FieldSyntaxVersion syntaxVersion = FieldSyntaxVersion.valueOf(config.getString(FIELD_SYNTAX_VERSION_CONFIG));
+        List<String> fields = config.getList(FIELDS_FIELD);
+        fieldPaths = FieldPaths.of(fields, syntaxVersion);
+        List<String> headers = config.getList(HEADERS_FIELD);
+        if (headers.size() != fields.size()) {
+            throw new ConfigException(format("'%s' config must have the same number of elements as '%s' config.",
+                FIELDS_FIELD, HEADERS_FIELD));
+        }
+        headersMap = new HashMap<>(headers.size());
+        for (int i = 0; i < headers.size(); i++) {
+            final String headerName = headers.get(i);
+            final FieldPath field = FieldPath.of(fields.get(i), syntaxVersion);
+            headersMap.computeIfPresent(headerName, (s, p) -> {
+                p.add(field);
+                return p;
+            });
+            headersMap.computeIfAbsent(headerName, s -> {
+                List<FieldPath> paths = new ArrayList<>();
+                paths.add(field);
+                return paths;
+            });
+        }
+        operation = Operation.fromName(config.getString(OPERATION_FIELD));
+    }
 
     @Override
     public R apply(R record) {
@@ -124,20 +156,23 @@ public abstract class HeaderFrom<R extends ConnectRecord<R>> implements Transfor
         final Struct updatedValue;
         if (operation == Operation.MOVE) {
             updatedSchema = moveSchema(operatingSchema);
-            updatedValue = new Struct(updatedSchema);
-            for (Field field : updatedSchema.fields()) {
-                updatedValue.put(field, value.get(field.name()));
-            }
+            updatedValue = fieldPaths.updateValuesAt(operatingSchema, value, updatedSchema,
+                (oldField, updatedField, updated, fieldValue) -> {
+                    // ignore value
+                });
         } else {
             updatedSchema = operatingSchema;
             updatedValue = value;
         }
-        for (int i = 0; i < fieldPaths.size(); i++) {
-            FieldPath fieldPath = fieldPaths.get(i);
-            String headerName = headers.get(i);
-            Object fieldValue = fieldPath.fieldAt(value.schema()) != null ? fieldPath.valueAt(value) : null;
-            Schema fieldSchema = fieldPath.fieldAt(operatingSchema).schema();
-            updatedHeaders.add(headerName, fieldValue, fieldSchema);
+        Map<FieldPath, StructFieldAndValue> fieldAndValues = fieldPaths.fieldAndValuesFrom(value);
+        for (Map.Entry<String, List<FieldPath>> entry : headersMap.entrySet()) {
+            for (FieldPath fieldPath : entry.getValue()) {
+                StructFieldAndValue fieldAndValue = fieldAndValues.get(fieldPath);
+                if (fieldAndValue != null) {
+                    updatedHeaders.add(entry.getKey(), fieldAndValue.value(),
+                        fieldAndValue.schema());
+                }
+            }
         }
         return newRecord(record, updatedSchema, updatedValue, updatedHeaders);
     }
@@ -145,12 +180,9 @@ public abstract class HeaderFrom<R extends ConnectRecord<R>> implements Transfor
     private Schema moveSchema(Schema operatingSchema) {
         Schema moveSchema = this.moveSchemaCache.get(operatingSchema);
         if (moveSchema == null) {
-            moveSchema = operatingSchema;
-            for (FieldPath path : fieldPaths) {
-                moveSchema = path.updateSchemaAt(moveSchema, (builder, field) -> {
-                    // ignore field
-                });
-            }
+            moveSchema = fieldPaths.updateSchemaAt(operatingSchema, (builder, field) -> {
+                // ignore field
+            });
             moveSchemaCache.put(operatingSchema, moveSchema);
         }
         return moveSchema;
@@ -160,14 +192,15 @@ public abstract class HeaderFrom<R extends ConnectRecord<R>> implements Transfor
         Headers updatedHeaders = record.headers().duplicate();
         Map<String, Object> value = Requirements.requireMap(operatingValue, "header " + operation);
         Map<String, Object> updatedValue = new HashMap<>(value);
-        for (int i = 0; i < fieldPaths.size(); i++) {
-            FieldPath fieldPath = fieldPaths.get(i);
-            Object fieldValue = fieldPath.valueAt(value);
-            String headerName = headers.get(i);
-            if (operation == Operation.MOVE) {
-                updatedValue = fieldPath.updateValueAt(updatedValue, (map, fieldName, v) -> map.remove(fieldName));
+        Map<FieldPath, MapFieldAndValue> values = fieldPaths.fieldAndValuesFrom(value);
+        if (operation == Operation.MOVE) {
+            updatedValue = fieldPaths.updateValuesAt(updatedValue, (map, fieldName, fieldValue) -> map.remove(fieldName));
+        }
+        for (Map.Entry<String, List<FieldPath>> entry : headersMap.entrySet()) {
+            for (FieldPath fieldPath : entry.getValue()) {
+                final MapFieldAndValue fieldAndValue = values.get(fieldPath);
+                updatedHeaders.add(entry.getKey(), fieldAndValue != null ? fieldAndValue.value() : null, null);
             }
-            updatedHeaders.add(headerName, fieldValue, null);
         }
         return newRecord(record, null, updatedValue, updatedHeaders);
     }
@@ -222,19 +255,5 @@ public abstract class HeaderFrom<R extends ConnectRecord<R>> implements Transfor
     @Override
     public void close() {
 
-    }
-
-    @Override
-    public void configure(Map<String, ?> props) {
-        final SimpleConfig config = new SimpleConfig(CONFIG_DEF, props);
-        FieldSyntaxVersion syntaxVersion = FieldSyntaxVersion.valueOf(config.getString(FIELD_SYNTAX_VERSION_CONFIG));
-        List<String> fields = config.getList(FIELDS_FIELD);
-        fieldPaths = fields.stream().map(f -> FieldPath.from(f, syntaxVersion)).collect(Collectors.toList());
-        headers = config.getList(HEADERS_FIELD);
-        if (headers.size() != fields.size()) {
-            throw new ConfigException(format("'%s' config must have the same number of elements as '%s' config.",
-                    FIELDS_FIELD, HEADERS_FIELD));
-        }
-        operation = Operation.fromName(config.getString(OPERATION_FIELD));
     }
 }

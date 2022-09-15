@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.kafka.connect.transforms;
+package org.apache.kafka.connect.transforms.field;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -31,47 +31,47 @@ class FieldPathTest {
     final static String[] EMPTY_PATH = new String[]{};
 
     @Test void shouldBuildV1WithDotsAndBacktickPair() {
-        assertArrayEquals(new String[] {"foo.bar.baz"}, FieldPath.from("foo.bar.baz", FieldSyntaxVersion.V1).path());
-        assertArrayEquals(new String[] {"foo.`bar.baz`"}, FieldPath.from("foo.`bar.baz`", FieldSyntaxVersion.V1).path());
+        assertArrayEquals(new String[] {"foo.bar.baz"}, FieldPath.ofV1("foo.bar.baz").path());
+        assertArrayEquals(new String[] {"foo.`bar.baz`"}, FieldPath.ofV1("foo.`bar.baz`").path());
     }
 
     @Test void shouldBuildV2WithEmptyPath() {
-        assertArrayEquals(EMPTY_PATH, FieldPath.from("", FieldSyntaxVersion.V2).path());
+        assertArrayEquals(EMPTY_PATH, FieldPath.of("", FieldSyntaxVersion.V2).path());
     }
 
     @Test void shouldBuildV2WithNullPath() {
-        assertArrayEquals(EMPTY_PATH, FieldPath.from(null, FieldSyntaxVersion.V2).path());
+        assertArrayEquals(EMPTY_PATH, FieldPath.of(null, FieldSyntaxVersion.V2).path());
     }
 
     @Test void shouldBuildV2WithoutDots() {
-        assertArrayEquals(new String[] {"foobarbaz"}, FieldPath.from("foobarbaz", FieldSyntaxVersion.V2).path());
+        assertArrayEquals(new String[] {"foobarbaz"}, FieldPath.of("foobarbaz", FieldSyntaxVersion.V2).path());
     }
     @Test void shouldBuildV2WithoutWrappingBackticks() {
-        assertArrayEquals(new String[] {"foo`bar`baz"}, FieldPath.from("foo`bar`baz", FieldSyntaxVersion.V2).path());
+        assertArrayEquals(new String[] {"foo`bar`baz"}, FieldPath.of("foo`bar`baz", FieldSyntaxVersion.V2).path());
     }
 
     @Test void shouldBuildV2WhenIncludesDots() {
-        assertArrayEquals(new String[] {"foo", "bar", "baz"}, FieldPath.from("foo.bar.baz", FieldSyntaxVersion.V2).path());
+        assertArrayEquals(new String[] {"foo", "bar", "baz"}, FieldPath.of("foo.bar.baz", FieldSyntaxVersion.V2).path());
     }
 
     @Test void shouldBuildV2WhenIncludesDotsAndBacktickPair() {
-        assertArrayEquals(new String[] {"foo", "bar.baz"}, FieldPath.from("foo.`bar.baz`", FieldSyntaxVersion.V2).path());
-        assertArrayEquals(new String[] {"foo", "bar", "baz"}, FieldPath.from("foo.`bar`.baz", FieldSyntaxVersion.V2).path());
+        assertArrayEquals(new String[] {"foo", "bar.baz"}, FieldPath.of("foo.`bar.baz`", FieldSyntaxVersion.V2).path());
+        assertArrayEquals(new String[] {"foo", "bar", "baz"}, FieldPath.of("foo.`bar`.baz", FieldSyntaxVersion.V2).path());
     }
 
     @Test void shouldBuildV2AndIgnoreBackticksThatAreNotWrapping() {
-        assertArrayEquals(new String[] {"foo", "ba`r.baz"}, FieldPath.from("foo.`ba`r.baz`", FieldSyntaxVersion.V2).path());
-        assertArrayEquals(new String[] {"foo", "ba`r", "baz"}, FieldPath.from("foo.ba`r.baz", FieldSyntaxVersion.V2).path());
+        assertArrayEquals(new String[] {"foo", "ba`r.baz"}, FieldPath.of("foo.`ba`r.baz`", FieldSyntaxVersion.V2).path());
+        assertArrayEquals(new String[] {"foo", "ba`r", "baz"}, FieldPath.of("foo.ba`r.baz", FieldSyntaxVersion.V2).path());
     }
 
     @Test void shouldBuildV2AndEscapeBackticks() {
-        assertArrayEquals(new String[] {"foo", "bar`.`baz"}, FieldPath.from("foo.`bar\\`.\\`baz`", FieldSyntaxVersion.V2).path());
-        assertArrayEquals(new String[] {"foo", "bar\\`.`baz"}, FieldPath.from("foo.`bar\\\\`.\\`baz`", FieldSyntaxVersion.V2).path());
+        assertArrayEquals(new String[] {"foo", "bar`.`baz"}, FieldPath.of("foo.`bar\\`.\\`baz`", FieldSyntaxVersion.V2).path());
+        assertArrayEquals(new String[] {"foo", "bar\\`.`baz"}, FieldPath.of("foo.`bar\\\\`.\\`baz`", FieldSyntaxVersion.V2).path());
     }
 
     @Test void shouldBuildV2WithBackticksWrappingBackticks() {
-        assertArrayEquals(new String[] {"foo", "`bar`", "baz"}, FieldPath.from("foo.``bar``.baz", FieldSyntaxVersion.V2).path());
-        assertArrayEquals(new String[] {"`foo.bar.baz`"}, FieldPath.from("``foo.bar.baz``", FieldSyntaxVersion.V2).path());
+        assertArrayEquals(new String[] {"foo", "`bar`", "baz"}, FieldPath.of("foo.``bar``.baz", FieldSyntaxVersion.V2).path());
+        assertArrayEquals(new String[] {"`foo.bar.baz`"}, FieldPath.of("``foo.bar.baz``", FieldSyntaxVersion.V2).path());
     }
 
     @Test void shouldFilterSchemaV1Fields() {
@@ -81,7 +81,7 @@ class FieldPathTest {
             .build();
 
         SchemaBuilder updated = SchemaUtil.copySchemaBasics(schema, SchemaBuilder.struct());
-        Schema result = FieldPath.from("foo", FieldSyntaxVersion.V1)
+        Schema result = FieldPath.of("foo", FieldSyntaxVersion.V1)
             .updateSchemaAt(schema, updated, (builder, field) -> {
                 // ignore field
             });
@@ -97,7 +97,7 @@ class FieldPathTest {
             .build();
 
         SchemaBuilder updated = SchemaUtil.copySchemaBasics(schema, SchemaBuilder.struct());
-        Schema result = FieldPath.from("foo.baz", FieldSyntaxVersion.V2)
+        Schema result = FieldPath.of("foo.baz", FieldSyntaxVersion.V2)
             .updateSchemaAt(schema, updated, (builder, field) -> {
                 // ignore field
             });
@@ -114,7 +114,7 @@ class FieldPathTest {
             .build();
 
         SchemaBuilder updated = SchemaUtil.copySchemaBasics(schema, SchemaBuilder.struct());
-        Schema result = FieldPath.from("foo", FieldSyntaxVersion.V1)
+        Schema result = FieldPath.of("foo", FieldSyntaxVersion.V1)
             .updateSchemaAt(schema, updated, (builder, field) -> builder.field("other", field.schema()));
 
         assertEquals(3, result.fields().size());
@@ -130,7 +130,7 @@ class FieldPathTest {
             .build();
 
         SchemaBuilder updated = SchemaUtil.copySchemaBasics(schema, SchemaBuilder.struct());
-        Schema result = FieldPath.from("foo.baz", FieldSyntaxVersion.V2)
+        Schema result = FieldPath.of("foo.baz", FieldSyntaxVersion.V2)
             .updateSchemaAt(schema, updated, (builder, field) -> builder.field("other", field.schema()));
 
         assertEquals(1, result.fields().size());
@@ -142,7 +142,7 @@ class FieldPathTest {
     @Test void shouldUpdateValueV1FromSchemaless() {
         final Map<String, Object> value = Collections.singletonMap("foo", 42);
 
-        final Map<String, Object> updated = FieldPath.from("foo", FieldSyntaxVersion.V1)
+        final Map<String, Object> updated = FieldPath.of("foo", FieldSyntaxVersion.V1)
             .updateValueAt(value, (map, f, v) -> map.put(f, ((Integer) v) * 2));
 
         assertEquals(84, updated.get("foo"));
@@ -152,7 +152,7 @@ class FieldPathTest {
     @Test void shouldUpdateNestedValueV2FromSchemaless() {
         final Map<String, Object> value = Collections.singletonMap("foo", Collections.singletonMap("bar", 42));
 
-        final Map<String, Object> updated = FieldPath.from("foo.bar", FieldSyntaxVersion.V2)
+        final Map<String, Object> updated = FieldPath.of("foo.bar", FieldSyntaxVersion.V2)
             .updateValueAt(value, (map, f, v) -> map.put(f, ((Integer) v) * 2));
 
         assertEquals(84, ((Map<String, Object>) updated.get("foo")).get("bar"));
@@ -162,7 +162,7 @@ class FieldPathTest {
         final Schema schema = SchemaBuilder.struct().field("foo", Schema.INT32_SCHEMA).build();
         final Struct value = new Struct(schema).put("foo", 42);
 
-        final Struct updated = FieldPath.from("foo", FieldSyntaxVersion.V1)
+        final Struct updated = FieldPath.of("foo", FieldSyntaxVersion.V1)
             .updateValueAt(schema, value, schema,
                 (oldField, updatedField, s, v) -> s.put(updatedField, ((Integer) v) * 2));
 
@@ -174,7 +174,7 @@ class FieldPathTest {
         final Schema schema = SchemaBuilder.struct().field("foo", barSchema).build();
         final Struct value = new Struct(schema).put("foo", new Struct(barSchema).put("bar", 42));
 
-        final Struct updated = FieldPath.from("foo.bar", FieldSyntaxVersion.V2)
+        final Struct updated = FieldPath.of("foo.bar", FieldSyntaxVersion.V2)
             .updateValueAt(schema, value, schema,
                 (oldField, updatedField, s, v) -> s.put(updatedField, ((Integer) v) * 2));
 

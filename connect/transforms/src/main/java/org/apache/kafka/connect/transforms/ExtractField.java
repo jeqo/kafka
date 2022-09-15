@@ -21,6 +21,8 @@ import org.apache.kafka.connect.connector.ConnectRecord;
 import org.apache.kafka.connect.data.Field;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
+import org.apache.kafka.connect.transforms.field.FieldPath;
+import org.apache.kafka.connect.transforms.field.FieldSyntaxVersion;
 import org.apache.kafka.connect.transforms.util.SimpleConfig;
 
 import java.util.Map;
@@ -50,7 +52,7 @@ public abstract class ExtractField<R extends ConnectRecord<R>> implements Transf
     public void configure(Map<String, ?> props) {
         final SimpleConfig config = new SimpleConfig(CONFIG_DEF, props);
         FieldSyntaxVersion syntaxVersion = FieldSyntaxVersion.valueOf(config.getString(FIELD_SYNTAX_VERSION_CONFIG));
-        fieldPath = FieldPath.from(config.getString(FIELD_CONFIG), syntaxVersion);
+        fieldPath = FieldPath.of(config.getString(FIELD_CONFIG), syntaxVersion);
     }
 
     @Override
