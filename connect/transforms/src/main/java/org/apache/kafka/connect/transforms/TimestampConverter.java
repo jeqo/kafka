@@ -31,6 +31,8 @@ import org.apache.kafka.connect.data.Time;
 import org.apache.kafka.connect.data.Timestamp;
 import org.apache.kafka.connect.errors.ConnectException;
 import org.apache.kafka.connect.errors.DataException;
+import org.apache.kafka.connect.transforms.field.FieldPath;
+import org.apache.kafka.connect.transforms.field.FieldSyntaxVersion;
 import org.apache.kafka.connect.transforms.util.SchemaUtil;
 import org.apache.kafka.connect.transforms.util.SimpleConfig;
 
@@ -155,7 +157,7 @@ public abstract class TimestampConverter<R extends ConnectRecord<R>> implements 
             public Date toRaw(Config config, Object orig) {
                 if (!(orig instanceof Long))
                     throw new DataException("Expected Unix timestamp to be a Long, but found " + orig.getClass());
-                Long unixTime = (Long) orig;
+                long unixTime = (Long) orig;
                 switch (config.unixPrecision) {
                     case UNIX_PRECISION_SECONDS:
                         return Timestamp.toLogical(Timestamp.SCHEMA, TimeUnit.SECONDS.toMillis(unixTime));
@@ -176,7 +178,7 @@ public abstract class TimestampConverter<R extends ConnectRecord<R>> implements 
 
             @Override
             public Long toType(Config config, Date orig) {
-                Long unixTimeMillis = Timestamp.fromLogical(Timestamp.SCHEMA, orig);
+                long unixTimeMillis = Timestamp.fromLogical(Timestamp.SCHEMA, orig);
                 switch (config.unixPrecision) {
                     case UNIX_PRECISION_SECONDS:
                         return TimeUnit.MILLISECONDS.toSeconds(unixTimeMillis);
@@ -306,7 +308,7 @@ public abstract class TimestampConverter<R extends ConnectRecord<R>> implements 
                         + formatPattern, e);
             }
         }
-        config = new Config(FieldPath.from(field, syntaxVersion), type, format, unixPrecision);
+        config = new Config(FieldPath.of(field, syntaxVersion), type, format, unixPrecision);
     }
 
     @Override

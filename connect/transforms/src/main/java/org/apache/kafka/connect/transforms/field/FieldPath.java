@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.kafka.connect.transforms;
+package org.apache.kafka.connect.transforms.field;
 
 import org.apache.kafka.connect.data.Field;
 import org.apache.kafka.connect.data.Schema;
@@ -53,21 +53,29 @@ public class FieldPath {
 
     private final String[] path;
 
+    public static FieldPath ofV1(String field) {
+        return of(field, FieldSyntaxVersion.V1);
+    }
+
+    public static FieldPath ofV2(String field) {
+        return of(field, FieldSyntaxVersion.V2);
+    }
+
     /**
      * If version is V2, then paths are cached for further access.
      *
-     * @param pathText field path expression
+     * @param field field path expression
      * @param version  field syntax version
      */
-    public static FieldPath from(String pathText, FieldSyntaxVersion version) {
-        if (pathText == null || pathText.isEmpty() || version.equals(FieldSyntaxVersion.V1)) {
-            return new FieldPath(pathText, version);
+    public static FieldPath of(String field, FieldSyntaxVersion version) {
+        if (field == null || field.isEmpty() || version.equals(FieldSyntaxVersion.V1)) {
+            return new FieldPath(field, version);
         } else {
-            if (PATHS_CACHE.containsKey(pathText)) {
-                return PATHS_CACHE.get(pathText);
+            if (PATHS_CACHE.containsKey(field)) {
+                return PATHS_CACHE.get(field);
             } else {
-                final FieldPath fieldPath = new FieldPath(pathText, version);
-                PATHS_CACHE.put(pathText, fieldPath);
+                final FieldPath fieldPath = new FieldPath(field, version);
+                PATHS_CACHE.put(field, fieldPath);
                 return fieldPath;
             }
         }
@@ -240,8 +248,11 @@ public class FieldPath {
         return updateSchema(schema, updated, 0, change);
     }
 
-    public Schema updateSchemaAt(Schema schema, SchemaBuilder updated,
-        BiConsumer<SchemaBuilder, Field> change) {
+    public Schema updateSchemaAt(
+        Schema schema,
+        SchemaBuilder updated,
+        BiConsumer<SchemaBuilder, Field> change
+    ) {
         return updateSchema(schema, updated, 0, change);
     }
 
@@ -317,6 +328,8 @@ public class FieldPath {
                 } else {
                     updated.put(field, value.get(field));
                 }
+            } else {
+                updated.put(field, value.get(field));
             }
         }
         return updated;
@@ -357,13 +370,8 @@ public class FieldPath {
         return path.length == 0;
     }
 
-    @FunctionalInterface
-    interface StructValueUpdater {
-        void apply(Field oldField, Field updatedField, Struct updated, Object value);
+    public String at(int i) {
+        return i < path.length ? path[i] : null;
     }
 
-    @FunctionalInterface
-    interface MapValueUpdater {
-        void apply(Map<String, Object> map, String fieldName, Object value);
-    }
 }
