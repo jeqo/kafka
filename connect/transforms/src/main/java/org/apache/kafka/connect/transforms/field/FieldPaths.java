@@ -35,6 +35,9 @@ import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 
 /**
+ * Multiple field paths to access record structures ({@code Struct} or {@code Map} efficiently,
+ * instead of using single {@code FieldPath} individually.
+ * <br/>
  * Invariants:
  * <li>
  *     <ul>Tree nodes contain either a nested tree or a field path</ul>
@@ -71,22 +74,23 @@ public class FieldPaths {
             .collect(Collectors.toList()));
     }
 
-    Map<String, Object> buildTree(List<FieldPath> paths, int i, Map<String, Object> tree) {
-        if (paths.size() == 1) {
+    Map<String, Object> buildTree(List<FieldPath> paths, int step, Map<String, Object> tree) {
+        if (paths.size() == 1) { // optimize for paths with a single member
             FieldPath path = paths.get(0);
-            if (path.at(i + 1) == null) {
-                tree.put(path.at(i), path);
+            if (path.at(step + 1) == null) { // if last path step
+                tree.put(path.at(step), path);
             } else {
-                tree.put(path.at(i), buildTree(paths, i + 1, new HashMap<>()));
+                tree.put(path.at(step), buildTree(paths, step + 1, new HashMap<>()));
             }
         } else {
-            Map<String, List<FieldPath>> groups = new HashMap<>();
+            // group paths by prefix
+            final Map<String, List<FieldPath>> groups = new HashMap<>();
             for (FieldPath path : paths) {
-                String step = path.at(i);
-                if (step != null) {
-                    groups.computeIfPresent(step, (s, fieldPaths) -> {
+                String pathStep = path.at(step);
+                if (pathStep != null) {
+                    groups.computeIfPresent(pathStep, (s, fieldPaths) -> {
                         for (FieldPath other : fieldPaths) {
-                            if (!path.equals(other) && (other.at(i + 1) == null || path.at(i + 1) == null)) {
+                            if (!path.equals(other) && (other.at(step + 1) == null || path.at(step + 1) == null)) {
                                 throw new IllegalArgumentException(
                                     "Path " + other + " and " + path + " are overlapping. "
                                         + "Paths need to point to leaf values");
@@ -95,7 +99,7 @@ public class FieldPaths {
                         if (!fieldPaths.contains(path)) fieldPaths.add(path);
                         return fieldPaths;
                     });
-                    groups.computeIfAbsent(step, s -> {
+                    groups.computeIfAbsent(pathStep, s -> {
                         List<FieldPath> fieldPaths = new ArrayList<>();
                         fieldPaths.add(path);
                         return fieldPaths;
@@ -103,17 +107,18 @@ public class FieldPaths {
                 }
             }
 
+            // create tree from grouped paths
             for (Map.Entry<String, List<FieldPath>> entry : groups.entrySet()) {
                 if (entry.getValue().size() == 1) {
-                    FieldPath path = entry.getValue().iterator().next();
-                    if (path.at(i + 1) == null) {
+                    final FieldPath path = entry.getValue().get(0);
+                    if (path.at(step + 1) == null) { // if last path step
                         tree.put(entry.getKey(), path);
                     } else {
                         tree.put(entry.getKey(),
-                            buildTree(entry.getValue(), i + 1, new HashMap<>()));
+                            buildTree(entry.getValue(), step + 1, new HashMap<>()));
                     }
                 } else {
-                    tree.put(entry.getKey(), buildTree(entry.getValue(), i + 1, new HashMap<>()));
+                    tree.put(entry.getKey(), buildTree(entry.getValue(), step + 1, new HashMap<>()));
                 }
             }
         }
