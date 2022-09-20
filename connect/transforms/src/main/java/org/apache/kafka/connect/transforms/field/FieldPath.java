@@ -36,7 +36,7 @@ import java.util.function.BiConsumer;
  * <ul>
  * <li>It follows a dotted notation to represent nested values.</li>
  * <li>If field names contain dots, can be escaped by wrapping field names with backticks.</li>
- * <li>If field names contain dots at wrapping positions (beginning or end of path, before or after dots), then backticks need to be
+ * <li>If field names contain backticks at wrapping positions (beginning or end of path, before or after dots), then backticks need to be
  * escaped by backslash.</li>
  * </ul>
  * Paths are calculated once and cached for further access.
