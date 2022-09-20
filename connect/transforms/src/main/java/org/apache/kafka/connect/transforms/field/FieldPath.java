@@ -16,6 +16,9 @@
  */
 package org.apache.kafka.connect.transforms.field;
 
+import org.apache.kafka.common.cache.Cache;
+import org.apache.kafka.common.cache.LRUCache;
+import org.apache.kafka.common.cache.SynchronizedCache;
 import org.apache.kafka.connect.data.Field;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Schema.Type;
@@ -31,8 +34,8 @@ import java.util.Map;
 import java.util.function.BiConsumer;
 
 /**
- * Represents a path to a field within a structure within a Connect key/value (e.g. Struct or
- * Map<String, Object>).
+ * Represents a path to a field within a structure within a Connect key/value (e.g. {@code Struct} or
+ * {@code Map<String, Object>}).
  * <ul>
  * <li>It follows a dotted notation to represent nested values.</li>
  * <li>If field names contain dots, can be escaped by wrapping field names with backticks.</li>
@@ -49,7 +52,7 @@ public class FieldPath {
     public static final char DOT_CHAR = '.';
     public static final char BACKSLASH_CHAR = '\\';
 
-    private static final Map<String, FieldPath> PATHS_CACHE = new HashMap<>();
+    private static final Cache<String, FieldPath> PATHS_CACHE = new SynchronizedCache<>(new LRUCache<>(16));
 
     private final String[] path;
 
@@ -71,8 +74,9 @@ public class FieldPath {
         if (field == null || field.isEmpty() || version.equals(FieldSyntaxVersion.V1)) {
             return new FieldPath(field, version);
         } else {
-            if (PATHS_CACHE.containsKey(field)) {
-                return PATHS_CACHE.get(field);
+            final FieldPath found = PATHS_CACHE.get(field);
+            if (found != null) {
+                return found;
             } else {
                 final FieldPath fieldPath = new FieldPath(field, version);
                 PATHS_CACHE.put(field, fieldPath);
