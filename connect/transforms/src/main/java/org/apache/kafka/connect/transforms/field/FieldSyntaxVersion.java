@@ -37,7 +37,7 @@ public enum FieldSyntaxVersion {
     public static final String FIELD_SYNTAX_VERSION_DOC =
             "Defines the version of the syntax to access fields. "
                     + "If set to `V1`, then the field paths are limited to access the elements at the root level of the struct or map."
-                    + "If set to `V2`, the syntax will support accessing nested elements. o access nested elements, "
+                    + "If set to `V2`, the syntax will support accessing nested elements. To access nested elements, "
                     + "dotted notation is used. If dots are already included in the field name, then backtick pairs "
                     + "can be used to wrap field names containing dots. "
                     + "e.g. to access elements from a field in a struct/map named \"foo.bar\", "
