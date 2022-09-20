@@ -60,8 +60,8 @@ public abstract class HeaderFrom<R extends ConnectRecord<R>> implements Transfor
                     "key (<code>" + Key.class.getName() + "</code>) or value (<code>" + Value.class.getName() + "</code>).";
 
     public static final ConfigDef CONFIG_DEF = new ConfigDef()
-            .define(FIELD_SYNTAX_VERSION_CONFIG, ConfigDef.Type.STRING,
-                    FIELD_SYNTAX_VERSION_DEFAULT_VALUE, ConfigDef.Importance.HIGH, FIELD_SYNTAX_VERSION_DOC)
+            .define(FieldSyntaxVersion.FIELD_SYNTAX_VERSION_CONFIG, ConfigDef.Type.STRING,
+                    FieldSyntaxVersion.FIELD_SYNTAX_VERSION_DEFAULT_VALUE, ConfigDef.Importance.HIGH, FieldSyntaxVersion.FIELD_SYNTAX_VERSION_DOC)
             .define(FIELDS_FIELD, ConfigDef.Type.LIST,
                     NO_DEFAULT_VALUE, new NonEmptyListValidator(),
                     ConfigDef.Importance.HIGH,
@@ -112,7 +112,7 @@ public abstract class HeaderFrom<R extends ConnectRecord<R>> implements Transfor
     @Override
     public void configure(Map<String, ?> props) {
         final SimpleConfig config = new SimpleConfig(CONFIG_DEF, props);
-        FieldSyntaxVersion syntaxVersion = FieldSyntaxVersion.valueOf(config.getString(FIELD_SYNTAX_VERSION_CONFIG));
+        FieldSyntaxVersion syntaxVersion = FieldSyntaxVersion.fromConfig(config);
         List<String> fields = config.getList(FIELDS_FIELD);
         fieldPaths = FieldPaths.of(fields, syntaxVersion);
         List<String> headers = config.getList(HEADERS_FIELD);

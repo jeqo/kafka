@@ -41,8 +41,19 @@ public abstract class ExtractField<R extends ConnectRecord<R>> implements Transf
     private static final String FIELD_CONFIG = "field";
 
     public static final ConfigDef CONFIG_DEF = new ConfigDef()
-            .define(FIELD_CONFIG, ConfigDef.Type.STRING, ConfigDef.NO_DEFAULT_VALUE, ConfigDef.Importance.MEDIUM, "Field name to extract.")
-            .define(FIELD_SYNTAX_VERSION_CONFIG, ConfigDef.Type.STRING, FIELD_SYNTAX_VERSION_DEFAULT_VALUE, ConfigDef.Importance.HIGH, FIELD_SYNTAX_VERSION_DOC);
+            .define(
+                FieldSyntaxVersion.FIELD_SYNTAX_VERSION_CONFIG,
+                ConfigDef.Type.STRING,
+                FieldSyntaxVersion.FIELD_SYNTAX_VERSION_DEFAULT_VALUE,
+                FieldSyntaxVersion.FIELD_SYNTAX_VERSION_VALIDATOR,
+                ConfigDef.Importance.HIGH,
+                FieldSyntaxVersion.FIELD_SYNTAX_VERSION_DOC)
+            .define(
+                FIELD_CONFIG,
+                ConfigDef.Type.STRING,
+                ConfigDef.NO_DEFAULT_VALUE,
+                ConfigDef.Importance.MEDIUM,
+                "Field name to extract.");
 
     private static final String PURPOSE = "field extraction";
 
@@ -51,8 +62,7 @@ public abstract class ExtractField<R extends ConnectRecord<R>> implements Transf
     @Override
     public void configure(Map<String, ?> props) {
         final SimpleConfig config = new SimpleConfig(CONFIG_DEF, props);
-        FieldSyntaxVersion syntaxVersion = FieldSyntaxVersion.valueOf(config.getString(FIELD_SYNTAX_VERSION_CONFIG));
-        fieldPath = FieldPath.of(config.getString(FIELD_CONFIG), syntaxVersion);
+        fieldPath = FieldPath.of(config.getString(FIELD_CONFIG), FieldSyntaxVersion.fromConfig(config));
     }
 
     @Override
