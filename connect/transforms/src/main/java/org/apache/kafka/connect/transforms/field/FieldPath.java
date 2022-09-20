@@ -115,11 +115,11 @@ public class FieldPath {
                                     if (idx == -1) {
                                         throw new IllegalArgumentException("Incomplete backtick pair at [...]`" + s);
                                     }
-                                    if (idx < s.length() - 1 // non-global backtick
+                                    if (idx < s.length() - 1 // not wrapping the whole field path
                                             && (s.charAt(idx + 1) != DOT_CHAR
-                                            || s.charAt(idx - 1) == BACKSLASH_CHAR)) { // not wrapped or escaped
+                                            || s.charAt(idx - 1) == BACKSLASH_CHAR)) { // not wrapping or escaped
                                         idx++; // move index forward and keep searching
-                                    } else { // it's end pair
+                                    } else { // it's ending pair
                                         steps.add(escapeBackticks(s.substring(0, idx)));
                                         s.delete(0, idx + 2); // rm backtick and dot
                                         break;
