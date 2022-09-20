@@ -53,19 +53,19 @@ public class FieldPath {
 
     private final String[] path;
 
-    public static FieldPath ofV1(String field) {
+    static FieldPath ofV1(String field) {
         return of(field, FieldSyntaxVersion.V1);
     }
 
-    public static FieldPath ofV2(String field) {
+    static FieldPath ofV2(String field) {
         return of(field, FieldSyntaxVersion.V2);
     }
 
     /**
      * If version is V2, then paths are cached for further access.
      *
-     * @param field field path expression
-     * @param version  field syntax version
+     * @param field   field path expression
+     * @param version field syntax version
      */
     public static FieldPath of(String field, FieldSyntaxVersion version) {
         if (field == null || field.isEmpty() || version.equals(FieldSyntaxVersion.V1)) {
@@ -92,14 +92,13 @@ public class FieldPath {
                 case V2:
                     // if no dots or wrapping backticks are used, then return path with single step
                     if (!path.contains(DOT)
-                        && !(path.startsWith(BACKTICK) && path.endsWith(
-                        BACKTICK))) {
+                            && !(path.startsWith(BACKTICK) && path.endsWith(BACKTICK))) {
                         this.path = new String[] {path};
                     } else {
                         // prepare for tracking path steps
                         final List<String> steps = new ArrayList<>();
                         final StringBuilder s = new StringBuilder(
-                            path); // avoid creating new string on changes
+                                path); // avoid creating new string on changes
 
                         while (s.length() > 0) { // until path is traverse
                             // process backtick pair if any
@@ -111,17 +110,14 @@ public class FieldPath {
                                 while (idx >= 0) {
                                     idx = s.indexOf(BACKTICK, idx);
                                     if (idx == -1) {
-                                        throw new IllegalArgumentException(
-                                            "Incomplete backtick pair at [...]`" + s);
+                                        throw new IllegalArgumentException("Incomplete backtick pair at [...]`" + s);
                                     }
                                     if (idx != s.length() - 1) { // non-global backtick
                                         if (s.charAt(idx + 1) != DOT_CHAR
-                                            || s.charAt(idx - 1)
-                                            == BACKSLASH_CHAR) { // not wrapped or escaped
+                                                || s.charAt(idx - 1) == BACKSLASH_CHAR) { // not wrapped or escaped
                                             idx++; // move index forward and keep searching
                                         } else { // it's end pair
-                                            steps.add(
-                                                checkIncompleteBacktickPair(s.substring(0, idx)));
+                                            steps.add(checkIncompleteBacktickPair(s.substring(0, idx)));
                                             s.delete(0, idx + 2); // rm backtick and dot
                                             break;
                                         }
@@ -159,15 +155,15 @@ public class FieldPath {
             idx = s.indexOf(BACKTICK, idx + 1);
             if (idx >= 1 && s.length() > 2) {
                 if (s.charAt(idx - 1) == DOT_CHAR
-                    || (idx < s.length() - 1 && s.charAt(idx + 1) == DOT_CHAR
-                    && s.charAt(idx - 1) != BACKSLASH_CHAR)) {
+                        || (idx < s.length() - 1 && s.charAt(idx + 1) == DOT_CHAR
+                        && s.charAt(idx - 1) != BACKSLASH_CHAR)) {
                     throw new IllegalArgumentException("Incomplete backtick pair at [...]" + field);
                 }
                 if (s.charAt(idx - 1) == BACKSLASH_CHAR) { // escape backtick
                     if (s.charAt(idx + 1) == DOT_CHAR // before a dot
-                        || s.charAt(idx - 2) == DOT_CHAR // after a dot
-                        || (idx == 1 && s.charAt(0) == BACKSLASH_CHAR) // at the beginning
-                        || idx == s.length() - 1) { // at the end
+                            || s.charAt(idx - 2) == DOT_CHAR // after a dot
+                            || (idx == 1 && s.charAt(0) == BACKSLASH_CHAR) // at the beginning
+                            || idx == s.length() - 1) { // at the end
                         s.deleteCharAt(idx - 1);
                     }
                 }
@@ -249,15 +245,15 @@ public class FieldPath {
     }
 
     public Schema updateSchemaAt(
-        Schema schema,
-        SchemaBuilder updated,
-        BiConsumer<SchemaBuilder, Field> change
+            Schema schema,
+            SchemaBuilder updated,
+            BiConsumer<SchemaBuilder, Field> change
     ) {
         return updateSchema(schema, updated, 0, change);
     }
 
     private Schema updateSchema(Schema operatingSchema, SchemaBuilder builder, int step,
-        BiConsumer<SchemaBuilder, Field> change) {
+            BiConsumer<SchemaBuilder, Field> change) {
         if (operatingSchema.isOptional()) {
             builder.optional();
         }
@@ -269,7 +265,12 @@ public class FieldPath {
                     if (step == path.length - 1) {
                         change.accept(builder, field);
                     } else {
-                        builder.field(field.name(), updateSchema(field.schema(), SchemaBuilder.struct(), step + 1, change));
+                        Schema fieldSchema = updateSchema(
+                                field.schema(),
+                                SchemaBuilder.struct(),
+                                step + 1,
+                                change);
+                        builder.field(field.name(), fieldSchema);
                     }
                 }
             } else {
@@ -284,7 +285,11 @@ public class FieldPath {
     }
 
     @SuppressWarnings("unchecked")
-    private Map<String, Object> updateValue(Map<String, Object> value, int step, MapValueUpdater change) {
+    private Map<String, Object> updateValue(
+            Map<String, Object> value,
+            int step,
+            MapValueUpdater change
+    ) {
         Map<String, Object> updated = new HashMap<>(value);
         for (Map.Entry<String, Object> entry : value.entrySet()) {
             if (step < path.length) {
@@ -294,8 +299,9 @@ public class FieldPath {
                     } else {
                         if (entry.getValue() instanceof Map) {
                             updated.put(
-                                entry.getKey(),
-                                updateValue((Map<String, Object>) entry.getValue(), step + 1, change));
+                                    entry.getKey(),
+                                    updateValue((Map<String, Object>) entry.getValue(), step + 1,
+                                            change));
                         }
                     }
                 }
@@ -304,25 +310,43 @@ public class FieldPath {
         return updated;
     }
 
-    public Struct updateValueAt(Schema schema, Struct value, Schema updatedSchema, StructValueUpdater change) {
+    public Struct updateValueAt(
+            Schema schema,
+            Struct value,
+            Schema updatedSchema,
+            StructValueUpdater change
+    ) {
         return updateValue(schema, value, updatedSchema, 0, change);
     }
 
-    private Struct updateValue(Schema schema, Struct value, Schema updateSchema, int step, StructValueUpdater change) {
+    private Struct updateValue(
+            Schema schema,
+            Struct value,
+            Schema updateSchema,
+            int step,
+            StructValueUpdater change
+    ) {
         Struct updated = new Struct(updateSchema);
         for (Field field : schema.fields()) {
             if (step < path.length) {
                 if (path[step].equals(field.name())) {
                     if (step == path.length - 1) {
-                        change.apply(field, updateSchema.field(field.name()), updated, value.get(field.name()));
+                        change.apply(
+                                field,
+                                updateSchema.field(field.name()),
+                                updated,
+                                value.get(field.name())
+                        );
                     } else {
                         if (field.schema().type() == Type.STRUCT) {
-                            updated.put(
-                                field,
-                                updateValue(field.schema(), value.getStruct(field.name()),
-                                updateSchema.field(field.name()).schema(),
-                                step + 1,
-                                change));
+                            Struct fieldValue = updateValue(
+                                    field.schema(),
+                                    value.getStruct(field.name()),
+                                    updateSchema.field(field.name()).schema(),
+                                    step + 1,
+                                    change
+                            );
+                            updated.put(field, fieldValue);
                         }
                     }
                 } else {

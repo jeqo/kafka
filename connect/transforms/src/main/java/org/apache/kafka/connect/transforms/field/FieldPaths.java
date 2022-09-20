@@ -37,7 +37,7 @@ import java.util.stream.Collectors;
 /**
  * Multiple field paths to access record structures ({@code Struct} or {@code Map} efficiently,
  * instead of using single {@code FieldPath} individually.
- * <br/>
+ * <p>
  * Invariants:
  * <li>
  *     <ul>Tree nodes contain either a nested tree or a field path</ul>
@@ -64,14 +64,14 @@ public class FieldPaths {
 
     public static FieldPaths of(Set<String> fields, FieldSyntaxVersion syntaxVersion) {
         return new FieldPaths(fields.stream()
-            .map(f -> FieldPath.of(f, syntaxVersion))
-            .collect(Collectors.toList()));
+                .map(f -> FieldPath.of(f, syntaxVersion))
+                .collect(Collectors.toList()));
     }
 
     public static FieldPaths of(List<String> fields, FieldSyntaxVersion syntaxVersion) {
         return new FieldPaths(fields.stream()
-            .map(f -> FieldPath.of(f, syntaxVersion))
-            .collect(Collectors.toList()));
+                .map(f -> FieldPath.of(f, syntaxVersion))
+                .collect(Collectors.toList()));
     }
 
     Map<String, Object> buildTree(List<FieldPath> paths, int step, Map<String, Object> tree) {
@@ -90,13 +90,16 @@ public class FieldPaths {
                 if (pathStep != null) {
                     groups.computeIfPresent(pathStep, (s, fieldPaths) -> {
                         for (FieldPath other : fieldPaths) {
-                            if (!path.equals(other) && (other.at(step + 1) == null || path.at(step + 1) == null)) {
+                            if (!path.equals(other) && (other.at(step + 1) == null
+                                    || path.at(step + 1) == null)) {
                                 throw new IllegalArgumentException(
-                                    "Path " + other + " and " + path + " are overlapping. "
-                                        + "Paths need to point to leaf values");
+                                        "Path " + other + " and " + path + " are overlapping. "
+                                                + "Paths need to point to leaf values");
                             }
                         }
-                        if (!fieldPaths.contains(path)) fieldPaths.add(path);
+                        if (!fieldPaths.contains(path)) {
+                            fieldPaths.add(path);
+                        }
                         return fieldPaths;
                     });
                     groups.computeIfAbsent(pathStep, s -> {
@@ -115,10 +118,11 @@ public class FieldPaths {
                         tree.put(entry.getKey(), path);
                     } else {
                         tree.put(entry.getKey(),
-                            buildTree(entry.getValue(), step + 1, new HashMap<>()));
+                                buildTree(entry.getValue(), step + 1, new HashMap<>()));
                     }
                 } else {
-                    tree.put(entry.getKey(), buildTree(entry.getValue(), step + 1, new HashMap<>()));
+                    tree.put(entry.getKey(),
+                            buildTree(entry.getValue(), step + 1, new HashMap<>()));
                 }
             }
         }
@@ -126,7 +130,8 @@ public class FieldPaths {
     }
 
     public Map<FieldPath, StructFieldAndValue> fieldAndValuesFrom(Struct struct) {
-        final Map<FieldPath, StructFieldAndValue> map = findFieldAndValues(struct, pathTree, new HashMap<>());
+        final Map<FieldPath, StructFieldAndValue> map = findFieldAndValues(struct, pathTree,
+                new HashMap<>());
         for (FieldPath path : paths) {
             if (!map.containsKey(path)) {
                 map.put(path, null);
@@ -136,14 +141,18 @@ public class FieldPaths {
     }
 
     @SuppressWarnings("unchecked")
-    private Map<FieldPath, StructFieldAndValue> findFieldAndValues(Struct struct, Map<String, Object> tree, Map<FieldPath, StructFieldAndValue> map) {
+    private Map<FieldPath, StructFieldAndValue> findFieldAndValues(Struct struct,
+            Map<String, Object> tree, Map<FieldPath, StructFieldAndValue> map) {
         for (Map.Entry<String, Object> step : tree.entrySet()) {
             Field field = struct.schema().field(step.getKey());
             if (step.getValue() instanceof FieldPath) {
-                map.put((FieldPath) step.getValue(), field != null ? new StructFieldAndValue(field, struct.get(field)) : null);
+                map.put((FieldPath) step.getValue(),
+                        field != null ? new StructFieldAndValue(field, struct.get(field)) : null);
             } else {
-                if (field.schema().type() == Type.STRUCT) { // what if we don't get to the leaf? how to nullify a path not found
-                    findFieldAndValues(struct.getStruct(field.name()), (Map<String, Object>) step.getValue(), map);
+                if (field.schema().type()
+                        == Type.STRUCT) { // what if we don't get to the leaf? how to nullify a path not found
+                    findFieldAndValues(struct.getStruct(field.name()),
+                            (Map<String, Object>) step.getValue(), map);
                 }
             }
         }
@@ -151,7 +160,8 @@ public class FieldPaths {
     }
 
     public Map<FieldPath, MapFieldAndValue> fieldAndValuesFrom(Map<String, Object> value) {
-        final Map<FieldPath, MapFieldAndValue> map = findFieldAndValues(value, pathTree, new HashMap<>());
+        final Map<FieldPath, MapFieldAndValue> map = findFieldAndValues(value, pathTree,
+                new HashMap<>());
         for (FieldPath path : paths) {
             if (!map.containsKey(path)) {
                 map.put(path, null);
@@ -161,14 +171,17 @@ public class FieldPaths {
     }
 
     @SuppressWarnings("unchecked")
-    private Map<FieldPath, MapFieldAndValue> findFieldAndValues(Map<String, Object> value, Map<String, Object> tree, Map<FieldPath, MapFieldAndValue> map) {
+    private Map<FieldPath, MapFieldAndValue> findFieldAndValues(Map<String, Object> value,
+            Map<String, Object> tree, Map<FieldPath, MapFieldAndValue> map) {
         for (Map.Entry<String, Object> step : tree.entrySet()) {
             Object fieldValue = value.get(step.getKey());
             if (step.getValue() instanceof FieldPath) {
-                map.put((FieldPath) step.getValue(), new MapFieldAndValue(step.getKey(), fieldValue));
+                map.put((FieldPath) step.getValue(),
+                        new MapFieldAndValue(step.getKey(), fieldValue));
             } else {
                 if (fieldValue instanceof Map) { // what if we don't get to the leaf? how to nullify a path not found
-                    findFieldAndValues((Map<String, Object>) fieldValue, (Map<String, Object>) step.getValue(), map);
+                    findFieldAndValues((Map<String, Object>) fieldValue,
+                            (Map<String, Object>) step.getValue(), map);
                 }
             }
         }
@@ -180,7 +193,8 @@ public class FieldPaths {
     }
 
     @SuppressWarnings("unchecked")
-    private Map<String, Object> updateValues(Map<String, Object> value, Map<String, Object> tree, MapValueUpdater updater) {
+    private Map<String, Object> updateValues(Map<String, Object> value, Map<String, Object> tree,
+            MapValueUpdater updater) {
         Map<String, Object> updated = new HashMap<>(value);
         for (Map.Entry<String, Object> entry : tree.entrySet()) {
             final String fieldName = entry.getKey();
@@ -190,11 +204,11 @@ public class FieldPaths {
                 } else {
                     if (value.get(fieldName) instanceof Map) {
                         updated.put(
-                            fieldName,
-                            updateValues(
-                                (Map<String, Object>) updated.get(fieldName),
-                                (Map<String, Object>) entry.getValue(),
-                                updater));
+                                fieldName,
+                                updateValues(
+                                        (Map<String, Object>) updated.get(fieldName),
+                                        (Map<String, Object>) entry.getValue(),
+                                        updater));
                     }
                 }
             }
@@ -202,26 +216,29 @@ public class FieldPaths {
         return updated;
     }
 
-    public Struct updateValuesAt(Schema schema, Struct value, Schema updatedSchema, StructValueUpdater change) {
-        return updateValues(schema, value, updatedSchema,  pathTree, change);
+    public Struct updateValuesAt(Schema schema, Struct value, Schema updatedSchema,
+            StructValueUpdater change) {
+        return updateValues(schema, value, updatedSchema, pathTree, change);
     }
 
     @SuppressWarnings("unchecked")
-    private Struct updateValues(Schema schema, Struct value, Schema updateSchema, Map<String, Object> tree, StructValueUpdater change) {
+    private Struct updateValues(Schema schema, Struct value, Schema updateSchema,
+            Map<String, Object> tree, StructValueUpdater change) {
         Struct updated = new Struct(updateSchema);
         for (Field field : updateSchema.fields()) {
             if (!tree.isEmpty()) {
                 if (tree.containsKey(field.name())) {
                     if (tree.get(field.name()) instanceof FieldPath) {
-                        change.apply(schema.field(field.name()), updateSchema.field(field.name()), updated, value.get(field.name()));
+                        change.apply(schema.field(field.name()), updateSchema.field(field.name()),
+                                updated, value.get(field.name()));
                     } else {
                         if (field.schema().type() == Type.STRUCT) {
                             updated.put(
-                                field,
-                                updateValues(field.schema(), value.getStruct(field.name()),
-                                    updateSchema.field(field.name()).schema(),
-                                    (Map<String, Object>) tree.get(field.name()),
-                                    change));
+                                    field,
+                                    updateValues(field.schema(), value.getStruct(field.name()),
+                                            updateSchema.field(field.name()).schema(),
+                                            (Map<String, Object>) tree.get(field.name()),
+                                            change));
                         }
                     }
                 } else {
@@ -240,7 +257,8 @@ public class FieldPaths {
     }
 
     @SuppressWarnings("unchecked")
-    private Schema updateSchema(Schema operatingSchema, SchemaBuilder builder, Map<String, Object> tree, BiConsumer<SchemaBuilder, Field> change) {
+    private Schema updateSchema(Schema operatingSchema, SchemaBuilder builder,
+            Map<String, Object> tree, BiConsumer<SchemaBuilder, Field> change) {
         if (operatingSchema.isOptional()) {
             builder.optional();
         }
@@ -254,12 +272,12 @@ public class FieldPaths {
                     } else {
                         if (field.schema().type() == Type.STRUCT) {
                             builder.field(
-                                field.name(),
-                                updateSchema(
-                                    field.schema(),
-                                    SchemaBuilder.struct(),
-                                    (Map<String, Object>) tree.get(field.name()),
-                                    change));
+                                    field.name(),
+                                    updateSchema(
+                                            field.schema(),
+                                            SchemaBuilder.struct(),
+                                            (Map<String, Object>) tree.get(field.name()),
+                                            change));
                         } else {
                             builder.field(field.name(), field.schema());
                         }
@@ -275,7 +293,7 @@ public class FieldPaths {
     @Override
     public String toString() {
         return new StringJoiner(", ", FieldPaths.class.getSimpleName() + "[", "]")
-            .add("pathTree=" + pathTree)
-            .toString();
+                .add("pathTree=" + pathTree)
+                .toString();
     }
 }

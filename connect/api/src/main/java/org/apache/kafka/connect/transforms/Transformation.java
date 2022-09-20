@@ -29,17 +29,6 @@ import java.io.Closeable;
  */
 public interface Transformation<R extends ConnectRecord<R>> extends Configurable, Closeable {
 
-    String FIELD_SYNTAX_VERSION_CONFIG = "field.syntax.version";
-    String FIELD_SYNTAX_VERSION_DOC = "Defines the version of the syntax to access fields. "
-        + "If set to `V1`, then the field paths are limited to access the elements at the root level of the struct or map."
-        + "If set to `V2`, the syntax will support accessing nested elements. o access nested elements, "
-        + "dotted notation is used. If dots are already included in the field name, then backtick pairs "
-        + "can be used to wrap field names containing dots. "
-        + "e.g. to access elements from a struct/map named \"foo.bar\", "
-        + "the following format can be used to access its elements: \"`foo.bar`.baz\".";
-
-    String FIELD_SYNTAX_VERSION_DEFAULT_VALUE = "V1";
-
     /**
      * Apply transformation to the {@code record} and return another record object (which may be {@code record} itself) or {@code null},
      * corresponding to a map or filter operation respectively.

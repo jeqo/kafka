@@ -20,6 +20,7 @@ import java.util.Objects;
 import java.util.StringJoiner;
 
 public final class MapFieldAndValue {
+
     final String field;
     final Object value;
 
@@ -42,7 +43,7 @@ public final class MapFieldAndValue {
         }
         MapFieldAndValue that = (MapFieldAndValue) o;
         return Objects.equals(field, that.field) && Objects.equals(value,
-            that.value);
+                that.value);
     }
 
     @Override
@@ -53,8 +54,8 @@ public final class MapFieldAndValue {
     @Override
     public String toString() {
         return new StringJoiner(", ", MapFieldAndValue.class.getSimpleName() + "[", "]")
-            .add("field='" + field + "'")
-            .add("value=" + value)
-            .toString();
+                .add("field='" + field + "'")
+                .add("value=" + value)
+                .toString();
     }
 }

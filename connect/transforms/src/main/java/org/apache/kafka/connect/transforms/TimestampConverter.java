@@ -87,21 +87,33 @@ public abstract class TimestampConverter<R extends ConnectRecord<R>> implements 
     public static final Schema OPTIONAL_TIME_SCHEMA = Time.builder().optional().schema();
 
     public static final ConfigDef CONFIG_DEF = new ConfigDef()
-            .define(FIELD_SYNTAX_VERSION_CONFIG, ConfigDef.Type.STRING,
-                    FIELD_SYNTAX_VERSION_DEFAULT_VALUE, ConfigDef.Importance.HIGH, FIELD_SYNTAX_VERSION_DOC)
-            .define(FIELD_CONFIG, ConfigDef.Type.STRING, FIELD_DEFAULT, ConfigDef.Importance.HIGH,
+            .define(FieldSyntaxVersion.FIELD_SYNTAX_VERSION_CONFIG,
+                    ConfigDef.Type.STRING,
+                    FieldSyntaxVersion.FIELD_SYNTAX_VERSION_DEFAULT_VALUE,
+                    FieldSyntaxVersion.FIELD_SYNTAX_VERSION_VALIDATOR,
+                    ConfigDef.Importance.HIGH,
+                    FieldSyntaxVersion.FIELD_SYNTAX_VERSION_DOC)
+            .define(FIELD_CONFIG,
+                    ConfigDef.Type.STRING,
+                    FIELD_DEFAULT,
+                    ConfigDef.Importance.HIGH,
                     "The field containing the timestamp, or empty if the entire value is a timestamp")
-            .define(TARGET_TYPE_CONFIG, ConfigDef.Type.STRING, ConfigDef.NO_DEFAULT_VALUE,
+            .define(TARGET_TYPE_CONFIG,
+                    ConfigDef.Type.STRING,
+                    ConfigDef.NO_DEFAULT_VALUE,
                     ConfigDef.ValidString.in(TYPE_STRING, TYPE_UNIX, TYPE_DATE, TYPE_TIME, TYPE_TIMESTAMP),
                     ConfigDef.Importance.HIGH,
                     "The desired timestamp representation: string, unix, Date, Time, or Timestamp")
-            .define(FORMAT_CONFIG, ConfigDef.Type.STRING, FORMAT_DEFAULT, ConfigDef.Importance.MEDIUM,
+            .define(FORMAT_CONFIG,
+                    ConfigDef.Type.STRING,
+                    FORMAT_DEFAULT,
+                    ConfigDef.Importance.MEDIUM,
                     "A SimpleDateFormat-compatible format for the timestamp. Used to generate the output when type=string "
                             + "or used to parse the input if the input is a string.")
-            .define(UNIX_PRECISION_CONFIG, ConfigDef.Type.STRING, UNIX_PRECISION_DEFAULT,
-                    ConfigDef.ValidString.in(
-                            UNIX_PRECISION_NANOS, UNIX_PRECISION_MICROS,
-                            UNIX_PRECISION_MILLIS, UNIX_PRECISION_SECONDS),
+            .define(UNIX_PRECISION_CONFIG,
+                    ConfigDef.Type.STRING,
+                    UNIX_PRECISION_DEFAULT,
+                    ConfigDef.ValidString.in(UNIX_PRECISION_NANOS, UNIX_PRECISION_MICROS, UNIX_PRECISION_MILLIS, UNIX_PRECISION_SECONDS),
                     ConfigDef.Importance.LOW,
                     "The desired Unix precision for the timestamp: seconds, milliseconds, microseconds, or nanoseconds. " +
                             "Used to generate the output when type=unix or used to parse the input if the input is a Long." +
@@ -293,7 +305,6 @@ public abstract class TimestampConverter<R extends ConnectRecord<R>> implements 
         String formatPattern = simpleConfig.getString(FORMAT_CONFIG);
         final String unixPrecision = simpleConfig.getString(UNIX_PRECISION_CONFIG);
         schemaUpdateCache = new SynchronizedCache<>(new LRUCache<>(16));
-        final FieldSyntaxVersion syntaxVersion = FieldSyntaxVersion.valueOf(simpleConfig.getString(FIELD_SYNTAX_VERSION_CONFIG));
 
         if (type.equals(TYPE_STRING) && Utils.isBlank(formatPattern)) {
             throw new ConfigException("TimestampConverter requires format option to be specified when using string timestamps");
@@ -308,7 +319,8 @@ public abstract class TimestampConverter<R extends ConnectRecord<R>> implements 
                         + formatPattern, e);
             }
         }
-        config = new Config(FieldPath.of(field, syntaxVersion), type, format, unixPrecision);
+        config = new Config(FieldPath.of(field, FieldSyntaxVersion.fromConfig(simpleConfig)), type,
+                format, unixPrecision);
     }
 
     @Override

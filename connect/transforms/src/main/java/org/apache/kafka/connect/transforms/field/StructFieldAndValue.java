@@ -23,6 +23,7 @@ import java.util.Objects;
 import java.util.StringJoiner;
 
 public final class StructFieldAndValue {
+
     final Field field;
     final Object value;
 
@@ -59,8 +60,8 @@ public final class StructFieldAndValue {
     @Override
     public String toString() {
         return new StringJoiner(", ", StructFieldAndValue.class.getSimpleName() + "[", "]")
-            .add("field=" + field)
-            .add("value=" + value)
-            .toString();
+                .add("field=" + field)
+                .add("value=" + value)
+                .toString();
     }
 }

@@ -54,7 +54,7 @@ public class ExtractFieldTest {
     @Test
     public void schemalessAndNestedPath() {
         Map<String, String> configs = new HashMap<>();
-        configs.put(Transformation.FIELD_SYNTAX_VERSION_CONFIG, FieldSyntaxVersion.V2.name());
+        configs.put(FieldSyntaxVersion.FIELD_SYNTAX_VERSION_CONFIG, FieldSyntaxVersion.V2.name());
         configs.put("field", "magic.foo");
         xform.configure(configs);
 
@@ -94,7 +94,7 @@ public class ExtractFieldTest {
     @Test
     public void withSchemaAndNestedPath() {
         Map<String, String> configs = new HashMap<>();
-        configs.put(Transformation.FIELD_SYNTAX_VERSION_CONFIG, FieldSyntaxVersion.V2.name());
+        configs.put(FieldSyntaxVersion.FIELD_SYNTAX_VERSION_CONFIG, FieldSyntaxVersion.V2.name());
         configs.put("field", "magic.foo");
         xform.configure(configs);
 
