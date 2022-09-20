@@ -163,10 +163,11 @@ public class FieldPath {
                     throw new IllegalArgumentException("Incomplete backtick pair at [...]" + field);
                 }
                 if (s.charAt(idx - 1) == BACKSLASH_CHAR) { // escape backtick
-                    if (s.charAt(idx + 1) == DOT_CHAR // before a dot
-                            || s.charAt(idx - 2) == DOT_CHAR // after a dot
-                            || (idx == 1 && s.charAt(0) == BACKSLASH_CHAR) // at the beginning
-                            || idx == s.length() - 1) { // at the end
+                    if ((idx == 1 && s.charAt(0) == BACKSLASH_CHAR) // at the beginning: \`foo[...]
+                            || idx == s.length() - 1) { // at the end: [...]baz\`
+                        s.deleteCharAt(idx - 1);
+                    } else if ((idx > 2 && s.charAt(idx - 2) == DOT_CHAR) // after a dot: [...].\`bar[...]
+                            || (idx < s.length() - 1 && s.charAt(idx + 1) == DOT_CHAR)) { // before a dot: [...]bar\`.[...]
                         s.deleteCharAt(idx - 1);
                     }
                 }

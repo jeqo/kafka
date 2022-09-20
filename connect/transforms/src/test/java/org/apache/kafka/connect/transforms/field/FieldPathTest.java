@@ -70,8 +70,8 @@ class FieldPathTest {
     }
 
     @Test void shouldBuildV2WithBackticksWrappingBackticks() {
-        assertArrayEquals(new String[] {"foo", "`bar`", "baz"}, FieldPath.of("foo.``bar``.baz", FieldSyntaxVersion.V2).path());
-        assertArrayEquals(new String[] {"`foo.bar.baz`"}, FieldPath.of("``foo.bar.baz``", FieldSyntaxVersion.V2).path());
+        assertArrayEquals(new String[] {"foo", "`bar`", "baz"}, FieldPath.of("foo.`\\`bar\\``.baz", FieldSyntaxVersion.V2).path());
+        assertArrayEquals(new String[] {"`foo.bar.baz`"}, FieldPath.of("`\\`foo.bar.baz\\``", FieldSyntaxVersion.V2).path());
     }
 
     @Test void shouldFilterSchemaV1Fields() {
