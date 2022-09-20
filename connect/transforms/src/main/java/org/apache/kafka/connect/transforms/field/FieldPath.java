@@ -91,49 +91,43 @@ public class FieldPath {
                     break;
                 case V2:
                     // if no dots or wrapping backticks are used, then return path with single step
-                    if (!path.contains(DOT)
-                            && !(path.startsWith(BACKTICK) && path.endsWith(BACKTICK))) {
+                    if (!path.contains(DOT)) {
                         this.path = new String[] {path};
                     } else {
                         // prepare for tracking path steps
                         final List<String> steps = new ArrayList<>();
-                        final StringBuilder s = new StringBuilder(
-                                path); // avoid creating new string on changes
+                        // avoid creating new string on changes
+                        final StringBuilder s = new StringBuilder(path);
 
                         while (s.length() > 0) { // until path is traverse
                             // process backtick pair if any
                             if (s.charAt(0) == BACKTICK_CHAR) {
                                 s.deleteCharAt(0);
 
-                                // find backtick pair
+                                // find backtick closing pair
                                 int idx = 0;
                                 while (idx >= 0) {
                                     idx = s.indexOf(BACKTICK, idx);
                                     if (idx == -1) {
                                         throw new IllegalArgumentException("Incomplete backtick pair at [...]`" + s);
                                     }
-                                    if (idx != s.length() - 1) { // non-global backtick
-                                        if (s.charAt(idx + 1) != DOT_CHAR
-                                                || s.charAt(idx - 1) == BACKSLASH_CHAR) { // not wrapped or escaped
-                                            idx++; // move index forward and keep searching
-                                        } else { // it's end pair
-                                            steps.add(checkIncompleteBacktickPair(s.substring(0, idx)));
-                                            s.delete(0, idx + 2); // rm backtick and dot
-                                            break;
-                                        }
-                                    } else { // global backtick
-                                        steps.add(checkIncompleteBacktickPair(s.substring(0, idx)));
-                                        s.delete(0, s.length());
+                                    if (idx < s.length() - 1 // non-global backtick
+                                            && (s.charAt(idx + 1) != DOT_CHAR
+                                            || s.charAt(idx - 1) == BACKSLASH_CHAR)) { // not wrapped or escaped
+                                        idx++; // move index forward and keep searching
+                                    } else { // it's end pair
+                                        steps.add(escapeBackticks(s.substring(0, idx)));
+                                        s.delete(0, idx + 2); // rm backtick and dot
                                         break;
                                     }
                                 }
                             } else { // process path dots
                                 final int atDot = s.indexOf(DOT);
                                 if (atDot > 0) { // get step and move forward
-                                    steps.add(checkIncompleteBacktickPair(s.substring(0, atDot)));
+                                    steps.add(escapeBackticks(s.substring(0, atDot)));
                                     s.delete(0, atDot + 1);
                                 } else { // add all
-                                    steps.add(checkIncompleteBacktickPair(s.toString()));
+                                    steps.add(escapeBackticks(s.toString()));
                                     s.delete(0, s.length());
                                 }
                             }
@@ -148,7 +142,12 @@ public class FieldPath {
         }
     }
 
-    private String checkIncompleteBacktickPair(String field) {
+    /**
+     * Return field name with escaped backticks, if any.
+     * @param field potentially containing backticks
+     * @throws IllegalArgumentException when there are incomplete backtick pairs
+     */
+    private String escapeBackticks(String field) {
         final StringBuilder s = new StringBuilder(field);
         int idx = 0;
         while (idx >= 0) {
