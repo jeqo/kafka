@@ -29,8 +29,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
-import java.util.StringJoiner;
 import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 
@@ -51,7 +51,7 @@ public class FieldPaths {
 
     FieldPaths(List<FieldPath> paths) {
         this.paths = paths;
-        pathTree = buildTree(paths, 0, new HashMap<>());
+        pathTree = buildPathTree(paths, 0, new HashMap<>());
     }
 
     public static FieldPaths of(FieldPath path) {
@@ -74,13 +74,13 @@ public class FieldPaths {
                 .collect(Collectors.toList()));
     }
 
-    Map<String, Object> buildTree(List<FieldPath> paths, int step, Map<String, Object> tree) {
+    Map<String, Object> buildPathTree(List<FieldPath> paths, int step, Map<String, Object> pathTree) {
         if (paths.size() == 1) { // optimize for paths with a single member
             FieldPath path = paths.get(0);
             if (path.at(step + 1) == null) { // if last path step
-                tree.put(path.at(step), path);
+                pathTree.put(path.at(step), path);
             } else {
-                tree.put(path.at(step), buildTree(paths, step + 1, new HashMap<>()));
+                pathTree.put(path.at(step), buildPathTree(paths, step + 1, new HashMap<>()));
             }
         } else {
             // group paths by prefix
@@ -115,185 +115,258 @@ public class FieldPaths {
                 if (entry.getValue().size() == 1) {
                     final FieldPath path = entry.getValue().get(0);
                     if (path.at(step + 1) == null) { // if last path step
-                        tree.put(entry.getKey(), path);
+                        pathTree.put(entry.getKey(), path);
                     } else {
-                        tree.put(entry.getKey(),
-                                buildTree(entry.getValue(), step + 1, new HashMap<>()));
+                        pathTree.put(entry.getKey(),
+                                buildPathTree(entry.getValue(), step + 1, new HashMap<>()));
                     }
                 } else {
-                    tree.put(entry.getKey(),
-                            buildTree(entry.getValue(), step + 1, new HashMap<>()));
+                    pathTree.put(entry.getKey(),
+                            buildPathTree(entry.getValue(), step + 1, new HashMap<>()));
                 }
             }
         }
-        return tree;
+        return pathTree;
     }
 
+    /**
+     * Find values at the field paths on the tree.
+     * @param struct data value
+     * @return map of field paths and field/values
+     */
     public Map<FieldPath, StructFieldAndValue> fieldAndValuesFrom(Struct struct) {
-        final Map<FieldPath, StructFieldAndValue> map = findFieldAndValues(struct, pathTree,
-                new HashMap<>());
-        for (FieldPath path : paths) {
-            if (!map.containsKey(path)) {
-                map.put(path, null);
-            }
-        }
-        return map;
+        return findFieldAndValues(struct, pathTree, new HashMap<>());
     }
 
     @SuppressWarnings("unchecked")
-    private Map<FieldPath, StructFieldAndValue> findFieldAndValues(Struct struct,
-            Map<String, Object> tree, Map<FieldPath, StructFieldAndValue> map) {
-        for (Map.Entry<String, Object> step : tree.entrySet()) {
-            Field field = struct.schema().field(step.getKey());
+    private Map<FieldPath, StructFieldAndValue> findFieldAndValues(
+            Struct originalValue,
+            Map<String, Object> treeAt,
+            Map<FieldPath, StructFieldAndValue> fieldAndValueMap
+    ) {
+        for (Map.Entry<String, Object> step : treeAt.entrySet()) {
+            Field field = originalValue.schema().field(step.getKey());
             if (step.getValue() instanceof FieldPath) {
-                map.put((FieldPath) step.getValue(),
-                        field != null ? new StructFieldAndValue(field, struct.get(field)) : null);
+                StructFieldAndValue fieldAndValue =
+                        field != null
+                                ? new StructFieldAndValue(field, originalValue.get(field))
+                                : null;
+                fieldAndValueMap.put((FieldPath) step.getValue(), fieldAndValue);
             } else {
-                if (field.schema().type()
-                        == Type.STRUCT) { // what if we don't get to the leaf? how to nullify a path not found
-                    findFieldAndValues(struct.getStruct(field.name()),
-                            (Map<String, Object>) step.getValue(), map);
+                if (field.schema().type() == Type.STRUCT) {
+                    findFieldAndValues(
+                            originalValue.getStruct(field.name()),
+                            (Map<String, Object>) step.getValue(),
+                            fieldAndValueMap
+                    );
                 }
             }
         }
-        return map;
+        return fieldAndValueMap;
     }
 
+    /**
+     * Find values at the field paths on the tree.
+     * @param value data value
+     * @return map of field paths and field/values
+     */
     public Map<FieldPath, MapFieldAndValue> fieldAndValuesFrom(Map<String, Object> value) {
-        final Map<FieldPath, MapFieldAndValue> map = findFieldAndValues(value, pathTree,
-                new HashMap<>());
-        for (FieldPath path : paths) {
-            if (!map.containsKey(path)) {
-                map.put(path, null);
-            }
-        }
-        return map;
+        return findFieldAndValues(value, pathTree, new HashMap<>());
     }
 
     @SuppressWarnings("unchecked")
-    private Map<FieldPath, MapFieldAndValue> findFieldAndValues(Map<String, Object> value,
-            Map<String, Object> tree, Map<FieldPath, MapFieldAndValue> map) {
-        for (Map.Entry<String, Object> step : tree.entrySet()) {
+    private Map<FieldPath, MapFieldAndValue> findFieldAndValues(
+            Map<String, Object> value,
+            Map<String, Object> treeAt,
+            Map<FieldPath, MapFieldAndValue> fieldAndValueMap
+    ) {
+        for (Map.Entry<String, Object> step : treeAt.entrySet()) {
             Object fieldValue = value.get(step.getKey());
             if (step.getValue() instanceof FieldPath) {
-                map.put((FieldPath) step.getValue(),
-                        new MapFieldAndValue(step.getKey(), fieldValue));
+                fieldAndValueMap.put((
+                        FieldPath) step.getValue(),
+                        new MapFieldAndValue(step.getKey(), fieldValue)
+                );
             } else {
-                if (fieldValue instanceof Map) { // what if we don't get to the leaf? how to nullify a path not found
-                    findFieldAndValues((Map<String, Object>) fieldValue,
-                            (Map<String, Object>) step.getValue(), map);
+                if (fieldValue instanceof Map) {
+                    findFieldAndValues(
+                            (Map<String, Object>) fieldValue,
+                            (Map<String, Object>) step.getValue(),
+                            fieldAndValueMap
+                    );
                 }
             }
         }
-        return map;
+        return fieldAndValueMap;
     }
 
-    public Map<String, Object> updateValuesAt(Map<String, Object> value, MapValueUpdater updater) {
-        return updateValues(value, pathTree, updater);
+    /**
+     * Find values at the path tree leafs within the {@code Map} and apply update function when found.
+     *
+     * @param originalValue  schemaless data value
+     * @param update function to apply when found
+     * @return updated data value
+     */
+    public Map<String, Object> updateValuesAt(
+            Map<String, Object> originalValue,
+            MapValueUpdater update
+    ) {
+        return updateValues(originalValue, pathTree, update);
     }
 
     @SuppressWarnings("unchecked")
-    private Map<String, Object> updateValues(Map<String, Object> value, Map<String, Object> tree,
-            MapValueUpdater updater) {
-        Map<String, Object> updated = new HashMap<>(value);
-        for (Map.Entry<String, Object> entry : tree.entrySet()) {
+    private Map<String, Object> updateValues(
+            Map<String, Object> originalValue,
+            Map<String, Object> treeAt,
+            MapValueUpdater update
+    ) {
+        Map<String, Object> updatedValue = new HashMap<>(originalValue);
+        for (Map.Entry<String, Object> entry : treeAt.entrySet()) {
             final String fieldName = entry.getKey();
-            if (value.containsKey(fieldName)) {
+            if (originalValue.containsKey(fieldName)) {
                 if (entry.getValue() instanceof FieldPath) {
-                    updater.apply(updated, fieldName, entry.getValue());
+                    update.apply(updatedValue, fieldName, entry.getValue());
                 } else {
-                    if (value.get(fieldName) instanceof Map) {
-                        updated.put(
-                                fieldName,
-                                updateValues(
-                                        (Map<String, Object>) updated.get(fieldName),
-                                        (Map<String, Object>) entry.getValue(),
-                                        updater));
+                    if (originalValue.get(fieldName) instanceof Map) {
+                        Map<String, Object> fieldValue = updateValues(
+                                (Map<String, Object>) updatedValue.get(fieldName),
+                                (Map<String, Object>) entry.getValue(),
+                                update);
+                        updatedValue.put(fieldName, fieldValue);
                     }
                 }
             }
         }
-        return updated;
+        return updatedValue;
     }
 
-    public Struct updateValuesAt(Schema schema, Struct value, Schema updatedSchema,
-            StructValueUpdater change) {
-        return updateValues(schema, value, updatedSchema, pathTree, change);
+    /**
+     * Find values at the path tree leafs within the {@code Struct} and apply update function when found.
+     *
+     * @param originalSchema original struct schema
+     * @param originalValue  schema-based data value
+     * @param updatedSchema updated struct schema
+     * @param update function to apply when found
+     * @return updated data value
+     */
+    public Struct updateValuesAt(
+            Schema originalSchema,
+            Struct originalValue,
+            Schema updatedSchema,
+            StructValueUpdater update
+    ) {
+        return updateValues(originalSchema, originalValue, updatedSchema, pathTree, update);
     }
 
     @SuppressWarnings("unchecked")
-    private Struct updateValues(Schema schema, Struct value, Schema updateSchema,
-            Map<String, Object> tree, StructValueUpdater change) {
-        Struct updated = new Struct(updateSchema);
+    private Struct updateValues(
+            Schema originalSchema,
+            Struct originalValue,
+            Schema updateSchema,
+            Map<String, Object> treeAt,
+            StructValueUpdater update) {
+        Struct updatedValue = new Struct(updateSchema);
         for (Field field : updateSchema.fields()) {
-            if (!tree.isEmpty()) {
-                if (tree.containsKey(field.name())) {
-                    if (tree.get(field.name()) instanceof FieldPath) {
-                        change.apply(schema.field(field.name()), updateSchema.field(field.name()),
-                                updated, value.get(field.name()));
+            if (!treeAt.isEmpty()) {
+                if (treeAt.containsKey(field.name())) {
+                    if (treeAt.get(field.name()) instanceof FieldPath) {
+                        update.apply(
+                                originalSchema.field(field.name()),
+                                updateSchema.field(field.name()),
+                                updatedValue,
+                                originalValue.get(field.name())
+                        );
                     } else {
                         if (field.schema().type() == Type.STRUCT) {
-                            updated.put(
-                                    field,
-                                    updateValues(field.schema(), value.getStruct(field.name()),
-                                            updateSchema.field(field.name()).schema(),
-                                            (Map<String, Object>) tree.get(field.name()),
-                                            change));
+                            Struct fieldValue = updateValues(
+                                    field.schema(),
+                                    originalValue.getStruct(field.name()),
+                                    updateSchema.field(field.name()).schema(),
+                                    (Map<String, Object>) treeAt.get(field.name()),
+                                    update
+                            );
+                            updatedValue.put(field, fieldValue);
                         }
                     }
                 } else {
-                    updated.put(field, value.get(field.name()));
+                    updatedValue.put(field, originalValue.get(field.name()));
                 }
             } else {
-                updated.put(field, value.get(field.name()));
+                updatedValue.put(field, originalValue.get(field.name()));
             }
         }
-        return updated;
+        return updatedValue;
     }
 
-    public Schema updateSchemaAt(Schema schema, BiConsumer<SchemaBuilder, Field> change) {
-        SchemaBuilder updated = SchemaUtil.copySchemaBasics(schema, SchemaBuilder.struct());
-        return updateSchema(schema, updated, pathTree, change);
+    /**
+     * Find the {@code Field}s at the path tree leafs, and apply an update function. If fields are not
+     * found, then no update function is applied.
+     * <p>
+     * A copy of the {@code Schema} will be used as a base for the updated schema.
+     *
+     * @return the updated schema
+     */
+    public Schema updateSchemaAt(Schema originalSchema, BiConsumer<SchemaBuilder, Field> update) {
+        SchemaBuilder updated = SchemaUtil.copySchemaBasics(originalSchema, SchemaBuilder.struct());
+        return updateSchema(originalSchema, updated, pathTree, update);
     }
 
     @SuppressWarnings("unchecked")
-    private Schema updateSchema(Schema operatingSchema, SchemaBuilder builder,
-            Map<String, Object> tree, BiConsumer<SchemaBuilder, Field> change) {
-        if (operatingSchema.isOptional()) {
-            builder.optional();
+    private Schema updateSchema(
+            Schema originalSchema,
+            SchemaBuilder baseSchemaBuilder,
+            Map<String, Object> treeAt,
+            BiConsumer<SchemaBuilder, Field> update
+    ) {
+        if (originalSchema.isOptional()) {
+            baseSchemaBuilder.optional();
         }
-        for (Field field : operatingSchema.fields()) {
-            if (!tree.isEmpty()) {
-                if (!tree.containsKey(field.name())) {
-                    builder.field(field.name(), field.schema());
+        for (Field field : originalSchema.fields()) {
+            if (!treeAt.isEmpty()) {
+                if (!treeAt.containsKey(field.name())) {
+                    baseSchemaBuilder.field(field.name(), field.schema());
                 } else {
-                    if (tree.get(field.name()) instanceof FieldPath) {
-                        change.accept(builder, field);
+                    if (treeAt.get(field.name()) instanceof FieldPath) {
+                        update.accept(baseSchemaBuilder, field);
                     } else {
                         if (field.schema().type() == Type.STRUCT) {
-                            builder.field(
-                                    field.name(),
-                                    updateSchema(
-                                            field.schema(),
-                                            SchemaBuilder.struct(),
-                                            (Map<String, Object>) tree.get(field.name()),
-                                            change));
+                            Schema fieldSchema = updateSchema(
+                                    field.schema(),
+                                    SchemaBuilder.struct(),
+                                    (Map<String, Object>) treeAt.get(field.name()),
+                                    update);
+                            baseSchemaBuilder.field(field.name(), fieldSchema);
                         } else {
-                            builder.field(field.name(), field.schema());
+                            baseSchemaBuilder.field(field.name(), field.schema());
                         }
                     }
                 }
             } else {
-                builder.field(field.name(), field.schema());
+                baseSchemaBuilder.field(field.name(), field.schema());
             }
         }
-        return builder.build();
+        return baseSchemaBuilder.build();
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        FieldPaths that = (FieldPaths) o;
+        return Objects.equals(pathTree, that.pathTree);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(pathTree);
     }
 
     @Override
     public String toString() {
-        return new StringJoiner(", ", FieldPaths.class.getSimpleName() + "[", "]")
-                .add("pathTree=" + pathTree)
-                .toString();
+        return "FieldPaths(pathTree = " + pathTree + ")";
     }
 }

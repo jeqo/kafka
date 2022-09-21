@@ -144,7 +144,7 @@ public class ExtractFieldTest {
             xform.apply(record);
             fail("Expected exception wasn't raised");
         } catch (IllegalArgumentException iae) {
-            assertEquals("Unknown field: path=[nonexistent]", iae.getMessage());
+            assertEquals("Unknown field: FieldPath(path = [nonexistent])", iae.getMessage());
         }
     }
 }
