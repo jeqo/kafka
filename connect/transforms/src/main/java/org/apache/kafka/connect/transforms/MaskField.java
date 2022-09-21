@@ -19,11 +19,12 @@ package org.apache.kafka.connect.transforms;
 import java.util.ArrayList;
 import org.apache.kafka.common.config.ConfigDef;
 import org.apache.kafka.connect.connector.ConnectRecord;
-import org.apache.kafka.connect.data.Field;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.data.Values;
 import org.apache.kafka.connect.errors.DataException;
+import org.apache.kafka.connect.transforms.field.FieldPaths;
+import org.apache.kafka.connect.transforms.field.FieldSyntaxVersion;
 import org.apache.kafka.connect.transforms.util.NonEmptyListValidator;
 import org.apache.kafka.connect.transforms.util.SimpleConfig;
 
@@ -31,10 +32,8 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.function.Function;
 
 import static org.apache.kafka.connect.transforms.util.Requirements.requireMap;
@@ -52,6 +51,8 @@ public abstract class MaskField<R extends ConnectRecord<R>> implements Transform
     private static final String REPLACEMENT_CONFIG = "replacement";
 
     public static final ConfigDef CONFIG_DEF = new ConfigDef()
+            .define(FieldSyntaxVersion.FIELD_SYNTAX_VERSION_CONFIG, ConfigDef.Type.STRING,
+                    FieldSyntaxVersion.FIELD_SYNTAX_VERSION_DEFAULT_VALUE, ConfigDef.Importance.HIGH, FieldSyntaxVersion.FIELD_SYNTAX_VERSION_DOC)
             .define(FIELDS_CONFIG, ConfigDef.Type.LIST, ConfigDef.NO_DEFAULT_VALUE, new NonEmptyListValidator(),
                     ConfigDef.Importance.HIGH, "Names of fields to mask.")
             .define(REPLACEMENT_CONFIG, ConfigDef.Type.STRING, null, new ConfigDef.NonEmptyString(),
@@ -87,13 +88,13 @@ public abstract class MaskField<R extends ConnectRecord<R>> implements Transform
         REPLACEMENT_MAPPING_FUNC.put(BigInteger.class, BigInteger::new);
     }
 
-    private Set<String> maskedFields;
+    private FieldPaths maskedFields;
     private String replacement;
 
     @Override
     public void configure(Map<String, ?> props) {
         final SimpleConfig config = new SimpleConfig(CONFIG_DEF, props);
-        maskedFields = new HashSet<>(config.getList(FIELDS_CONFIG));
+        maskedFields = FieldPaths.of(config.getList(FIELDS_CONFIG), FieldSyntaxVersion.fromConfig(config));
         replacement = config.getString(REPLACEMENT_CONFIG);
     }
 
@@ -108,21 +109,19 @@ public abstract class MaskField<R extends ConnectRecord<R>> implements Transform
 
     private R applySchemaless(R record) {
         final Map<String, Object> value = requireMap(operatingValue(record), PURPOSE);
-        final HashMap<String, Object> updatedValue = new HashMap<>(value);
-        for (String field : maskedFields) {
-            updatedValue.put(field, masked(value.get(field)));
-        }
-        return newRecord(record, updatedValue);
+        final Map<String, Object> updated = maskedFields.updateValuesAt(
+                value,
+                (updatedValue, fieldName, fieldValue) ->
+                        updatedValue.put(fieldName, masked(fieldValue)));
+        return newRecord(record, updated);
     }
 
     private R applyWithSchema(R record) {
         final Struct value = requireStruct(operatingValue(record), PURPOSE);
-        final Struct updatedValue = new Struct(value.schema());
-        for (Field field : value.schema().fields()) {
-            final Object origFieldValue = value.get(field);
-            updatedValue.put(field, maskedFields.contains(field.name()) ? masked(origFieldValue) : origFieldValue);
-        }
-        return newRecord(record, updatedValue);
+        final Struct updated = maskedFields.updateValuesAt(value.schema(), value, value.schema(),
+                (originalField, updatedField, updatedValue, fieldValue) ->
+                  updatedValue.put(updatedField.name(), masked(fieldValue)));
+        return newRecord(record, updated);
     }
 
     private Object masked(Object value) {
