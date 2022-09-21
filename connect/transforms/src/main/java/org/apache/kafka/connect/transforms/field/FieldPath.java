@@ -85,60 +85,16 @@ public class FieldPath {
         }
     }
 
-    FieldPath(String path, FieldSyntaxVersion version) {
-        if (path == null || path.isEmpty()) { // empty path
+    FieldPath(String pathText, FieldSyntaxVersion version) {
+        if (pathText == null || pathText.isEmpty()) { // empty path
             this.path = new String[] {};
         } else {
             switch (version) {
                 case V1: // backward compatibility
-                    this.path = new String[] {path};
+                    this.path = new String[] {pathText};
                     break;
                 case V2:
-                    // if no dots or wrapping backticks are used, then return path with single step
-                    if (!path.contains(DOT)) {
-                        this.path = new String[] {path};
-                    } else {
-                        // prepare for tracking path steps
-                        final List<String> steps = new ArrayList<>();
-                        // avoid creating new string on changes
-                        final StringBuilder s = new StringBuilder(path);
-
-                        while (s.length() > 0) { // until path is traverse
-                            // process backtick pair if any
-                            if (s.charAt(0) == BACKTICK_CHAR) {
-                                s.deleteCharAt(0);
-
-                                // find backtick closing pair
-                                int idx = 0;
-                                while (idx >= 0) {
-                                    idx = s.indexOf(BACKTICK, idx);
-                                    if (idx == -1) {
-                                        throw new IllegalArgumentException("Incomplete backtick pair at [...]`" + s);
-                                    }
-                                    if (idx < s.length() - 1 // not wrapping the whole field path
-                                            && (s.charAt(idx + 1) != DOT_CHAR
-                                            || s.charAt(idx - 1) == BACKSLASH_CHAR)) { // not wrapping or escaped
-                                        idx++; // move index forward and keep searching
-                                    } else { // it's ending pair
-                                        steps.add(escapeBackticks(s.substring(0, idx)));
-                                        s.delete(0, idx + 2); // rm backtick and dot
-                                        break;
-                                    }
-                                }
-                            } else { // process path dots
-                                final int atDot = s.indexOf(DOT);
-                                if (atDot > 0) { // get step and move forward
-                                    steps.add(escapeBackticks(s.substring(0, atDot)));
-                                    s.delete(0, atDot + 1);
-                                } else { // add all
-                                    steps.add(escapeBackticks(s.toString()));
-                                    s.delete(0, s.length());
-                                }
-                            }
-                        }
-
-                        this.path = steps.toArray(new String[0]);
-                    }
+                    path = buildFieldPathV2(pathText);
                     break;
                 default:
                     throw new IllegalArgumentException("Unknown syntax version: " + version);
@@ -146,8 +102,58 @@ public class FieldPath {
         }
     }
 
+    private String[] buildFieldPathV2(String pathText) {
+        // if no dots or wrapping backticks are used, then return path with single step
+        if (!pathText.contains(DOT)) {
+            return new String[] {pathText};
+        } else {
+            // prepare for tracking path steps
+            final List<String> steps = new ArrayList<>();
+            // avoid creating new string on changes
+            final StringBuilder s = new StringBuilder(pathText);
+
+            while (s.length() > 0) { // until path is traverse
+                // process backtick pair if any
+                if (s.charAt(0) == BACKTICK_CHAR) {
+                    s.deleteCharAt(0);
+
+                    // find backtick closing pair
+                    int idx = 0;
+                    while (idx >= 0) {
+                        idx = s.indexOf(BACKTICK, idx);
+                        if (idx == -1) {
+                            throw new IllegalArgumentException(
+                                    "Incomplete backtick pair at [...]`" + s);
+                        }
+                        if (idx < s.length() - 1 // not wrapping the whole field path
+                                && (s.charAt(idx + 1) != DOT_CHAR // not wrapping
+                                || s.charAt(idx - 1) == BACKSLASH_CHAR)) { // ... or escaped
+                            idx++; // move index forward and keep searching
+                        } else { // it's ending pair
+                            steps.add(escapeBackticks(s.substring(0, idx)));
+                            s.delete(0, idx + 2); // rm backtick and dot
+                            break;
+                        }
+                    }
+                } else { // process path dots
+                    final int atDot = s.indexOf(DOT);
+                    if (atDot > 0) { // get step and move forward
+                        steps.add(escapeBackticks(s.substring(0, atDot)));
+                        s.delete(0, atDot + 1);
+                    } else { // add all
+                        steps.add(escapeBackticks(s.toString()));
+                        s.delete(0, s.length());
+                    }
+                }
+            }
+
+            return steps.toArray(new String[0]);
+        }
+    }
+
     /**
      * Return field name with escaped backticks, if any.
+     *
      * @param field potentially containing backticks
      * @throws IllegalArgumentException when there are incomplete backtick pairs
      */
@@ -177,7 +183,8 @@ public class FieldPath {
     }
 
     /**
-     * Access field at the current path within a schema {@code Schema}
+     * Access a {@code Field} at the current path within a schema {@code Schema} If field is not
+     * found, then {@code null} is returned.
      */
     public Field fieldAt(Schema schema) {
         if (path.length == 1) {
@@ -199,7 +206,8 @@ public class FieldPath {
     }
 
     /**
-     * Access value at the current path within a schema-based {@code Struct}
+     * Access a value at the current path within a schema-based {@code Struct} If object is not
+     * found, then {@code null} is returned.
      */
     public Object valueAt(Struct struct) {
         if (path.length == 1) {
@@ -221,7 +229,8 @@ public class FieldPath {
     }
 
     /**
-     * Access value at the current path within a schemaless {@code Map<String, Object>}
+     * Access a value at the current path within a schemaless {@code Map<String, Object>}. If object
+     * is not found, then {@code null} is returned.
      */
     @SuppressWarnings("unchecked")
     public Object valueAt(Map<String, Object> map) {
@@ -243,21 +252,42 @@ public class FieldPath {
         return null;
     }
 
-    public Schema updateSchemaAt(Schema schema, BiConsumer<SchemaBuilder, Field> change) {
-        SchemaBuilder updated = SchemaUtil.copySchemaBasics(schema, SchemaBuilder.struct());
-        return updateSchema(schema, updated, 0, change);
+    /**
+     * Find the {@code Field} at the current path, and apply an update function. If field is not
+     * found, then no update function is applied.
+     * <p>
+     * A copy of the {@code Schema} will be used as a base for the updated schema.
+     *
+     * @return the updated schema
+     */
+    public Schema updateSchemaAt(Schema originalSchema, BiConsumer<SchemaBuilder, Field> update) {
+        SchemaBuilder updated = SchemaUtil.copySchemaBasics(originalSchema, SchemaBuilder.struct());
+        return updateSchema(originalSchema, updated, 0, update);
     }
 
+    /**
+     * Find the {@code Field} at the current path, and apply an update function. If field is not
+     * found, then no update function is applied.
+     *
+     * @param originalSchema        source schema
+     * @param baselineSchemaBuilder baseline schema to update
+     * @param update                change function to apply to the source schema field when found
+     * @return the updated schema
+     */
     public Schema updateSchemaAt(
-            Schema schema,
-            SchemaBuilder updated,
+            Schema originalSchema,
+            SchemaBuilder baselineSchemaBuilder,
+            BiConsumer<SchemaBuilder, Field> update
+    ) {
+        return updateSchema(originalSchema, baselineSchemaBuilder, 0, update);
+    }
+
+    private Schema updateSchema(
+            Schema operatingSchema,
+            SchemaBuilder builder,
+            int step,
             BiConsumer<SchemaBuilder, Field> change
     ) {
-        return updateSchema(schema, updated, 0, change);
-    }
-
-    private Schema updateSchema(Schema operatingSchema, SchemaBuilder builder, int step,
-            BiConsumer<SchemaBuilder, Field> change) {
         if (operatingSchema.isOptional()) {
             builder.optional();
         }
@@ -284,8 +314,15 @@ public class FieldPath {
         return builder.build();
     }
 
-    public Map<String, Object> updateValueAt(Map<String, Object> value, MapValueUpdater change) {
-        return updateValue(value, 0, change);
+    /**
+     * Find values at the current path within the {@code Map} and apply update function when found.
+     *
+     * @param value  schemaless data value
+     * @param update function to apply when found
+     * @return updated data value
+     */
+    public Map<String, Object> updateValueAt(Map<String, Object> value, MapValueUpdater update) {
+        return updateValue(value, 0, update);
     }
 
     @SuppressWarnings("unchecked")
@@ -302,10 +339,11 @@ public class FieldPath {
                         change.apply(updated, path[step], entry.getValue());
                     } else {
                         if (entry.getValue() instanceof Map) {
-                            updated.put(
-                                    entry.getKey(),
-                                    updateValue((Map<String, Object>) entry.getValue(), step + 1,
-                                            change));
+                            Map<String, Object> updatedValue = updateValue(
+                                    (Map<String, Object>) entry.getValue(),
+                                    step + 1,
+                                    change);
+                            updated.put(entry.getKey(), updatedValue);
                         }
                     }
                 }
@@ -314,50 +352,59 @@ public class FieldPath {
         return updated;
     }
 
+    /**
+     * Find values at the current path within the {@code Struct} and apply update function when found.
+     *
+     * @param originalSchema original struct schema
+     * @param originalValue  schema-based data value
+     * @param updatedSchema updated struct schema
+     * @param update function to apply when found
+     * @return updated data value
+     */
     public Struct updateValueAt(
-            Schema schema,
-            Struct value,
+            Schema originalSchema,
+            Struct originalValue,
             Schema updatedSchema,
-            StructValueUpdater change
+            StructValueUpdater update
     ) {
-        return updateValue(schema, value, updatedSchema, 0, change);
+        return updateValue(originalSchema, originalValue, updatedSchema, 0, update);
     }
 
     private Struct updateValue(
-            Schema schema,
-            Struct value,
+            Schema originalSchema,
+            Struct originalValue,
             Schema updateSchema,
             int step,
-            StructValueUpdater change
+            StructValueUpdater update
     ) {
         Struct updated = new Struct(updateSchema);
-        for (Field field : schema.fields()) {
+        for (Field field : originalSchema.fields()) {
             if (step < path.length) {
                 if (path[step].equals(field.name())) {
                     if (step == path.length - 1) {
-                        change.apply(
+                        update.apply(
                                 field,
                                 updateSchema.field(field.name()),
                                 updated,
-                                value.get(field.name())
+                                originalValue.get(field.name())
                         );
                     } else {
                         if (field.schema().type() == Type.STRUCT) {
                             Struct fieldValue = updateValue(
                                     field.schema(),
-                                    value.getStruct(field.name()),
+                                    originalValue.getStruct(field.name()),
                                     updateSchema.field(field.name()).schema(),
                                     step + 1,
-                                    change
+                                    update
                             );
                             updated.put(field, fieldValue);
                         }
                     }
                 } else {
-                    updated.put(field, value.get(field));
+                    updated.put(field, originalValue.get(field));
                 }
             } else {
-                updated.put(field, value.get(field));
+                updated.put(field, originalValue.get(field));
             }
         }
         return updated;
@@ -368,9 +415,16 @@ public class FieldPath {
         return Arrays.copyOf(path, path.length);
     }
 
-    @Override
-    public String toString() {
-        return "path=" + Arrays.toString(path);
+    public String last() {
+        return path[path.length - 1];
+    }
+
+    public boolean isEmpty() {
+        return path.length == 0;
+    }
+
+    public String at(int i) {
+        return i < path.length ? path[i] : null;
     }
 
     @Override
@@ -390,16 +444,8 @@ public class FieldPath {
         return Arrays.hashCode(path);
     }
 
-    public String last() {
-        return path[path.length - 1];
+    @Override
+    public String toString() {
+        return "FieldPath(path = " + Arrays.toString(path) + ")";
     }
-
-    public boolean isEmpty() {
-        return path.length == 0;
-    }
-
-    public String at(int i) {
-        return i < path.length ? path[i] : null;
-    }
-
 }
