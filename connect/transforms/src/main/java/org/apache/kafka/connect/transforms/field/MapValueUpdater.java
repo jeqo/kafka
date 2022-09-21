@@ -21,5 +21,5 @@ import java.util.Map;
 @FunctionalInterface
 public interface MapValueUpdater {
 
-    void apply(Map<String, Object> map, String fieldName, Object fieldValue);
+    void apply(Map<String, Object> updatedValue, String fieldName, Object fieldValue);
 }
