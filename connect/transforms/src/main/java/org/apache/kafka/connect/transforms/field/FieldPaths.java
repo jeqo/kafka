@@ -225,7 +225,7 @@ public class FieldPaths {
             final String fieldName = entry.getKey();
             if (originalValue.containsKey(fieldName)) {
                 if (entry.getValue() instanceof FieldPath) {
-                    update.apply(updatedValue, fieldName, entry.getValue());
+                    update.apply(updatedValue, fieldName, originalValue.get(fieldName));
                 } else {
                     if (originalValue.get(fieldName) instanceof Map) {
                         Map<String, Object> fieldValue = updateValues(
@@ -346,6 +346,10 @@ public class FieldPaths {
             }
         }
         return baseSchemaBuilder.build();
+    }
+
+    public int size() {
+        return paths.size();
     }
 
     @Override
