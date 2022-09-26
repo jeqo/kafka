@@ -264,7 +264,8 @@ public class FieldPaths {
             Struct originalValue,
             Schema updateSchema,
             Map<String, Object> treeAt,
-            StructValueUpdater update) {
+            StructValueUpdater update
+    ) {
         Struct updatedValue = new Struct(updateSchema);
         for (Field field : updateSchema.fields()) {
             if (!treeAt.isEmpty()) {

@@ -133,6 +133,18 @@ public class ExtractFieldTest {
     }
 
     @Test
+    public void nonExistentNestedFieldSchemalessShouldReturnNull() {
+        xform.configure(Collections.singletonMap("field", "magic.nonexistent"));
+
+        final Map<String, Object> key = Collections.singletonMap("magic", Collections.singletonMap("foo", 42));
+        final SinkRecord record = new SinkRecord("test", 0, null, key, null, null, 0);
+        final SinkRecord transformedRecord = xform.apply(record);
+
+        assertNull(transformedRecord.keySchema());
+        assertNull(transformedRecord.key());
+    }
+
+    @Test
     public void nonExistentFieldWithSchemaShouldFail() {
         xform.configure(Collections.singletonMap("field", "nonexistent"));
 
@@ -145,6 +157,23 @@ public class ExtractFieldTest {
             fail("Expected exception wasn't raised");
         } catch (IllegalArgumentException iae) {
             assertEquals("Unknown field: FieldPath(path = [nonexistent])", iae.getMessage());
+        }
+    }
+
+    @Test
+    public void nonExistentNestedFieldWithSchemaShouldFail() {
+        xform.configure(Collections.singletonMap("field", "magic.nonexistent"));
+
+        final Schema fooSchema = SchemaBuilder.struct().field("foo", Schema.INT32_SCHEMA).build();
+        final Schema keySchema = SchemaBuilder.struct().field("magic", fooSchema).build();
+        final Struct key = new Struct(keySchema).put("magic", new Struct(fooSchema).put("foo", 42));
+        final SinkRecord record = new SinkRecord("test", 0, keySchema, key, null, null, 0);
+
+        try {
+            xform.apply(record);
+            fail("Expected exception wasn't raised");
+        } catch (IllegalArgumentException iae) {
+            assertEquals("Unknown field: FieldPath(path = [magic.nonexistent])", iae.getMessage());
         }
     }
 }
