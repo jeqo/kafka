@@ -53,9 +53,9 @@ public final class MapFieldAndValue {
 
     @Override
     public String toString() {
-        return new StringJoiner(", ", MapFieldAndValue.class.getSimpleName() + "[", "]")
-                .add("field='" + field + "'")
-                .add("value=" + value)
+        return new StringJoiner(", ", MapFieldAndValue.class.getSimpleName() + "(", ")")
+                .add("field = " + field)
+                .add("value = " + value)
                 .toString();
     }
 }

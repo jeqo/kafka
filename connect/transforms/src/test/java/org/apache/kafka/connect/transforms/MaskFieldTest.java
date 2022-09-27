@@ -26,6 +26,8 @@ import org.apache.kafka.connect.data.Time;
 import org.apache.kafka.connect.data.Timestamp;
 import org.apache.kafka.connect.errors.DataException;
 import org.apache.kafka.connect.sink.SinkRecord;
+import org.apache.kafka.connect.transforms.field.FieldPath;
+import org.apache.kafka.connect.transforms.field.FieldSyntaxVersion;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -61,8 +63,11 @@ public class MaskFieldTest {
             .field("array", SchemaBuilder.array(Schema.INT32_SCHEMA))
             .field("map", SchemaBuilder.map(Schema.STRING_SCHEMA, Schema.STRING_SCHEMA))
             .build();
+    private static final Schema NESTED_SCHEMA = SchemaBuilder.struct().field("foo", SCHEMA);
     private static final Map<String, Object> VALUES = new HashMap<>();
+    private static final Map<String, Object> NESTED_VALUES = new HashMap<>();
     private static final Struct VALUES_WITH_SCHEMA = new Struct(SCHEMA);
+    private static final Struct NESTED_VALUES_WITH_SCHEMA = new Struct(NESTED_SCHEMA);
 
     static {
         VALUES.put("magic", 42);
@@ -79,6 +84,7 @@ public class MaskFieldTest {
         VALUES.put("bigdec", new BigDecimal("42.0"));
         VALUES.put("list", singletonList(42));
         VALUES.put("map", Collections.singletonMap("key", "value"));
+        NESTED_VALUES.put("foo", VALUES);
 
         VALUES_WITH_SCHEMA.put("magic", 42);
         VALUES_WITH_SCHEMA.put("bool", true);
@@ -95,13 +101,20 @@ public class MaskFieldTest {
         VALUES_WITH_SCHEMA.put("decimal", new BigDecimal(42));
         VALUES_WITH_SCHEMA.put("array", Arrays.asList(1, 2, 3));
         VALUES_WITH_SCHEMA.put("map", Collections.singletonMap("what", "what"));
+        NESTED_VALUES_WITH_SCHEMA.put("foo", VALUES_WITH_SCHEMA);
     }
 
+
     private static MaskField<SinkRecord> transform(List<String> fields, String replacement) {
+        return transform(fields, replacement, FieldSyntaxVersion.V1);
+    }
+
+    private static MaskField<SinkRecord> transform(List<String> fields, String replacement, FieldSyntaxVersion version) {
         final MaskField<SinkRecord> xform = new MaskField.Value<>();
         Map<String, Object> props = new HashMap<>();
         props.put("fields", fields);
         props.put("replacement", replacement);
+        props.put(FieldSyntaxVersion.FIELD_SYNTAX_VERSION_CONFIG, version.name());
         xform.configure(props);
         return xform;
     }
@@ -112,22 +125,51 @@ public class MaskFieldTest {
 
     private static void checkReplacementWithSchema(String maskField, Object replacement) {
         SinkRecord record = record(SCHEMA, VALUES_WITH_SCHEMA);
-        final Struct updatedValue = (Struct) transform(singletonList(maskField), String.valueOf(replacement)).apply(record).value();
-        assertEquals(replacement, updatedValue.get(maskField), "Invalid replacement for " + maskField + " value");
+        checkReplacementWithSchema(record, maskField, replacement, FieldSyntaxVersion.V1);
+    }
+
+    private static void checkReplacementWithSchemaV2(String maskField, Object replacement) {
+        SinkRecord record = record(NESTED_SCHEMA, NESTED_VALUES_WITH_SCHEMA);
+        checkReplacementWithSchema(record, maskField, replacement, FieldSyntaxVersion.V2);
+    }
+
+    private static void checkReplacementWithSchema(SinkRecord record, String maskField, Object replacement, FieldSyntaxVersion version) {
+        final FieldPath fieldPath = FieldPath.of(maskField, version);
+        final Struct updatedValue =
+                (Struct) transform(singletonList(maskField), String.valueOf(replacement), version)
+                        .apply(record)
+                        .value();
+        assertEquals(replacement, fieldPath.valueAt(updatedValue), "Invalid replacement for " + maskField + " value");
+    }
+
+    private static void checkReplacementSchemalessV2(String maskField, Object replacement) {
+        SinkRecord record = record(null, NESTED_VALUES);
+        checkReplacementSchemaless(record, singletonList(maskField), replacement, FieldSyntaxVersion.V2);
     }
 
     private static void checkReplacementSchemaless(String maskField, Object replacement) {
-        checkReplacementSchemaless(singletonList(maskField), replacement);
+        SinkRecord record = record(null, VALUES);
+        checkReplacementSchemaless(record, singletonList(maskField), replacement, FieldSyntaxVersion.V1);
+    }
+
+    private static void checkReplacementSchemaless(List<String> maskField, Object replacement) {
+        SinkRecord record = record(null, VALUES);
+        checkReplacementSchemaless(record, maskField, replacement, FieldSyntaxVersion.V1);
+    }
+
+    private static void checkReplacementSchemalessV2(List<String> maskField, Object replacement) {
+        SinkRecord record = record(null, NESTED_VALUES);
+        checkReplacementSchemaless(record, maskField, replacement, FieldSyntaxVersion.V2);
     }
 
     @SuppressWarnings("unchecked")
-    private static void checkReplacementSchemaless(List<String> maskFields, Object replacement) {
-        SinkRecord record = record(null, VALUES);
-        final Map<String, Object> updatedValue = (Map) transform(maskFields, String.valueOf(replacement))
-                .apply(record)
-                .value();
+    private static void checkReplacementSchemaless(SinkRecord record, List<String> maskFields, Object replacement, FieldSyntaxVersion version) {
+        final Map<String, Object> updatedValue =
+                (Map<String, Object>) transform(maskFields, String.valueOf(replacement), version)
+                        .apply(record)
+                        .value();
         for (String maskField : maskFields) {
-            assertEquals(replacement, updatedValue.get(maskField), "Invalid replacement for " + maskField + " value");
+            assertEquals(replacement, FieldPath.of(maskField, version).valueAt(updatedValue), "Invalid replacement for " + maskField + " value");
         }
     }
 
@@ -135,7 +177,10 @@ public class MaskFieldTest {
     public void testSchemaless() {
         final List<String> maskFields = new ArrayList<>(VALUES.keySet());
         maskFields.remove("magic");
-        @SuppressWarnings("unchecked") final Map<String, Object> updatedValue = (Map) transform(maskFields, null).apply(record(null, VALUES)).value();
+        @SuppressWarnings("unchecked") final Map<String, Object> updatedValue =
+                (Map<String, Object>) transform(maskFields, null)
+                        .apply(record(null, VALUES))
+                        .value();
 
         assertEquals(42, updatedValue.get("magic"));
         assertEquals(false, updatedValue.get("bool"));
@@ -154,6 +199,34 @@ public class MaskFieldTest {
     }
 
     @Test
+    public void testSchemalessV2() {
+        final List<String> maskFields = new ArrayList<>(VALUES.keySet().size());
+        for (String field : VALUES.keySet()) {
+            maskFields.add("foo." + field);
+        }
+        maskFields.remove("foo.magic");
+        @SuppressWarnings("unchecked") final Map<String, Object> updatedValue =
+                (Map<String, Object>) transform(maskFields, null, FieldSyntaxVersion.V2)
+                        .apply(record(null, NESTED_VALUES))
+                        .value();
+
+        assertEquals(42, FieldPath.of("foo.magic", FieldSyntaxVersion.V2).valueAt(updatedValue));
+        assertEquals(false, FieldPath.of("foo.bool", FieldSyntaxVersion.V2).valueAt(updatedValue));
+        assertEquals((byte) 0, FieldPath.of("foo.byte", FieldSyntaxVersion.V2).valueAt(updatedValue));
+        assertEquals((short) 0, FieldPath.of("foo.short", FieldSyntaxVersion.V2).valueAt(updatedValue));
+        assertEquals(0, FieldPath.of("foo.int", FieldSyntaxVersion.V2).valueAt(updatedValue));
+        assertEquals(0L, FieldPath.of("foo.long", FieldSyntaxVersion.V2).valueAt(updatedValue));
+        assertEquals(0f, FieldPath.of("foo.float", FieldSyntaxVersion.V2).valueAt(updatedValue));
+        assertEquals(0d, FieldPath.of("foo.double", FieldSyntaxVersion.V2).valueAt(updatedValue));
+        assertEquals("", FieldPath.of("foo.string", FieldSyntaxVersion.V2).valueAt(updatedValue));
+        assertEquals(new Date(0), FieldPath.of("foo.date", FieldSyntaxVersion.V2).valueAt(updatedValue));
+        assertEquals(BigInteger.ZERO, FieldPath.of("foo.bigint", FieldSyntaxVersion.V2).valueAt(updatedValue));
+        assertEquals(BigDecimal.ZERO, FieldPath.of("foo.bigdec", FieldSyntaxVersion.V2).valueAt(updatedValue));
+        assertEquals(Collections.emptyList(), FieldPath.of("foo.list", FieldSyntaxVersion.V2).valueAt(updatedValue));
+        assertEquals(Collections.emptyMap(), FieldPath.of("foo.map", FieldSyntaxVersion.V2).valueAt(updatedValue));
+    }
+
+    @Test
     public void testWithSchema() {
         final List<String> maskFields = new ArrayList<>(SCHEMA.fields().size());
         for (Field field : SCHEMA.fields()) {
@@ -162,7 +235,10 @@ public class MaskFieldTest {
             }
         }
 
-        final Struct updatedValue = (Struct) transform(maskFields, null).apply(record(SCHEMA, VALUES_WITH_SCHEMA)).value();
+        final Struct updatedValue =
+                (Struct) transform(maskFields, null)
+                        .apply(record(SCHEMA, VALUES_WITH_SCHEMA))
+                        .value();
 
         assertEquals(42, updatedValue.get("magic"));
         assertEquals(false, updatedValue.get("bool"));
@@ -182,6 +258,37 @@ public class MaskFieldTest {
     }
 
     @Test
+    public void testWithSchemaV2() {
+        final List<String> maskFields = new ArrayList<>(SCHEMA.fields().size());
+        for (Field field : SCHEMA.fields()) {
+            if (!field.name().equals("magic")) {
+                maskFields.add("foo." + field.name());
+            }
+        }
+
+        final Struct updatedValue =
+                (Struct) transform(maskFields, null, FieldSyntaxVersion.V2)
+                        .apply(record(NESTED_SCHEMA, NESTED_VALUES_WITH_SCHEMA))
+                        .value();
+
+        assertEquals(42, FieldPath.of("foo.magic", FieldSyntaxVersion.V2).valueAt(updatedValue));
+        assertEquals(false, FieldPath.of("foo.bool", FieldSyntaxVersion.V2).valueAt(updatedValue));
+        assertEquals((byte) 0, FieldPath.of("foo.byte", FieldSyntaxVersion.V2).valueAt(updatedValue));
+        assertEquals((short) 0, FieldPath.of("foo.short", FieldSyntaxVersion.V2).valueAt(updatedValue));
+        assertEquals(0, FieldPath.of("foo.int", FieldSyntaxVersion.V2).valueAt(updatedValue));
+        assertEquals(0L, FieldPath.of("foo.long", FieldSyntaxVersion.V2).valueAt(updatedValue));
+        assertEquals(0f, FieldPath.of("foo.float", FieldSyntaxVersion.V2).valueAt(updatedValue));
+        assertEquals(0d, FieldPath.of("foo.double", FieldSyntaxVersion.V2).valueAt(updatedValue));
+        assertEquals("", FieldPath.of("foo.string", FieldSyntaxVersion.V2).valueAt(updatedValue));
+        assertEquals(new Date(0), FieldPath.of("foo.date", FieldSyntaxVersion.V2).valueAt(updatedValue));
+        assertEquals(new Date(0), FieldPath.of("foo.time", FieldSyntaxVersion.V2).valueAt(updatedValue));
+        assertEquals(new Date(0), FieldPath.of("foo.timestamp", FieldSyntaxVersion.V2).valueAt(updatedValue));
+        assertEquals(BigDecimal.ZERO, FieldPath.of("foo.decimal", FieldSyntaxVersion.V2).valueAt(updatedValue));
+        assertEquals(Collections.emptyList(), FieldPath.of("foo.array", FieldSyntaxVersion.V2).valueAt(updatedValue));
+        assertEquals(Collections.emptyMap(), FieldPath.of("foo.map", FieldSyntaxVersion.V2).valueAt(updatedValue));
+    }
+
+    @Test
     public void testSchemalessWithReplacement() {
         checkReplacementSchemaless("short", (short) 123);
         checkReplacementSchemaless("byte", (byte) 123);
@@ -192,6 +299,19 @@ public class MaskFieldTest {
         checkReplacementSchemaless("string", "123");
         checkReplacementSchemaless("bigint", BigInteger.valueOf(123L));
         checkReplacementSchemaless("bigdec", BigDecimal.valueOf(123.0));
+    }
+
+    @Test
+    public void testSchemalessWithReplacementV2() {
+        checkReplacementSchemalessV2("foo.short", (short) 123);
+        checkReplacementSchemalessV2("foo.byte", (byte) 123);
+        checkReplacementSchemalessV2("foo.int", 123);
+        checkReplacementSchemalessV2("foo.long", 123L);
+        checkReplacementSchemalessV2("foo.float", 123.0f);
+        checkReplacementSchemalessV2("foo.double", 123.0);
+        checkReplacementSchemalessV2("foo.string", "123");
+        checkReplacementSchemalessV2("foo.bigint", BigInteger.valueOf(123L));
+        checkReplacementSchemalessV2("foo.bigdec", BigDecimal.valueOf(123.0));
     }
 
     @Test
@@ -207,6 +327,18 @@ public class MaskFieldTest {
     }
 
     @Test
+    public void testSchemalessUnsupportedReplacementTypeV2() {
+        String exMessage = "Cannot mask value of type";
+        Class<DataException> exClass = DataException.class;
+
+        assertThrows(exClass, () -> checkReplacementSchemalessV2("foo.date", new Date()), exMessage);
+        assertThrows(exClass, () -> checkReplacementSchemalessV2("foo.bool", false), exMessage);
+        assertThrows(exClass, () -> checkReplacementSchemalessV2("foo.list", singletonList("123")), exMessage);
+        assertThrows(exClass, () -> checkReplacementSchemalessV2("foo.map", Collections.singletonMap("123", "321")), exMessage);
+        assertThrows(exClass, () -> checkReplacementSchemalessV2(Arrays.asList("foo.int", "foo.date"), new Date()), exMessage);
+    }
+
+    @Test
     public void testWithSchemaAndReplacement() {
         checkReplacementWithSchema("short", (short) 123);
         checkReplacementWithSchema("byte", (byte) 123);
@@ -219,6 +351,18 @@ public class MaskFieldTest {
     }
 
     @Test
+    public void testWithSchemaAndReplacementV2() {
+        checkReplacementWithSchemaV2("foo.short", (short) 123);
+        checkReplacementWithSchemaV2("foo.byte", (byte) 123);
+        checkReplacementWithSchemaV2("foo.int", 123);
+        checkReplacementWithSchemaV2("foo.long", 123L);
+        checkReplacementWithSchemaV2("foo.float", 123.0f);
+        checkReplacementWithSchemaV2("foo.double", 123.0);
+        checkReplacementWithSchemaV2("foo.string", "123");
+        checkReplacementWithSchemaV2("foo.decimal", BigDecimal.valueOf(123.0));
+    }
+
+    @Test
     public void testWithSchemaUnsupportedReplacementType() {
         String exMessage = "Cannot mask value of type";
         Class<DataException> exClass = DataException.class;
@@ -226,6 +370,16 @@ public class MaskFieldTest {
         assertThrows(exClass, () -> checkReplacementWithSchema("time", new Date()), exMessage);
         assertThrows(exClass, () -> checkReplacementWithSchema("timestamp", new Date()), exMessage);
         assertThrows(exClass, () -> checkReplacementWithSchema("array", singletonList(123)), exMessage);
+    }
+
+    @Test
+    public void testWithSchemaUnsupportedReplacementTypeV2() {
+        String exMessage = "Cannot mask value of type";
+        Class<DataException> exClass = DataException.class;
+
+        assertThrows(exClass, () -> checkReplacementWithSchemaV2("foo.time", new Date()), exMessage);
+        assertThrows(exClass, () -> checkReplacementWithSchemaV2("foo.timestamp", new Date()), exMessage);
+        assertThrows(exClass, () -> checkReplacementWithSchemaV2("foo.array", singletonList(123)), exMessage);
     }
 
     @Test
@@ -247,8 +401,31 @@ public class MaskFieldTest {
     }
 
     @Test
+    public void testReplacementTypeMismatchV2() {
+        String exMessage = "Invalid value  for configuration replacement";
+        Class<DataException> exClass = DataException.class;
+
+        assertThrows(exClass, () -> checkReplacementSchemalessV2("foo.byte", "foo"), exMessage);
+        assertThrows(exClass, () -> checkReplacementSchemalessV2("foo.short", "foo"), exMessage);
+        assertThrows(exClass, () -> checkReplacementSchemalessV2("foo.int", "foo"), exMessage);
+        assertThrows(exClass, () -> checkReplacementSchemalessV2("foo.long", "foo"), exMessage);
+        assertThrows(exClass, () -> checkReplacementSchemalessV2("foo.float", "foo"), exMessage);
+        assertThrows(exClass, () -> checkReplacementSchemalessV2("foo.double", "foo"), exMessage);
+        assertThrows(exClass, () -> checkReplacementSchemalessV2("foo.bigint", "foo"), exMessage);
+        assertThrows(exClass, () -> checkReplacementSchemalessV2("foo.bigdec", "foo"), exMessage);
+        assertThrows(exClass, () -> checkReplacementSchemalessV2("foo.int", new Date()), exMessage);
+        assertThrows(exClass, () -> checkReplacementSchemalessV2("foo.int", new Object()), exMessage);
+        assertThrows(exClass, () -> checkReplacementSchemalessV2(Arrays.asList("foo.string", "foo.int"), "foo"), exMessage);
+    }
+
+    @Test
     public void testEmptyStringReplacementValue() {
         assertThrows(ConfigException.class, () -> checkReplacementSchemaless("short", ""), "String must be non-empty");
+    }
+
+    @Test
+    public void testEmptyStringReplacementValueV2() {
+        assertThrows(ConfigException.class, () -> checkReplacementSchemalessV2("foo.short", ""), "String must be non-empty");
     }
 
     @Test
@@ -261,6 +438,23 @@ public class MaskFieldTest {
         assertEquals(Collections.singletonList(0), actualList);
 
         @SuppressWarnings("unchecked") Map<String, String> actualMap = (Map<String, String>) updatedValue.get("map");
+        assertEquals(Collections.emptyMap(), actualMap);
+        actualMap.put("k", "v");
+        assertEquals(Collections.singletonMap("k", "v"), actualMap);
+    }
+
+    @Test
+    public void testNullListAndMapReplacementsAreMutableV2() {
+        final List<String> maskFields = Arrays.asList("foo.array", "foo.map");
+        final Struct updatedValue = (Struct) transform(maskFields, null, FieldSyntaxVersion.V2)
+                .apply(record(NESTED_SCHEMA, NESTED_VALUES_WITH_SCHEMA))
+                .value();
+        @SuppressWarnings("unchecked") List<Integer> actualList = (List<Integer>) FieldPath.of("foo.array", FieldSyntaxVersion.V2).valueAt(updatedValue);
+        assertEquals(Collections.emptyList(), actualList);
+        actualList.add(0);
+        assertEquals(Collections.singletonList(0), actualList);
+
+        @SuppressWarnings("unchecked") Map<String, String> actualMap = (Map<String, String>) FieldPath.of("foo.map", FieldSyntaxVersion.V2).valueAt(updatedValue);
         assertEquals(Collections.emptyMap(), actualMap);
         actualMap.put("k", "v");
         assertEquals(Collections.singletonMap("k", "v"), actualMap);

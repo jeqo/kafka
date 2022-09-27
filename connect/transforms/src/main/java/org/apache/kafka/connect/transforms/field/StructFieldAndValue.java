@@ -59,9 +59,9 @@ public final class StructFieldAndValue {
 
     @Override
     public String toString() {
-        return new StringJoiner(", ", StructFieldAndValue.class.getSimpleName() + "[", "]")
-                .add("field=" + field)
-                .add("value=" + value)
+        return new StringJoiner(", ", StructFieldAndValue.class.getSimpleName() + "(", ")")
+                .add("field = " + field)
+                .add("value = " + value)
                 .toString();
     }
 }
