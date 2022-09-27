@@ -397,14 +397,14 @@ public class FieldPath {
                                     step + 1,
                                     update
                             );
-                            updated.put(field, fieldValue);
+                            updated.put(field.name(), fieldValue);
                         }
                     }
                 } else {
-                    updated.put(field, originalValue.get(field));
+                    updated.put(field.name(), originalValue.get(field));
                 }
             } else {
-                updated.put(field, originalValue.get(field));
+                updated.put(field.name(), originalValue.get(field));
             }
         }
         return updated;
