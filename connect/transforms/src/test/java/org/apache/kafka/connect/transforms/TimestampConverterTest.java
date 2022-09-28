@@ -29,6 +29,7 @@ import org.apache.kafka.connect.transforms.field.FieldSyntaxVersion;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
+import java.time.Instant;
 import java.util.Calendar;
 import java.util.Collections;
 import java.util.GregorianCalendar;
@@ -799,6 +800,40 @@ public class TimestampConverterTest {
 
         assertNull(transformed.valueSchema());
         assertEquals(DATE_PLUS_TIME_UNIX_SECONDS, transformed.value());
+    }
+
+
+    @Test
+    public void testWithSchemaFieldConversionWithDefaultValueV2() {
+        Map<String, String> config = new HashMap<>();
+        config.put(TimestampConverter.TARGET_TYPE_CONFIG, "Timestamp");
+        config.put(TimestampConverter.FIELD_CONFIG, "foo.ts");
+        config.put(FieldSyntaxVersion.FIELD_SYNTAX_VERSION_CONFIG, FieldSyntaxVersion.V2.name());
+        xformValue.configure(config);
+
+        Instant now = Instant.now();
+        // ts field is a unix timestamp
+        Schema structWithTimestampFieldSchema = SchemaBuilder.struct()
+                .field("ts", SchemaBuilder.int64().defaultValue(now.toEpochMilli()).build())
+                .field("other", Schema.STRING_SCHEMA)
+                .build();
+        SchemaBuilder fooSchema = SchemaBuilder.struct().field("foo", structWithTimestampFieldSchema);
+
+        Struct original = new Struct(structWithTimestampFieldSchema);
+        original.put("ts", DATE_PLUS_TIME_UNIX);
+        original.put("other", "test");
+        Struct foo = new Struct(fooSchema).put("foo", original);
+
+        SourceRecord transformed = xformValue.apply(createRecordWithSchema(fooSchema, foo));
+
+        Schema expectedSchema = SchemaBuilder.struct()
+                .field("ts", Timestamp.builder().defaultValue(java.util.Date.from(now)).build())
+                .field("other", Schema.STRING_SCHEMA)
+                .build();
+        Schema expectedFooSchema = SchemaBuilder.struct().field("foo", expectedSchema).build();
+        assertEquals(expectedFooSchema, transformed.valueSchema());
+        assertEquals(DATE_PLUS_TIME.getTime(), ((Struct) transformed.value()).getStruct("foo").get("ts"));
+        assertEquals("test", ((Struct) transformed.value()).getStruct("foo").get("other"));
     }
 
     // Validate Key implementation in addition to Value
