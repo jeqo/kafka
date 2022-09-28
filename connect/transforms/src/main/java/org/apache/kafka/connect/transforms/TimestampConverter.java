@@ -128,7 +128,7 @@ public abstract class TimestampConverter<R extends ConnectRecord<R>> implements 
         /**
          * Get the schema for this format.
          */
-        Schema typeSchema(boolean isOptional);
+        Schema typeSchema(boolean isOptional, Object defaultValue);
 
         /**
          * Convert from the universal java.util.Date format to the type-specific format
@@ -152,8 +152,8 @@ public abstract class TimestampConverter<R extends ConnectRecord<R>> implements 
             }
 
             @Override
-            public Schema typeSchema(boolean isOptional) {
-                return isOptional ? Schema.OPTIONAL_STRING_SCHEMA : Schema.STRING_SCHEMA;
+            public Schema typeSchema(boolean isOptional, Object defaultValue) {
+                return TimestampConverter.typeSchema(SchemaBuilder.string(), isOptional, defaultValue);
             }
 
             @Override
@@ -169,7 +169,7 @@ public abstract class TimestampConverter<R extends ConnectRecord<R>> implements 
             public Date toRaw(Config config, Object orig) {
                 if (!(orig instanceof Long))
                     throw new DataException("Expected Unix timestamp to be a Long, but found " + orig.getClass());
-                long unixTime = (Long) orig;
+                Long unixTime = (Long) orig;
                 switch (config.unixPrecision) {
                     case UNIX_PRECISION_SECONDS:
                         return Timestamp.toLogical(Timestamp.SCHEMA, TimeUnit.SECONDS.toMillis(unixTime));
@@ -184,13 +184,13 @@ public abstract class TimestampConverter<R extends ConnectRecord<R>> implements 
             }
 
             @Override
-            public Schema typeSchema(boolean isOptional) {
-                return isOptional ? Schema.OPTIONAL_INT64_SCHEMA : Schema.INT64_SCHEMA;
+            public Schema typeSchema(boolean isOptional, Object defaultValue) {
+                return TimestampConverter.typeSchema(SchemaBuilder.int64(), isOptional, defaultValue);
             }
 
             @Override
             public Long toType(Config config, Date orig) {
-                long unixTimeMillis = Timestamp.fromLogical(Timestamp.SCHEMA, orig);
+                Long unixTimeMillis = Timestamp.fromLogical(Timestamp.SCHEMA, orig);
                 switch (config.unixPrecision) {
                     case UNIX_PRECISION_SECONDS:
                         return TimeUnit.MILLISECONDS.toSeconds(unixTimeMillis);
@@ -215,8 +215,8 @@ public abstract class TimestampConverter<R extends ConnectRecord<R>> implements 
             }
 
             @Override
-            public Schema typeSchema(boolean isOptional) {
-                return isOptional ? OPTIONAL_DATE_SCHEMA : org.apache.kafka.connect.data.Date.SCHEMA;
+            public Schema typeSchema(boolean isOptional, Object defaultValue) {
+                return TimestampConverter.typeSchema(org.apache.kafka.connect.data.Date.builder(), isOptional, defaultValue);
             }
 
             @Override
@@ -241,8 +241,8 @@ public abstract class TimestampConverter<R extends ConnectRecord<R>> implements 
             }
 
             @Override
-            public Schema typeSchema(boolean isOptional) {
-                return isOptional ? OPTIONAL_TIME_SCHEMA : Time.SCHEMA;
+            public Schema typeSchema(boolean isOptional, Object defaultValue) {
+                return TimestampConverter.typeSchema(Time.builder(), isOptional, defaultValue);
             }
 
             @Override
@@ -268,8 +268,8 @@ public abstract class TimestampConverter<R extends ConnectRecord<R>> implements 
             }
 
             @Override
-            public Schema typeSchema(boolean isOptional) {
-                return isOptional ? OPTIONAL_TIMESTAMP_SCHEMA : Timestamp.SCHEMA;
+            public Schema typeSchema(boolean isOptional, Object defaultValue) {
+                return TimestampConverter.typeSchema(Timestamp.builder(), isOptional, defaultValue);
             }
 
             @Override
@@ -277,6 +277,12 @@ public abstract class TimestampConverter<R extends ConnectRecord<R>> implements 
                 return orig;
             }
         });
+    }
+
+    private static Schema typeSchema(SchemaBuilder builder, boolean isOptional, Object defaultValue) {
+        if (isOptional) builder.optional();
+        if (defaultValue != null) builder.defaultValue(defaultValue);
+        return builder.build();
     }
 
     // This is a bit unusual, but allows the transformation config to be passed to static anonymous classes to customize
@@ -386,28 +392,33 @@ public abstract class TimestampConverter<R extends ConnectRecord<R>> implements 
         if (config.field.isEmpty()) {
             Object value = operatingValue(record);
             // New schema is determined by the requested target timestamp type
-            Schema updatedSchema = TRANSLATORS.get(config.type).typeSchema(schema.isOptional());
+            Schema updatedSchema = TRANSLATORS.get(config.type).typeSchema(schema.isOptional(), schema.defaultValue());
             return newRecord(record, updatedSchema, convertTimestamp(value, timestampTypeFromSchema(schema)));
         } else {
             final Struct value = requireStructOrNull(operatingValue(record), PURPOSE);
             Schema updatedSchema = schemaUpdateCache.get(schema);
             if (updatedSchema == null) {
+                // cover raw schemas with default value
                 SchemaBuilder updated = SchemaUtil.copySchemaBasics(schema, SchemaBuilder.struct());
-                // TODO: how to handle default values generally? Seen at TimestampConverter so far.
-                //   are other SMTs considering default values when changing default values?
                 if (schema.defaultValue() != null) {
-                    Struct updatedDefaultValue = applyValueWithSchema(
-                        (Struct) schema.defaultValue(), updated);
+                    Struct updatedDefaultValue = applyValueWithSchema((Struct) schema.defaultValue(), updated);
                     updated.defaultValue(updatedDefaultValue);
                 }
-                // what if the default value is in a root or nested field?
 
                 updatedSchema = config.field.updateSchemaAt(
                     schema,
                     updated,
-                    (builder, field) -> builder.field(
-                        field.name(),
-                        TRANSLATORS.get(config.type).typeSchema(field.schema().isOptional())));
+                    (builder, field) -> {
+                        // default value is conserved and transformed
+                        Object defaultValue = convertTimestamp(
+                                field.schema().defaultValue(),
+                                timestampTypeFromSchema(field.schema()));
+                        builder.field(
+                                field.name(),
+                                TRANSLATORS.get(config.type)
+                                        .typeSchema(field.schema().isOptional(), defaultValue)
+                        );
+                    });
                 schemaUpdateCache.put(schema, updatedSchema);
             }
 
@@ -424,8 +435,13 @@ public abstract class TimestampConverter<R extends ConnectRecord<R>> implements 
             value.schema(),
             value,
             updatedSchema,
-            (oldField, updatedField, struct, o) ->
-                struct.put(updatedField.name(), convertTimestamp(o, timestampTypeFromSchema(oldField.schema()))));
+            (originalField, updatedField, struct, fieldValue) ->
+                struct.put(
+                        updatedField.name(),
+                        // default value is conserved
+                        convertTimestamp(fieldValue, timestampTypeFromSchema(originalField.schema()))
+                )
+        );
     }
 
     private R applySchemaless(R record) {
