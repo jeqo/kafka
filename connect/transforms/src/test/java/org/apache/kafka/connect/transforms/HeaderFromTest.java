@@ -710,11 +710,13 @@ public class HeaderFromTest {
 
     @ParameterizedTest
     @MethodSource("schemalessData")
-    public void schemaless(String description,
+    public void schemaless(
+            String description,
             boolean keyTransform,
             RecordBuilder originalBuilder,
             List<String> transformFields, List<String> headers1, HeaderFrom.Operation operation,
-            RecordBuilder expectedBuilder) {
+            RecordBuilder expectedBuilder
+    ) {
         HeaderFrom<SourceRecord> xform =
                 keyTransform ? new HeaderFrom.Key<>() : new HeaderFrom.Value<>();
 
@@ -753,11 +755,13 @@ public class HeaderFromTest {
 
     @ParameterizedTest
     @MethodSource("structData")
-    public void withSchema(String description,
-                           boolean keyTransform,
-                           RecordBuilder originalBuilder,
-                           List<String> transformFields, List<String> headers1, HeaderFrom.Operation operation,
-                           RecordBuilder expectedBuilder) {
+    public void withSchema(
+            String description,
+            boolean keyTransform,
+            RecordBuilder originalBuilder,
+            List<String> transformFields, List<String> headers1, HeaderFrom.Operation operation,
+            RecordBuilder expectedBuilder
+    ) {
         HeaderFrom<SourceRecord> xform = keyTransform ? new HeaderFrom.Key<>() : new HeaderFrom.Value<>();
         xform.configure(config(headers1, transformFields, operation));
         ConnectHeaders headers = new ConnectHeaders();
