@@ -164,13 +164,14 @@ public abstract class HeaderFrom<R extends ConnectRecord<R>> implements Transfor
             updatedSchema = operatingSchema;
             updatedValue = value;
         }
+
         Map<FieldPath, StructFieldAndValue> fieldAndValues = fieldPaths.fieldAndValuesFrom(value);
         for (Map.Entry<String, List<FieldPath>> entry : headersMap.entrySet()) {
+            // headers may point to many values, though it's usually close to 1
             for (FieldPath fieldPath : entry.getValue()) {
                 StructFieldAndValue fieldAndValue = fieldAndValues.get(fieldPath);
                 if (fieldAndValue != null) {
-                    updatedHeaders.add(entry.getKey(), fieldAndValue.value(),
-                        fieldAndValue.schema());
+                    updatedHeaders.add(entry.getKey(), fieldAndValue.value(), fieldAndValue.schema());
                 }
             }
         }
@@ -197,6 +198,7 @@ public abstract class HeaderFrom<R extends ConnectRecord<R>> implements Transfor
             updatedValue = fieldPaths.updateValuesAt(updatedValue, (map, fieldName, fieldValue) -> map.remove(fieldName));
         }
         for (Map.Entry<String, List<FieldPath>> entry : headersMap.entrySet()) {
+            // headers may point to many values, though it's usually close to 1
             for (FieldPath fieldPath : entry.getValue()) {
                 final MapFieldAndValue fieldAndValue = values.get(fieldPath);
                 updatedHeaders.add(entry.getKey(), fieldAndValue != null ? fieldAndValue.value() : null, null);
