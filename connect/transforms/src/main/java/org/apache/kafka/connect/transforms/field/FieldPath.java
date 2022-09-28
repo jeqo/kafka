@@ -291,6 +291,9 @@ public class FieldPath {
         if (operatingSchema.isOptional()) {
             builder.optional();
         }
+        if (operatingSchema.defaultValue() != null) {
+            builder.defaultValue(operatingSchema.defaultValue());
+        }
         for (Field field : operatingSchema.fields()) {
             if (step < path.length) {
                 if (!path[step].equals(field.name())) {
