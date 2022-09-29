@@ -34,15 +34,17 @@ import java.util.Map;
 import java.util.function.BiConsumer;
 
 /**
- * Represents a path to a field within a structure within a Connect key/value (e.g. {@code Struct} or
- * {@code Map<String, Object>}).
- * <ul>
- * <li>It follows a dotted notation to represent nested values.</li>
- * <li>If field names contain dots, can be escaped by wrapping field names with backticks.</li>
- * <li>If field names contain backticks at wrapping positions (beginning or end of path, before or after dots), then backticks need to be
- * escaped by backslash.</li>
- * </ul>
+ * Represents a path to a field within a data object ({@code Struct} or {@code Map<String, Object>}).
+ * If the SMT requires accessing multiple fields on the same data object, use {@see FieldPaths}
+ * <p>
+ * The field path semantics are defined by the syntax version {@see FieldSyntaxVersion}.
+ * <p>
  * Paths are calculated once and cached for further access.
+ * <p>
+ * Invariants:
+ * <li>
+ *     <ul>A field path can contain one or more steps</ul>
+ * </li>
  */
 public class FieldPath {
 
@@ -122,8 +124,7 @@ public class FieldPath {
                     while (idx >= 0) {
                         idx = s.indexOf(BACKTICK, idx);
                         if (idx == -1) {
-                            throw new IllegalArgumentException(
-                                    "Incomplete backtick pair at [...]`" + s);
+                            throw new IllegalArgumentException("Incomplete backtick pair at [...]`" + s);
                         }
                         if (idx < s.length() - 1 // not wrapping the whole field path
                                 && (s.charAt(idx + 1) != DOT_CHAR // not wrapping
@@ -186,7 +187,7 @@ public class FieldPath {
      * Access a {@code Field} at the current path within a schema {@code Schema} If field is not
      * found, then {@code null} is returned.
      */
-    public Field fieldAt(Schema schema) {
+    public Field fieldFrom(Schema schema) {
         if (path.length == 1) {
             return schema.field(path[0]);
         } else {
@@ -209,7 +210,7 @@ public class FieldPath {
      * Access a value at the current path within a schema-based {@code Struct} If object is not
      * found, then {@code null} is returned.
      */
-    public Object valueAt(Struct struct) {
+    public Object valueFrom(Struct struct) {
         if (path.length == 1) {
             return struct.get(path[0]);
         } else {
@@ -233,7 +234,7 @@ public class FieldPath {
      * is not found, then {@code null} is returned.
      */
     @SuppressWarnings("unchecked")
-    public Object valueAt(Map<String, Object> map) {
+    public Object valueFrom(Map<String, Object> map) {
         if (path.length == 1) {
             return map.get(path[0]);
         } else {
@@ -260,7 +261,7 @@ public class FieldPath {
      *
      * @return the updated schema
      */
-    public Schema updateSchemaAt(Schema originalSchema, BiConsumer<SchemaBuilder, Field> update) {
+    public Schema updateSchemaFrom(Schema originalSchema, BiConsumer<SchemaBuilder, Field> update) {
         SchemaBuilder updated = SchemaUtil.copySchemaBasics(originalSchema, SchemaBuilder.struct());
         return updateSchema(originalSchema, updated, 0, update);
     }
@@ -274,7 +275,7 @@ public class FieldPath {
      * @param update                change function to apply to the source schema field when found
      * @return the updated schema
      */
-    public Schema updateSchemaAt(
+    public Schema updateSchemaFrom(
             Schema originalSchema,
             SchemaBuilder baselineSchemaBuilder,
             BiConsumer<SchemaBuilder, Field> update
@@ -324,7 +325,7 @@ public class FieldPath {
      * @param update function to apply when found
      * @return updated data value
      */
-    public Map<String, Object> updateValueAt(Map<String, Object> value, MapValueUpdater update) {
+    public Map<String, Object> updateValueFrom(Map<String, Object> value, MapValueUpdater update) {
         return updateValue(value, 0, update);
     }
 
@@ -364,7 +365,7 @@ public class FieldPath {
      * @param update function to apply when found
      * @return updated data value
      */
-    public Struct updateValueAt(
+    public Struct updateValueFrom(
             Schema originalSchema,
             Struct originalValue,
             Schema updatedSchema,

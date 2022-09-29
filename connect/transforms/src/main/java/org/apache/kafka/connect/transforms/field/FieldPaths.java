@@ -35,12 +35,12 @@ import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 
 /**
- * Multiple field paths to access record structures ({@code Struct} or {@code Map} efficiently,
- * instead of using single {@code FieldPath} individually.
+ * Multiple field paths to access data objects ({@code Struct} or {@code Map}) efficiently,
+ * instead of using single {@see FieldPath} individually.
  * <p>
  * Invariants:
  * <li>
- *     <ul>Tree nodes contain either a nested tree or a field path</ul>
+ *     <ul>Tree values contain either a nested tree or a field path</ul>
  *     <ul>A tree cannot contain paths that are a subset of other paths (e.g. foo and foo.bar in V2 should collide and fail)</ul>
  * </li>
  */
@@ -207,7 +207,7 @@ public class FieldPaths {
      * @param update function to apply when found
      * @return updated data value
      */
-    public Map<String, Object> updateValuesAt(
+    public Map<String, Object> updateValuesFrom(
             Map<String, Object> originalValue,
             MapValueUpdater update
     ) {
@@ -249,7 +249,7 @@ public class FieldPaths {
      * @param update function to apply when found
      * @return updated data value
      */
-    public Struct updateValuesAt(
+    public Struct updateValuesFrom(
             Schema originalSchema,
             Struct originalValue,
             Schema updatedSchema,
@@ -307,9 +307,27 @@ public class FieldPaths {
      *
      * @return the updated schema
      */
-    public Schema updateSchemaAt(Schema originalSchema, BiConsumer<SchemaBuilder, Field> update) {
+    public Schema updateSchemaFrom(
+            Schema originalSchema,
+            BiConsumer<SchemaBuilder, Field> update
+    ) {
         SchemaBuilder updated = SchemaUtil.copySchemaBasics(originalSchema, SchemaBuilder.struct());
         return updateSchema(originalSchema, updated, pathTree, update);
+    }
+
+    /**
+     * Find the {@code Field}s at the path tree leafs, and apply an update function. If fields are not
+     * found, then no update function is applied.
+     * <p>
+     *
+     * @return the updated schema
+     */
+    public Schema updateSchemaFrom(
+            Schema originalSchema,
+            SchemaBuilder baseline,
+            BiConsumer<SchemaBuilder, Field> update
+    ) {
+        return updateSchema(originalSchema, baseline, pathTree, update);
     }
 
     @SuppressWarnings("unchecked")

@@ -405,7 +405,7 @@ public abstract class TimestampConverter<R extends ConnectRecord<R>> implements 
                     updated.defaultValue(updatedDefaultValue);
                 }
 
-                updatedSchema = config.field.updateSchemaAt(
+                updatedSchema = config.field.updateSchemaFrom(
                     schema,
                     updated,
                     (builder, field) -> {
@@ -431,7 +431,7 @@ public abstract class TimestampConverter<R extends ConnectRecord<R>> implements 
         if (value == null) {
             return null;
         }
-        return config.field.updateValueAt(
+        return config.field.updateValueFrom(
             value.schema(),
             value,
             updatedSchema,
@@ -450,7 +450,7 @@ public abstract class TimestampConverter<R extends ConnectRecord<R>> implements 
             return newRecord(record, null, convertTimestamp(rawValue));
         } else {
             final Map<String, Object> value = requireMap(rawValue, PURPOSE);
-            final Map<String, Object> updatedValue = config.field.updateValueAt(
+            final Map<String, Object> updatedValue = config.field.updateValueFrom(
                 value,
                 (map, field, v) -> map.put(field, convertTimestamp(v)));
             return newRecord(record, null, updatedValue);
