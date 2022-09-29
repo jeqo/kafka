@@ -82,7 +82,7 @@ class FieldPathTest {
 
         SchemaBuilder updated = SchemaUtil.copySchemaBasics(schema, SchemaBuilder.struct());
         Schema result = FieldPath.of("foo", FieldSyntaxVersion.V1)
-            .updateSchemaAt(schema, updated, (builder, field) -> {
+            .updateSchemaFrom(schema, updated, (builder, field) -> {
                 // ignore field
             });
 
@@ -97,10 +97,12 @@ class FieldPathTest {
             .build();
 
         SchemaBuilder updated = SchemaUtil.copySchemaBasics(schema, SchemaBuilder.struct());
-        Schema result = FieldPath.of("foo.baz", FieldSyntaxVersion.V2)
-            .updateSchemaAt(schema, updated, (builder, field) -> {
-                // ignore field
-            });
+        FieldPath fieldPath = FieldPath.of("foo.baz", FieldSyntaxVersion.V2);
+        Schema result = fieldPath.updateSchemaFrom(
+                schema,
+                updated, (builder, field) -> {
+                        // ignore field
+                });
 
         assertEquals(1, result.fields().size());
         assertEquals(1, result.field("foo").schema().fields().size());
@@ -108,14 +110,17 @@ class FieldPathTest {
     }
 
     @Test void shouldRenameSchemaV1Fields() {
-        Schema schema = SchemaBuilder.struct().field("foo", Schema.STRING_SCHEMA)
-            .field("bar", Schema.STRING_SCHEMA)
-            .field("baz", Schema.INT32_SCHEMA)
-            .build();
+        Schema schema = SchemaBuilder.struct()
+                .field("foo", Schema.STRING_SCHEMA)
+                .field("bar", Schema.STRING_SCHEMA)
+                .field("baz", Schema.INT32_SCHEMA)
+                .build();
 
-        SchemaBuilder updated = SchemaUtil.copySchemaBasics(schema, SchemaBuilder.struct());
-        Schema result = FieldPath.of("foo", FieldSyntaxVersion.V1)
-            .updateSchemaAt(schema, updated, (builder, field) -> builder.field("other", field.schema()));
+        FieldPath fieldPath = FieldPath.of("foo", FieldSyntaxVersion.V1);
+        Schema result = fieldPath.updateSchemaFrom(
+                schema,
+                (builder, field) -> builder.field("other", field.schema())
+        );
 
         assertEquals(3, result.fields().size());
         assertEquals("other", result.fields().get(0).name());
@@ -124,14 +129,18 @@ class FieldPathTest {
     }
 
     @Test void shouldRenameSchemaV2Fields() {
-        Schema schema = SchemaBuilder.struct().field("foo",
-                SchemaBuilder.struct().field("bar", Schema.STRING_SCHEMA)
-                    .field("baz", Schema.INT32_SCHEMA))
-            .build();
+        SchemaBuilder nested = SchemaBuilder.struct()
+                .field("bar", Schema.STRING_SCHEMA)
+                .field("baz", Schema.INT32_SCHEMA);
+        Schema schema = SchemaBuilder.struct()
+                .field("foo", nested)
+                .build();
 
-        SchemaBuilder updated = SchemaUtil.copySchemaBasics(schema, SchemaBuilder.struct());
-        Schema result = FieldPath.of("foo.baz", FieldSyntaxVersion.V2)
-            .updateSchemaAt(schema, updated, (builder, field) -> builder.field("other", field.schema()));
+        FieldPath fieldPath = FieldPath.of("foo.baz", FieldSyntaxVersion.V2);
+        Schema result = fieldPath.updateSchemaFrom(
+                schema,
+                (builder, field) -> builder.field("other", field.schema())
+        );
 
         assertEquals(1, result.fields().size());
         assertEquals(2, result.field("foo").schema().fields().size());
@@ -140,44 +149,47 @@ class FieldPathTest {
     }
 
     @Test void shouldUpdateValueV1FromSchemaless() {
-        final Map<String, Object> value = Collections.singletonMap("foo", 42);
+        Map<String, Object> value = Collections.singletonMap("foo", 42);
 
-        final Map<String, Object> updated = FieldPath.of("foo", FieldSyntaxVersion.V1)
-            .updateValueAt(value, (map, f, v) -> map.put(f, ((Integer) v) * 2));
+        FieldPath fieldPath = FieldPath.of("foo", FieldSyntaxVersion.V1);
+        Map<String, Object> updated = fieldPath
+            .updateValueFrom(value, (map, f, v) -> map.put(f, ((Integer) v) * 2));
 
-        assertEquals(84, updated.get("foo"));
+        assertEquals(84, fieldPath.valueFrom(updated));
     }
 
-    @SuppressWarnings("unchecked")
     @Test void shouldUpdateNestedValueV2FromSchemaless() {
-        final Map<String, Object> value = Collections.singletonMap("foo", Collections.singletonMap("bar", 42));
+        Map<String, Object> value = Collections.singletonMap("foo", Collections.singletonMap("bar", 42));
 
-        final Map<String, Object> updated = FieldPath.of("foo.bar", FieldSyntaxVersion.V2)
-            .updateValueAt(value, (map, f, v) -> map.put(f, ((Integer) v) * 2));
+        FieldPath fieldPath = FieldPath.of("foo.bar", FieldSyntaxVersion.V2);
+        Map<String, Object> updated = fieldPath.updateValueFrom(
+                value,
+                (map, f, v) -> map.put(f, ((Integer) v) * 2)
+        );
 
-        assertEquals(84, ((Map<String, Object>) updated.get("foo")).get("bar"));
+        assertEquals(84, fieldPath.valueFrom(updated));
     }
 
     @Test void shouldUpdateValueV1WithSchema() {
-        final Schema schema = SchemaBuilder.struct().field("foo", Schema.INT32_SCHEMA).build();
-        final Struct value = new Struct(schema).put("foo", 42);
+        Schema schema = SchemaBuilder.struct().field("foo", Schema.INT32_SCHEMA).build();
+        Struct value = new Struct(schema).put("foo", 42);
 
-        final Struct updated = FieldPath.of("foo", FieldSyntaxVersion.V1)
-            .updateValueAt(schema, value, schema,
+        FieldPath fieldPath = FieldPath.of("foo", FieldSyntaxVersion.V1);
+        Struct updated = fieldPath.updateValueFrom(schema, value, schema,
                 (oldField, updatedField, s, v) -> s.put(updatedField, ((Integer) v) * 2));
 
-        assertEquals(84, updated.getInt32("foo"));
+        assertEquals(84, fieldPath.valueFrom(updated));
     }
 
     @Test void shouldUpdateNestedValueV2WithSchema() {
-        final SchemaBuilder barSchema = SchemaBuilder.struct().field("bar", Schema.INT32_SCHEMA);
-        final Schema schema = SchemaBuilder.struct().field("foo", barSchema).build();
-        final Struct value = new Struct(schema).put("foo", new Struct(barSchema).put("bar", 42));
+        SchemaBuilder barSchema = SchemaBuilder.struct().field("bar", Schema.INT32_SCHEMA);
+        Schema schema = SchemaBuilder.struct().field("foo", barSchema).build();
+        Struct value = new Struct(schema).put("foo", new Struct(barSchema).put("bar", 42));
 
-        final Struct updated = FieldPath.of("foo.bar", FieldSyntaxVersion.V2)
-            .updateValueAt(schema, value, schema,
+        FieldPath fieldPath = FieldPath.of("foo.bar", FieldSyntaxVersion.V2);
+        Struct updated = fieldPath.updateValueFrom(schema, value, schema,
                 (oldField, updatedField, s, v) -> s.put(updatedField, ((Integer) v) * 2));
 
-        assertEquals(84, updated.getStruct("foo").getInt32("bar"));
+        assertEquals(84, fieldPath.valueFrom(updated));
     }
 }

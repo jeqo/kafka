@@ -156,7 +156,7 @@ public abstract class HeaderFrom<R extends ConnectRecord<R>> implements Transfor
         final Struct updatedValue;
         if (operation == Operation.MOVE) {
             updatedSchema = moveSchema(operatingSchema);
-            updatedValue = fieldPaths.updateValuesAt(operatingSchema, value, updatedSchema,
+            updatedValue = fieldPaths.updateValuesFrom(operatingSchema, value, updatedSchema,
                 (oldField, updatedField, updated, fieldValue) -> {
                     // ignore value
                 });
@@ -181,7 +181,7 @@ public abstract class HeaderFrom<R extends ConnectRecord<R>> implements Transfor
     private Schema moveSchema(Schema operatingSchema) {
         Schema moveSchema = this.moveSchemaCache.get(operatingSchema);
         if (moveSchema == null) {
-            moveSchema = fieldPaths.updateSchemaAt(operatingSchema, (builder, field) -> {
+            moveSchema = fieldPaths.updateSchemaFrom(operatingSchema, (builder, field) -> {
                 // ignore field
             });
             moveSchemaCache.put(operatingSchema, moveSchema);
@@ -195,7 +195,7 @@ public abstract class HeaderFrom<R extends ConnectRecord<R>> implements Transfor
         Map<String, Object> updatedValue = new HashMap<>(value);
         Map<FieldPath, MapFieldAndValue> values = fieldPaths.fieldAndValuesFrom(value);
         if (operation == Operation.MOVE) {
-            updatedValue = fieldPaths.updateValuesAt(updatedValue, (map, fieldName, fieldValue) -> map.remove(fieldName));
+            updatedValue = fieldPaths.updateValuesFrom(updatedValue, (map, fieldName, fieldValue) -> map.remove(fieldName));
         }
         for (Map.Entry<String, List<FieldPath>> entry : headersMap.entrySet()) {
             // headers may point to many values, though it's usually close to 1

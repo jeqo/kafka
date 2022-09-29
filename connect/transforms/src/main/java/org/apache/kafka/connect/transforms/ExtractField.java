@@ -70,16 +70,16 @@ public abstract class ExtractField<R extends ConnectRecord<R>> implements Transf
         final Schema schema = operatingSchema(record);
         if (schema == null) {
             final Map<String, Object> value = requireMapOrNull(operatingValue(record), PURPOSE);
-            return newRecord(record, null, value == null ? null : fieldPath.valueAt(value));
+            return newRecord(record, null, value == null ? null : fieldPath.valueFrom(value));
         } else {
             final Struct value = requireStructOrNull(operatingValue(record), PURPOSE);
-            Field field = fieldPath.fieldAt(schema);
+            Field field = fieldPath.fieldFrom(schema);
 
             if (field == null) {
                 throw new IllegalArgumentException("Unknown field: " + fieldPath);
             }
 
-            return newRecord(record, field.schema(), value == null ? null : fieldPath.valueAt(value));
+            return newRecord(record, field.schema(), value == null ? null : fieldPath.valueFrom(value));
         }
     }
 

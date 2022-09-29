@@ -16,8 +16,15 @@
  */
 package org.apache.kafka.connect.transforms.field;
 
+import org.apache.kafka.connect.data.Schema;
+import org.apache.kafka.connect.data.SchemaBuilder;
+import org.apache.kafka.connect.data.Struct;
+import org.apache.kafka.connect.transforms.util.SchemaUtil;
 import org.junit.jupiter.api.Test;
 
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -31,7 +38,6 @@ class FieldPathsTest {
         assertEquals(path, paths.pathTree.get("foo.bar.baz"));
     }
 
-    //TODO failing
     @Test void shouldBuildPathWithSamePathV1() {
         FieldPath path = FieldPath.of("foo.bar.baz", FieldSyntaxVersion.V1);
         FieldPaths paths = FieldPaths.of(path, path);
@@ -49,5 +55,126 @@ class FieldPathsTest {
     @Test void shouldFailWhenPathsCollide() {
         assertThrows(IllegalArgumentException.class,
             () -> FieldPaths.of(FieldPath.ofV2("foo"), FieldPath.ofV2("foo.bar")));
+    }
+
+    @Test void shouldRenameSchemaV1Fields() {
+        Schema schema = SchemaBuilder.struct()
+                .field("foo", Schema.STRING_SCHEMA)
+                .field("bar", Schema.STRING_SCHEMA)
+                .field("baz", Schema.INT32_SCHEMA)
+                .build();
+
+        FieldPaths fieldPath = FieldPaths.of(Arrays.asList("foo", "bar"), FieldSyntaxVersion.V1);
+        SchemaBuilder updated = SchemaUtil.copySchemaBasics(schema, SchemaBuilder.struct());
+        Schema result = fieldPath.updateSchemaFrom(
+                schema,
+                updated,
+                (builder, field) -> builder.field(field.name() + "_other", field.schema())
+        );
+
+        assertEquals(3, result.fields().size());
+        assertEquals("foo_other", result.fields().get(0).name());
+        assertEquals("bar_other", result.fields().get(1).name());
+        assertEquals("baz", result.fields().get(2).name());
+    }
+
+    @Test void shouldRenameSchemaV2Fields() {
+        SchemaBuilder nested = SchemaBuilder.struct()
+                .field("bar", Schema.STRING_SCHEMA)
+                .field("baz", Schema.INT32_SCHEMA);
+        Schema schema = SchemaBuilder.struct()
+                .field("foo", nested)
+                .build();
+
+        FieldPaths fieldPath = FieldPaths.of(Arrays.asList("foo.baz", "foo.bar"), FieldSyntaxVersion.V2);
+        Schema result = fieldPath.updateSchemaFrom(
+                schema,
+                (builder, field) -> builder.field(field.name() + "_other", field.schema())
+        );
+
+        assertEquals(1, result.fields().size());
+        assertEquals(2, result.field("foo").schema().fields().size());
+        assertEquals("bar_other", result.field("foo").schema().fields().get(0).name());
+        assertEquals("baz_other", result.field("foo").schema().fields().get(1).name());
+    }
+
+    @Test void shouldUpdateValuesV1FromSchemaless() {
+        Map<String, Object> value = new HashMap<>();
+        value.put("foo", 42);
+        value.put("bar", 21);
+
+        FieldPath fooPath = FieldPath.of("foo", FieldSyntaxVersion.V1);
+        FieldPath barPath = FieldPath.of("bar", FieldSyntaxVersion.V1);
+        FieldPaths fieldPaths = FieldPaths.of(fooPath, barPath);
+        Map<String, Object> updated = fieldPaths.updateValuesFrom(
+                value,
+                (map, f, v) -> map.put(f, ((Integer) v) * 2)
+        );
+
+        Map<FieldPath, MapFieldAndValue> actual = fieldPaths.fieldAndValuesFrom(updated);
+        assertEquals(84, actual.get(fooPath).value());
+        assertEquals(42, actual.get(barPath).value());
+    }
+
+    @Test void shouldUpdateNestedValuesV2FromSchemaless() {
+        Map<String, Object> nested = new HashMap<>();
+        nested.put("bar", 21);
+        nested.put("baz", 42);
+        Map<String, Object> value = Collections.singletonMap("foo", nested);
+
+        FieldPath barPath = FieldPath.of("foo.bar", FieldSyntaxVersion.V2);
+        FieldPath bazPath = FieldPath.of("foo.baz", FieldSyntaxVersion.V2);
+        FieldPaths fieldPaths = FieldPaths.of(bazPath, barPath);
+        Map<String, Object> updated = fieldPaths.updateValuesFrom(
+                value,
+                (map, f, v) -> map.put(f, ((Integer) v) * 2)
+        );
+
+        Map<FieldPath, MapFieldAndValue> actual = fieldPaths.fieldAndValuesFrom(updated);
+        assertEquals(84, actual.get(bazPath).value());
+        assertEquals(42, actual.get(barPath).value());
+    }
+
+    @Test void shouldUpdateValueV1WithSchema() {
+        Schema schema = SchemaBuilder.struct()
+                .field("foo.bar", Schema.INT32_SCHEMA)
+                .field("foo.baz", Schema.INT32_SCHEMA)
+                .build();
+        Struct value = new Struct(schema)
+                .put("foo.bar", 21)
+                .put("foo.baz", 42);
+
+        FieldPath bazPath = FieldPath.of("foo.baz", FieldSyntaxVersion.V1);
+        FieldPath barPath = FieldPath.of("foo.bar", FieldSyntaxVersion.V1);
+        FieldPaths fieldPaths = FieldPaths.of(bazPath, barPath);
+        Struct updated = fieldPaths.updateValuesFrom(schema, value, schema,
+                (oldField, updatedField, s, v) -> s.put(updatedField, ((Integer) v) * 2));
+
+        Map<FieldPath, StructFieldAndValue> actual = fieldPaths.fieldAndValuesFrom(updated);
+        assertEquals(84, actual.get(bazPath).value());
+        assertEquals(42, actual.get(barPath).value());
+    }
+
+    @Test void shouldUpdateNestedValueV2WithSchema() {
+        SchemaBuilder nestedSchema = SchemaBuilder.struct()
+                .field("bar", Schema.INT32_SCHEMA)
+                .field("baz", Schema.INT32_SCHEMA);
+        Schema schema = SchemaBuilder.struct()
+                .field("foo", nestedSchema)
+                .build();
+        Struct nested = new Struct(nestedSchema)
+                .put("bar", 21)
+                .put("baz", 42);
+        Struct value = new Struct(schema).put("foo", nested);
+
+        FieldPath bazPath = FieldPath.of("foo.baz", FieldSyntaxVersion.V2);
+        FieldPath barPath = FieldPath.of("foo.bar", FieldSyntaxVersion.V2);
+        FieldPaths fieldPaths = FieldPaths.of(bazPath, barPath);
+        Struct updated = fieldPaths.updateValuesFrom(schema, value, schema,
+                (oldField, updatedField, s, v) -> s.put(updatedField, ((Integer) v) * 2));
+
+        Map<FieldPath, StructFieldAndValue> actual = fieldPaths.fieldAndValuesFrom(updated);
+        assertEquals(84, actual.get(bazPath).value());
+        assertEquals(42, actual.get(barPath).value());
     }
 }
