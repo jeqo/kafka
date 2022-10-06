@@ -225,7 +225,7 @@ public class FieldPaths {
             final String fieldName = entry.getKey();
             if (originalValue.containsKey(fieldName)) {
                 if (entry.getValue() instanceof FieldPath) {
-                    update.apply(updatedValue, fieldName, originalValue.get(fieldName));
+                    update.apply(updatedValue, (FieldPath) entry.getValue(), originalValue.get(fieldName));
                 } else {
                     if (originalValue.get(fieldName) instanceof Map) {
                         Map<String, Object> fieldValue = updateValues(
@@ -275,6 +275,7 @@ public class FieldPaths {
                                 originalSchema.field(field.name()),
                                 updateSchema.field(field.name()),
                                 updatedValue,
+                                (FieldPath) treeAt.get(field.name()),
                                 originalValue.get(field.name())
                         );
                     } else {

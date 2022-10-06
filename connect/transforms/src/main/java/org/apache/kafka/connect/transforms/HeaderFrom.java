@@ -157,7 +157,7 @@ public abstract class HeaderFrom<R extends ConnectRecord<R>> implements Transfor
         if (operation == Operation.MOVE) {
             updatedSchema = moveSchema(operatingSchema);
             updatedValue = fieldPaths.updateValuesFrom(operatingSchema, value, updatedSchema,
-                (oldField, updatedField, updated, fieldValue) -> {
+                (oldField, updatedField, updated, fieldPath, fieldValue) -> {
                     // ignore value
                 });
         } else {
@@ -195,7 +195,7 @@ public abstract class HeaderFrom<R extends ConnectRecord<R>> implements Transfor
         Map<String, Object> updatedValue = new HashMap<>(value);
         Map<FieldPath, MapFieldAndValue> values = fieldPaths.fieldAndValuesFrom(value);
         if (operation == Operation.MOVE) {
-            updatedValue = fieldPaths.updateValuesFrom(updatedValue, (map, fieldName, fieldValue) -> map.remove(fieldName));
+            updatedValue = fieldPaths.updateValuesFrom(updatedValue, (map, fieldPath, fieldValue) -> map.remove(fieldPath.last()));
         }
         for (Map.Entry<String, List<FieldPath>> entry : headersMap.entrySet()) {
             // headers may point to many values, though it's usually close to 1

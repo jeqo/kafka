@@ -111,15 +111,15 @@ public abstract class MaskField<R extends ConnectRecord<R>> implements Transform
         final Map<String, Object> value = requireMap(operatingValue(record), PURPOSE);
         final Map<String, Object> updated = maskedFields.updateValuesFrom(
                 value,
-                (updatedValue, fieldName, fieldValue) ->
-                        updatedValue.put(fieldName, masked(fieldValue)));
+                (updatedValue, fieldPath, fieldValue) ->
+                        updatedValue.put(fieldPath.last(), masked(fieldValue)));
         return newRecord(record, updated);
     }
 
     private R applyWithSchema(R record) {
         final Struct value = requireStruct(operatingValue(record), PURPOSE);
         final Struct updated = maskedFields.updateValuesFrom(value.schema(), value, value.schema(),
-                (originalField, updatedField, updatedValue, fieldValue) ->
+                (originalField, updatedField, updatedValue, fieldPath, fieldValue) ->
                   updatedValue.put(updatedField.name(), masked(fieldValue)));
         return newRecord(record, updated);
     }

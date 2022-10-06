@@ -340,7 +340,7 @@ public class FieldPath {
             if (step < path.length) {
                 if (path[step].equals(entry.getKey())) {
                     if (step == path.length - 1) {
-                        change.apply(updated, path[step], entry.getValue());
+                        change.apply(updated, this, entry.getValue());
                     } else {
                         if (entry.getValue() instanceof Map) {
                             Map<String, Object> updatedValue = updateValue(
@@ -390,6 +390,7 @@ public class FieldPath {
                                 field,
                                 updateSchema.field(field.name()),
                                 updated,
+                                this,
                                 originalValue.get(field.name())
                         );
                     } else {
@@ -412,6 +413,21 @@ public class FieldPath {
             }
         }
         return updated;
+    }
+
+    public String toDottedPath() {
+        StringBuilder b = new StringBuilder();
+        for (String step : path) {
+            if (b.length() != 0) {
+                b.append(".");
+            }
+            if (step.contains(".")) {
+                b.append("`").append(step).append("`");
+            } else {
+                b.append(step);
+            }
+        }
+        return b.toString();
     }
 
     // For testing

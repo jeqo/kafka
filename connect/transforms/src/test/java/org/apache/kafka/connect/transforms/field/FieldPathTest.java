@@ -153,7 +153,7 @@ class FieldPathTest {
 
         FieldPath fieldPath = FieldPath.of("foo", FieldSyntaxVersion.V1);
         Map<String, Object> updated = fieldPath
-            .updateValueFrom(value, (map, f, v) -> map.put(f, ((Integer) v) * 2));
+            .updateValueFrom(value, (map, f, v) -> map.put(f.last(), ((Integer) v) * 2));
 
         assertEquals(84, fieldPath.valueFrom(updated));
     }
@@ -164,7 +164,7 @@ class FieldPathTest {
         FieldPath fieldPath = FieldPath.of("foo.bar", FieldSyntaxVersion.V2);
         Map<String, Object> updated = fieldPath.updateValueFrom(
                 value,
-                (map, f, v) -> map.put(f, ((Integer) v) * 2)
+                (map, f, v) -> map.put(f.last(), ((Integer) v) * 2)
         );
 
         assertEquals(84, fieldPath.valueFrom(updated));
@@ -176,7 +176,7 @@ class FieldPathTest {
 
         FieldPath fieldPath = FieldPath.of("foo", FieldSyntaxVersion.V1);
         Struct updated = fieldPath.updateValueFrom(schema, value, schema,
-                (oldField, updatedField, s, v) -> s.put(updatedField, ((Integer) v) * 2));
+                (oldField, updatedField, s, f, v) -> s.put(updatedField, ((Integer) v) * 2));
 
         assertEquals(84, fieldPath.valueFrom(updated));
     }
@@ -188,7 +188,7 @@ class FieldPathTest {
 
         FieldPath fieldPath = FieldPath.of("foo.bar", FieldSyntaxVersion.V2);
         Struct updated = fieldPath.updateValueFrom(schema, value, schema,
-                (oldField, updatedField, s, v) -> s.put(updatedField, ((Integer) v) * 2));
+                (oldField, updatedField, s, f, v) -> s.put(updatedField, ((Integer) v) * 2));
 
         assertEquals(84, fieldPath.valueFrom(updated));
     }
