@@ -108,7 +108,7 @@ class FieldPathsTest {
         FieldPaths fieldPaths = FieldPaths.of(fooPath, barPath);
         Map<String, Object> updated = fieldPaths.updateValuesFrom(
                 value,
-                (map, f, v) -> map.put(f, ((Integer) v) * 2)
+                (map, f, v) -> map.put(f.last(), ((Integer) v) * 2)
         );
 
         Map<FieldPath, MapFieldAndValue> actual = fieldPaths.fieldAndValuesFrom(updated);
@@ -127,7 +127,7 @@ class FieldPathsTest {
         FieldPaths fieldPaths = FieldPaths.of(bazPath, barPath);
         Map<String, Object> updated = fieldPaths.updateValuesFrom(
                 value,
-                (map, f, v) -> map.put(f, ((Integer) v) * 2)
+                (map, f, v) -> map.put(f.last(), ((Integer) v) * 2)
         );
 
         Map<FieldPath, MapFieldAndValue> actual = fieldPaths.fieldAndValuesFrom(updated);
@@ -148,7 +148,7 @@ class FieldPathsTest {
         FieldPath barPath = FieldPath.of("foo.bar", FieldSyntaxVersion.V1);
         FieldPaths fieldPaths = FieldPaths.of(bazPath, barPath);
         Struct updated = fieldPaths.updateValuesFrom(schema, value, schema,
-                (oldField, updatedField, s, v) -> s.put(updatedField, ((Integer) v) * 2));
+                (oldField, updatedField, s, f, v) -> s.put(updatedField, ((Integer) v) * 2));
 
         Map<FieldPath, StructFieldAndValue> actual = fieldPaths.fieldAndValuesFrom(updated);
         assertEquals(84, actual.get(bazPath).value());
@@ -171,7 +171,7 @@ class FieldPathsTest {
         FieldPath barPath = FieldPath.of("foo.bar", FieldSyntaxVersion.V2);
         FieldPaths fieldPaths = FieldPaths.of(bazPath, barPath);
         Struct updated = fieldPaths.updateValuesFrom(schema, value, schema,
-                (oldField, updatedField, s, v) -> s.put(updatedField, ((Integer) v) * 2));
+                (oldField, updatedField, s, f, v) -> s.put(updatedField, ((Integer) v) * 2));
 
         Map<FieldPath, StructFieldAndValue> actual = fieldPaths.fieldAndValuesFrom(updated);
         assertEquals(84, actual.get(bazPath).value());
