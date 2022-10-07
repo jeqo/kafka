@@ -34,7 +34,8 @@ import java.util.Map;
 import java.util.function.BiConsumer;
 
 /**
- * Represents a path to a field within a data object ({@code Struct} or {@code Map<String, Object>}).
+ * A FieldPath is composed by 1 or many field names, known as steps,
+ * to access values within a data object ({@code Struct} or {@code Map<String, Object>}).
  * If the SMT requires accessing multiple fields on the same data object, use {@see FieldPaths}
  * <p>
  * The field path semantics are defined by the syntax version {@see FieldSyntaxVersion}.
@@ -431,11 +432,6 @@ public class FieldPath {
         return b.toString();
     }
 
-    // For testing
-    String[] path() {
-        return Arrays.copyOf(path, path.length);
-    }
-
     public String last() {
         return path[path.length - 1];
     }
@@ -444,8 +440,13 @@ public class FieldPath {
         return path.length == 0;
     }
 
-    public String at(int i) {
+    public String stepAt(int i) {
         return i < path.length ? path[i] : null;
+    }
+
+    // For testing
+    String[] path() {
+        return Arrays.copyOf(path, path.length);
     }
 
     @Override
