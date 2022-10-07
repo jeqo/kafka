@@ -114,8 +114,8 @@ public class FieldPath {
             // avoid creating new string on changes
             final StringBuilder s = new StringBuilder(pathText);
 
-            while (s.length() > 0) { // until path is traverse
-                // process backtick pair if any
+            while (s.length() > 0) { // until path is traversed
+                // start processing backtick pair, if any
                 if (s.charAt(0) == BACKTICK_CHAR) {
                     s.deleteCharAt(0);
 
@@ -123,22 +123,23 @@ public class FieldPath {
                     int idx = 0;
                     while (idx >= 0) {
                         idx = s.indexOf(BACKTICK, idx);
-                        if (idx == -1) {
+                        if (idx == -1) { // if not found, fail
                             throw new IllegalArgumentException("Incomplete backtick pair at [...]`" + s);
                         }
+                        // check that it is not escaped or wrapped in another backticks pair
                         if (idx < s.length() - 1 // not wrapping the whole field path
                                 && (s.charAt(idx + 1) != DOT_CHAR // not wrapping
                                 || s.charAt(idx - 1) == BACKSLASH_CHAR)) { // ... or escaped
                             idx++; // move index forward and keep searching
-                        } else { // it's ending pair
+                        } else { // it's the closing pair
                             steps.add(escapeBackticks(s.substring(0, idx)));
                             s.delete(0, idx + 2); // rm backtick and dot
                             break;
                         }
                     }
-                } else { // process path dots
+                } else { // process dots in path
                     final int atDot = s.indexOf(DOT);
-                    if (atDot > 0) { // get step and move forward
+                    if (atDot > 0) { // get path step and move forward
                         steps.add(escapeBackticks(s.substring(0, atDot)));
                         s.delete(0, atDot + 1);
                     } else { // add all
