@@ -74,24 +74,26 @@ public class FieldPaths {
                 .collect(Collectors.toList()));
     }
 
-    Map<String, Object> buildPathTree(List<FieldPath> paths, int step, Map<String, Object> pathTree) {
+    Map<String, Object> buildPathTree(List<FieldPath> paths, int stepIdx, Map<String, Object> pathTree) {
         if (paths.size() == 1) { // optimize for paths with a single member
             FieldPath path = paths.get(0);
-            if (path.at(step + 1) == null) { // if last path step
-                pathTree.put(path.at(step), path);
+            if (path.stepAt(stepIdx + 1) == null) { // if last path step
+                pathTree.put(path.stepAt(stepIdx), path);
             } else {
-                pathTree.put(path.at(step), buildPathTree(paths, step + 1, new HashMap<>()));
+                pathTree.put(path.stepAt(stepIdx), buildPathTree(paths, stepIdx + 1, new HashMap<>()));
             }
         } else {
             // group paths by prefix
             final Map<String, List<FieldPath>> groups = new HashMap<>();
             for (FieldPath path : paths) {
-                String pathStep = path.at(step);
-                if (pathStep != null) {
-                    groups.computeIfPresent(pathStep, (s, fieldPaths) -> {
+                String step = path.stepAt(stepIdx);
+                if (step != null) {
+                    groups.computeIfPresent(step, (s, fieldPaths) -> {
                         for (FieldPath other : fieldPaths) {
-                            if (!path.equals(other) && (other.at(step + 1) == null
-                                    || path.at(step + 1) == null)) {
+                            // avoid overlapping paths
+                            if (!path.equals(other)
+                                    && (other.stepAt(stepIdx + 1) == null
+                                        || path.stepAt(stepIdx + 1) == null)) {
                                 throw new IllegalArgumentException(
                                         "Path " + other + " and " + path + " are overlapping. "
                                                 + "Paths need to point to leaf values");
@@ -102,7 +104,7 @@ public class FieldPaths {
                         }
                         return fieldPaths;
                     });
-                    groups.computeIfAbsent(pathStep, s -> {
+                    groups.computeIfAbsent(step, s -> {
                         List<FieldPath> fieldPaths = new ArrayList<>();
                         fieldPaths.add(path);
                         return fieldPaths;
@@ -114,15 +116,15 @@ public class FieldPaths {
             for (Map.Entry<String, List<FieldPath>> entry : groups.entrySet()) {
                 if (entry.getValue().size() == 1) {
                     final FieldPath path = entry.getValue().get(0);
-                    if (path.at(step + 1) == null) { // if last path step
+                    if (path.stepAt(stepIdx + 1) == null) { // if it is the last path step
                         pathTree.put(entry.getKey(), path);
                     } else {
                         pathTree.put(entry.getKey(),
-                                buildPathTree(entry.getValue(), step + 1, new HashMap<>()));
+                                buildPathTree(entry.getValue(), stepIdx + 1, new HashMap<>()));
                     }
                 } else {
                     pathTree.put(entry.getKey(),
-                            buildPathTree(entry.getValue(), step + 1, new HashMap<>()));
+                            buildPathTree(entry.getValue(), stepIdx + 1, new HashMap<>()));
                 }
             }
         }
