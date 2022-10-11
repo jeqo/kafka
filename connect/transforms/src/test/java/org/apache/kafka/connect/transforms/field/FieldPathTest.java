@@ -82,7 +82,7 @@ class FieldPathTest {
 
         SchemaBuilder updated = SchemaUtil.copySchemaBasics(schema, SchemaBuilder.struct());
         Schema result = FieldPath.of("foo", FieldSyntaxVersion.V1)
-            .updateSchemaFrom(schema, updated, (builder, field) -> {
+            .updateSchemaFrom(schema, updated, (builder, field, path) -> {
                 // ignore field
             });
 
@@ -100,7 +100,7 @@ class FieldPathTest {
         FieldPath fieldPath = FieldPath.of("foo.baz", FieldSyntaxVersion.V2);
         Schema result = fieldPath.updateSchemaFrom(
                 schema,
-                updated, (builder, field) -> {
+                updated, (builder, field, path) -> {
                         // ignore field
                 });
 
@@ -119,7 +119,7 @@ class FieldPathTest {
         FieldPath fieldPath = FieldPath.of("foo", FieldSyntaxVersion.V1);
         Schema result = fieldPath.updateSchemaFrom(
                 schema,
-                (builder, field) -> builder.field("other", field.schema())
+                (builder, field, path) -> builder.field("other", field.schema())
         );
 
         assertEquals(3, result.fields().size());
@@ -139,7 +139,7 @@ class FieldPathTest {
         FieldPath fieldPath = FieldPath.of("foo.baz", FieldSyntaxVersion.V2);
         Schema result = fieldPath.updateSchemaFrom(
                 schema,
-                (builder, field) -> builder.field("other", field.schema())
+                (builder, field, path) -> builder.field("other", field.schema())
         );
 
         assertEquals(1, result.fields().size());

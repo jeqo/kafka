@@ -31,7 +31,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.BiConsumer;
 
 /**
  * A FieldPath is composed by 1 or many field names, known as steps,
@@ -263,7 +262,7 @@ public class FieldPath {
      *
      * @return the updated schema
      */
-    public Schema updateSchemaFrom(Schema originalSchema, BiConsumer<SchemaBuilder, Field> update) {
+    public Schema updateSchemaFrom(Schema originalSchema, StructSchemaUpdater update) {
         SchemaBuilder updated = SchemaUtil.copySchemaBasics(originalSchema, SchemaBuilder.struct());
         return updateSchema(originalSchema, updated, 0, update);
     }
@@ -280,7 +279,7 @@ public class FieldPath {
     public Schema updateSchemaFrom(
             Schema originalSchema,
             SchemaBuilder baselineSchemaBuilder,
-            BiConsumer<SchemaBuilder, Field> update
+            StructSchemaUpdater update
     ) {
         return updateSchema(originalSchema, baselineSchemaBuilder, 0, update);
     }
@@ -289,7 +288,7 @@ public class FieldPath {
             Schema operatingSchema,
             SchemaBuilder builder,
             int step,
-            BiConsumer<SchemaBuilder, Field> change
+            StructSchemaUpdater change
     ) {
         if (operatingSchema.isOptional()) {
             builder.optional();
@@ -303,7 +302,7 @@ public class FieldPath {
                     builder.field(field.name(), field.schema());
                 } else {
                     if (step == path.length - 1) {
-                        change.accept(builder, field);
+                        change.apply(builder, field, this);
                     } else {
                         Schema fieldSchema = updateSchema(
                                 field.schema(),

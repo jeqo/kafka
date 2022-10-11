@@ -408,7 +408,7 @@ public abstract class TimestampConverter<R extends ConnectRecord<R>> implements 
                 updatedSchema = config.field.updateSchemaFrom(
                     schema,
                     updated,
-                    (builder, field) -> {
+                    (builder, field, fieldPath) -> {
                         // default value is conserved and transformed
                         Object defaultValue = convertTimestamp(
                                 field.schema().defaultValue(),

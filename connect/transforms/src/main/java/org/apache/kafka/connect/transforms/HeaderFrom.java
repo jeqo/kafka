@@ -181,7 +181,7 @@ public abstract class HeaderFrom<R extends ConnectRecord<R>> implements Transfor
     private Schema moveSchema(Schema operatingSchema) {
         Schema moveSchema = this.moveSchemaCache.get(operatingSchema);
         if (moveSchema == null) {
-            moveSchema = fieldPaths.updateSchemaFrom(operatingSchema, (builder, field) -> {
+            moveSchema = fieldPaths.updateSchemaFrom(operatingSchema, (builder, field, fieldPath) -> {
                 // ignore field
             });
             moveSchemaCache.put(operatingSchema, moveSchema);

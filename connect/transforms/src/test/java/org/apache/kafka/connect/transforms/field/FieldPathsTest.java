@@ -69,7 +69,7 @@ class FieldPathsTest {
         Schema result = fieldPath.updateSchemaFrom(
                 schema,
                 updated,
-                (builder, field) -> builder.field(field.name() + "_other", field.schema())
+                (builder, field, path) -> builder.field(field.name() + "_other", field.schema())
         );
 
         assertEquals(3, result.fields().size());
@@ -89,7 +89,7 @@ class FieldPathsTest {
         FieldPaths fieldPath = FieldPaths.of(Arrays.asList("foo.baz", "foo.bar"), FieldSyntaxVersion.V2);
         Schema result = fieldPath.updateSchemaFrom(
                 schema,
-                (builder, field) -> builder.field(field.name() + "_other", field.schema())
+                (builder, field, path) -> builder.field(field.name() + "_other", field.schema())
         );
 
         assertEquals(1, result.fields().size());
