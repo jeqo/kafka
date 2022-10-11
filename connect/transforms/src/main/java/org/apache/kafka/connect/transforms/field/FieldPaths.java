@@ -31,7 +31,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 
 /**
@@ -77,38 +76,43 @@ public class FieldPaths {
     Map<String, Object> buildPathTree(List<FieldPath> paths, int stepIdx, Map<String, Object> pathTree) {
         if (paths.size() == 1) { // optimize for paths with a single member
             FieldPath path = paths.get(0);
-            if (path.stepAt(stepIdx + 1) == null) { // if last path step
-                pathTree.put(path.stepAt(stepIdx), path);
-            } else {
-                pathTree.put(path.stepAt(stepIdx), buildPathTree(paths, stepIdx + 1, new HashMap<>()));
+            if (path != null) {
+                if (path.stepAt(stepIdx + 1) == null) { // if last path step
+                    pathTree.put(path.stepAt(stepIdx), path);
+                } else {
+                    pathTree.put(path.stepAt(stepIdx),
+                            buildPathTree(paths, stepIdx + 1, new HashMap<>()));
+                }
             }
         } else {
             // group paths by prefix
             final Map<String, List<FieldPath>> groups = new HashMap<>();
             for (FieldPath path : paths) {
-                String step = path.stepAt(stepIdx);
-                if (step != null) {
-                    groups.computeIfPresent(step, (s, fieldPaths) -> {
-                        for (FieldPath other : fieldPaths) {
-                            // avoid overlapping paths
-                            if (!path.equals(other)
-                                    && (other.stepAt(stepIdx + 1) == null
+                if (path != null) {
+                    String step = path.stepAt(stepIdx);
+                    if (step != null) {
+                        groups.computeIfPresent(step, (s, fieldPaths) -> {
+                            for (FieldPath other : fieldPaths) {
+                                // avoid overlapping paths
+                                if (!path.equals(other)
+                                        && (other.stepAt(stepIdx + 1) == null
                                         || path.stepAt(stepIdx + 1) == null)) {
-                                throw new IllegalArgumentException(
-                                        "Path " + other + " and " + path + " are overlapping. "
-                                                + "Paths need to point to leaf values");
+                                    throw new IllegalArgumentException(
+                                            "Path " + other + " and " + path + " are overlapping. "
+                                                    + "Paths need to point to leaf values");
+                                }
                             }
-                        }
-                        if (!fieldPaths.contains(path)) {
+                            if (!fieldPaths.contains(path)) {
+                                fieldPaths.add(path);
+                            }
+                            return fieldPaths;
+                        });
+                        groups.computeIfAbsent(step, s -> {
+                            List<FieldPath> fieldPaths = new ArrayList<>();
                             fieldPaths.add(path);
-                        }
-                        return fieldPaths;
-                    });
-                    groups.computeIfAbsent(step, s -> {
-                        List<FieldPath> fieldPaths = new ArrayList<>();
-                        fieldPaths.add(path);
-                        return fieldPaths;
-                    });
+                            return fieldPaths;
+                        });
+                    }
                 }
             }
 
@@ -312,7 +316,7 @@ public class FieldPaths {
      */
     public Schema updateSchemaFrom(
             Schema originalSchema,
-            BiConsumer<SchemaBuilder, Field> update
+            StructSchemaUpdater update
     ) {
         SchemaBuilder updated = SchemaUtil.copySchemaBasics(originalSchema, SchemaBuilder.struct());
         return updateSchema(originalSchema, updated, pathTree, update);
@@ -328,7 +332,7 @@ public class FieldPaths {
     public Schema updateSchemaFrom(
             Schema originalSchema,
             SchemaBuilder baseline,
-            BiConsumer<SchemaBuilder, Field> update
+            StructSchemaUpdater update
     ) {
         return updateSchema(originalSchema, baseline, pathTree, update);
     }
@@ -338,7 +342,7 @@ public class FieldPaths {
             Schema originalSchema,
             SchemaBuilder baseSchemaBuilder,
             Map<String, Object> treeAt,
-            BiConsumer<SchemaBuilder, Field> update
+            StructSchemaUpdater update
     ) {
         if (originalSchema.isOptional()) {
             baseSchemaBuilder.optional();
@@ -349,7 +353,7 @@ public class FieldPaths {
                     baseSchemaBuilder.field(field.name(), field.schema());
                 } else {
                     if (treeAt.get(field.name()) instanceof FieldPath) {
-                        update.accept(baseSchemaBuilder, field);
+                        update.apply(baseSchemaBuilder, field, (FieldPath) treeAt.get(field.name()));
                     } else {
                         if (field.schema().type() == Type.STRUCT) {
                             Schema fieldSchema = updateSchema(
