@@ -46,6 +46,16 @@ public enum FieldSyntaxVersion {
     public static final String FIELD_SYNTAX_VERSION_DEFAULT_VALUE = V1.name();
     public static final ConfigDef.Validator FIELD_SYNTAX_VERSION_VALIDATOR = new Validator();
 
+    public static ConfigDef baseConfigDef() {
+        return new ConfigDef()
+                .define(
+                        FieldSyntaxVersion.FIELD_SYNTAX_VERSION_CONFIG,
+                        ConfigDef.Type.STRING,
+                        FieldSyntaxVersion.FIELD_SYNTAX_VERSION_DEFAULT_VALUE,
+                        FieldSyntaxVersion.FIELD_SYNTAX_VERSION_VALIDATOR,
+                        ConfigDef.Importance.HIGH,
+                        FieldSyntaxVersion.FIELD_SYNTAX_VERSION_DOC);
+    }
 
     public final String name;
 

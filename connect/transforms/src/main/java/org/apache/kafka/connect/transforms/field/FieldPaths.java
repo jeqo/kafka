@@ -61,6 +61,10 @@ public class FieldPaths {
         return new FieldPaths(Arrays.asList(paths));
     }
 
+    public static FieldPaths of(List<FieldPath> paths) {
+        return new FieldPaths(paths);
+    }
+
     public static FieldPaths of(Set<String> fields, FieldSyntaxVersion syntaxVersion) {
         return new FieldPaths(fields.stream()
                 .map(f -> FieldPath.of(f, syntaxVersion))
@@ -217,32 +221,56 @@ public class FieldPaths {
             Map<String, Object> originalValue,
             MapValueUpdater update
     ) {
-        return updateValues(originalValue, pathTree, update);
+        return updateValues(originalValue, pathTree, update,
+                (originalParent, updatedParent, fieldPath, fieldName) ->
+                    updatedParent.put(fieldName, originalParent.get(fieldName)));
+    }
+
+    public Map<String, Object> updateValuesFrom(
+            Map<String, Object> originalValue,
+            MapValueUpdater update,
+            MapValueUpdater others
+    ) {
+        return updateValues(originalValue, pathTree, update, others);
     }
 
     @SuppressWarnings("unchecked")
     private Map<String, Object> updateValues(
             Map<String, Object> originalValue,
             Map<String, Object> treeAt,
-            MapValueUpdater update
+            MapValueUpdater update,
+            MapValueUpdater others
     ) {
-        Map<String, Object> updatedValue = new HashMap<>(originalValue);
-        for (Map.Entry<String, Object> entry : treeAt.entrySet()) {
-            final String fieldName = entry.getKey();
-            if (originalValue.containsKey(fieldName)) {
-                if (entry.getValue() instanceof FieldPath) {
-                    update.apply(updatedValue, (FieldPath) entry.getValue(), originalValue.get(fieldName));
-                } else {
-                    if (originalValue.get(fieldName) instanceof Map) {
-                        Map<String, Object> fieldValue = updateValues(
-                                (Map<String, Object>) updatedValue.get(fieldName),
-                                (Map<String, Object>) entry.getValue(),
-                                update);
-                        updatedValue.put(fieldName, fieldValue);
+        if (originalValue == null) return null;
+        Map<String, Object> updatedValue = new HashMap<>(originalValue.size());
+        for (Map.Entry<String, Object> entry : originalValue.entrySet()) {
+            String fieldName = entry.getKey();
+            Object fieldValue = entry.getValue();
+            if (!treeAt.isEmpty()) {
+                if (treeAt.containsKey(fieldName)) {
+                    Object treeValue = treeAt.get(fieldName);
+                    if (treeValue instanceof FieldPath) {
+                        update.apply(originalValue, updatedValue, (FieldPath) treeValue, fieldName);
+                    } else {
+                        if (fieldValue instanceof Map) {
+                            Map<String, Object> updatedField = updateValues(
+                                    (Map<String, Object>) fieldValue,
+                                    (Map<String, Object>) treeValue,
+                                    update,
+                                    others);
+                            updatedValue.put(fieldName, updatedField);
+                        } else {
+                            updatedValue.put(fieldName, fieldValue);
+                        }
                     }
+                } else {
+                    others.apply(originalValue, updatedValue, null, fieldName);
                 }
+            } else {
+                others.apply(originalValue, updatedValue, null, fieldName);
             }
         }
+
         return updatedValue;
     }
 
@@ -261,7 +289,19 @@ public class FieldPaths {
             Schema updatedSchema,
             StructValueUpdater update
     ) {
-        return updateValues(originalSchema, originalValue, updatedSchema, pathTree, update);
+        return updateValues(originalSchema, originalValue, updatedSchema, pathTree, update,
+                (originalParent, originalField, updatedParent, nullUpdatedField, nullFieldPath) ->
+                        updatedParent.put(originalField.name(), originalParent.get(originalField)));
+    }
+
+    public Struct updateValuesFrom(
+            Schema originalSchema,
+            Struct originalValue,
+            Schema updatedSchema,
+            StructValueUpdater update,
+            StructValueUpdater others
+    ) {
+        return updateValues(originalSchema, originalValue, updatedSchema, pathTree, update, others);
     }
 
     @SuppressWarnings("unchecked")
@@ -270,19 +310,20 @@ public class FieldPaths {
             Struct originalValue,
             Schema updateSchema,
             Map<String, Object> treeAt,
-            StructValueUpdater update
+            StructValueUpdater update,
+            StructValueUpdater others
     ) {
         Struct updatedValue = new Struct(updateSchema);
-        for (Field field : updateSchema.fields()) {
+        for (Field field : originalSchema.fields()) {
             if (!treeAt.isEmpty()) {
                 if (treeAt.containsKey(field.name())) {
                     if (treeAt.get(field.name()) instanceof FieldPath) {
                         update.apply(
+                                originalValue,
                                 originalSchema.field(field.name()),
-                                updateSchema.field(field.name()),
                                 updatedValue,
-                                (FieldPath) treeAt.get(field.name()),
-                                originalValue.get(field.name())
+                                updateSchema.field(field.name()),
+                                (FieldPath) treeAt.get(field.name())
                         );
                     } else {
                         if (field.schema().type() == Type.STRUCT) {
@@ -291,16 +332,17 @@ public class FieldPaths {
                                     originalValue.getStruct(field.name()),
                                     updateSchema.field(field.name()).schema(),
                                     (Map<String, Object>) treeAt.get(field.name()),
-                                    update
+                                    update,
+                                    others
                             );
-                            updatedValue.put(field, fieldValue);
+                            updatedValue.put(updateSchema.field(field.name()), fieldValue);
                         }
                     }
                 } else {
-                    updatedValue.put(field, originalValue.get(field.name()));
+                    others.apply(originalValue, field, updatedValue, null, null);
                 }
             } else {
-                updatedValue.put(field, originalValue.get(field.name()));
+                others.apply(originalValue, field, updatedValue, null, null);
             }
         }
         return updatedValue;
@@ -319,7 +361,17 @@ public class FieldPaths {
             StructSchemaUpdater update
     ) {
         SchemaBuilder updated = SchemaUtil.copySchemaBasics(originalSchema, SchemaBuilder.struct());
-        return updateSchema(originalSchema, updated, pathTree, update);
+        return updateSchema(originalSchema, updated, pathTree, update,
+                (schemaBuilder, field, fieldPath) -> schemaBuilder.field(field.name(), field.schema()));
+    }
+
+    public Schema updateSchemaFrom(
+            Schema originalSchema,
+            StructSchemaUpdater update,
+            StructSchemaUpdater others
+    ) {
+        SchemaBuilder updated = SchemaUtil.copySchemaBasics(originalSchema, SchemaBuilder.struct());
+        return updateSchema(originalSchema, updated, pathTree, update, others);
     }
 
     /**
@@ -334,7 +386,8 @@ public class FieldPaths {
             SchemaBuilder baseline,
             StructSchemaUpdater update
     ) {
-        return updateSchema(originalSchema, baseline, pathTree, update);
+        return updateSchema(originalSchema, baseline, pathTree, update,
+                (schemaBuilder, field, fieldPath) -> schemaBuilder.field(field.name(), field.schema()));
     }
 
     @SuppressWarnings("unchecked")
@@ -342,7 +395,8 @@ public class FieldPaths {
             Schema originalSchema,
             SchemaBuilder baseSchemaBuilder,
             Map<String, Object> treeAt,
-            StructSchemaUpdater update
+            StructSchemaUpdater update,
+            StructSchemaUpdater others
     ) {
         if (originalSchema.isOptional()) {
             baseSchemaBuilder.optional();
@@ -350,7 +404,7 @@ public class FieldPaths {
         for (Field field : originalSchema.fields()) {
             if (!treeAt.isEmpty()) {
                 if (!treeAt.containsKey(field.name())) {
-                    baseSchemaBuilder.field(field.name(), field.schema());
+                    others.apply(baseSchemaBuilder, field, null);
                 } else {
                     if (treeAt.get(field.name()) instanceof FieldPath) {
                         update.apply(baseSchemaBuilder, field, (FieldPath) treeAt.get(field.name()));
@@ -360,15 +414,15 @@ public class FieldPaths {
                                     field.schema(),
                                     SchemaBuilder.struct(),
                                     (Map<String, Object>) treeAt.get(field.name()),
-                                    update);
+                                    update, others);
                             baseSchemaBuilder.field(field.name(), fieldSchema);
                         } else {
-                            baseSchemaBuilder.field(field.name(), field.schema());
+                            others.apply(baseSchemaBuilder, field, null);
                         }
                     }
                 }
             } else {
-                baseSchemaBuilder.field(field.name(), field.schema());
+                others.apply(baseSchemaBuilder, field, null);
             }
         }
         return baseSchemaBuilder.build();

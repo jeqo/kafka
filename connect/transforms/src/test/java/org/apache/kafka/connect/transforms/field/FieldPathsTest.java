@@ -108,7 +108,7 @@ class FieldPathsTest {
         FieldPaths fieldPaths = FieldPaths.of(fooPath, barPath);
         Map<String, Object> updated = fieldPaths.updateValuesFrom(
                 value,
-                (map, f, v) -> map.put(f.last(), ((Integer) v) * 2)
+                (orig, map, f, k) -> map.put(k, ((Integer) orig.get(k)) * 2)
         );
 
         Map<FieldPath, MapFieldAndValue> actual = fieldPaths.fieldAndValuesFrom(updated);
@@ -127,7 +127,7 @@ class FieldPathsTest {
         FieldPaths fieldPaths = FieldPaths.of(bazPath, barPath);
         Map<String, Object> updated = fieldPaths.updateValuesFrom(
                 value,
-                (map, f, v) -> map.put(f.last(), ((Integer) v) * 2)
+                (orig, map, f, k) -> map.put(k, ((Integer) orig.get(k)) * 2)
         );
 
         Map<FieldPath, MapFieldAndValue> actual = fieldPaths.fieldAndValuesFrom(updated);
@@ -148,7 +148,7 @@ class FieldPathsTest {
         FieldPath barPath = FieldPath.of("foo.bar", FieldSyntaxVersion.V1);
         FieldPaths fieldPaths = FieldPaths.of(bazPath, barPath);
         Struct updated = fieldPaths.updateValuesFrom(schema, value, schema,
-                (oldField, updatedField, s, f, v) -> s.put(updatedField, ((Integer) v) * 2));
+                (orig, oldField, s, updatedField, f) -> s.put(updatedField, ((Integer) orig.get(oldField)) * 2));
 
         Map<FieldPath, StructFieldAndValue> actual = fieldPaths.fieldAndValuesFrom(updated);
         assertEquals(84, actual.get(bazPath).value());
@@ -171,7 +171,7 @@ class FieldPathsTest {
         FieldPath barPath = FieldPath.of("foo.bar", FieldSyntaxVersion.V2);
         FieldPaths fieldPaths = FieldPaths.of(bazPath, barPath);
         Struct updated = fieldPaths.updateValuesFrom(schema, value, schema,
-                (oldField, updatedField, s, f, v) -> s.put(updatedField, ((Integer) v) * 2));
+                (orig, oldField, s, updatedField, f) -> s.put(updatedField, ((Integer) orig.get(oldField)) * 2));
 
         Map<FieldPath, StructFieldAndValue> actual = fieldPaths.fieldAndValuesFrom(updated);
         assertEquals(84, actual.get(bazPath).value());

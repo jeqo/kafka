@@ -22,5 +22,5 @@ import org.apache.kafka.connect.data.Struct;
 @FunctionalInterface
 public interface StructValueUpdater {
 
-    void apply(Field originalField, Field updatedField, Struct updatedParent, FieldPath fieldPath, Object fieldValue);
+    void apply(Struct originalParent, Field originalField, Struct updatedParent, Field updatedField, FieldPath fieldPath);
 }
