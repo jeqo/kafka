@@ -21,5 +21,16 @@ import java.util.Map;
 @FunctionalInterface
 public interface MapValueUpdater {
 
-    void apply(Map<String, Object> updatedValue, FieldPath fieldPath, Object fieldValue);
+    /**
+     *
+     * @param updatedParent data object being updated
+     * @param fieldPath if match happened, null if applies to other fields
+     * @param fieldName field name
+     */
+    void apply(
+            Map<String, Object> originalParent,
+            Map<String, Object> updatedParent,
+            FieldPath fieldPath,
+            String fieldName
+    );
 }

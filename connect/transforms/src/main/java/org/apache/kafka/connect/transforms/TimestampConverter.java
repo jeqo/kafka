@@ -435,11 +435,11 @@ public abstract class TimestampConverter<R extends ConnectRecord<R>> implements 
             value.schema(),
             value,
             updatedSchema,
-            (originalField, updatedField, struct, fieldPath, fieldValue) ->
+            (originalParent, originalField, struct, updatedField, fieldPath) ->
                 struct.put(
                         updatedField.name(),
                         // default value is conserved
-                        convertTimestamp(fieldValue, timestampTypeFromSchema(originalField.schema()))
+                        convertTimestamp(originalParent.get(originalField), timestampTypeFromSchema(originalField.schema()))
                 )
         );
     }
@@ -452,7 +452,7 @@ public abstract class TimestampConverter<R extends ConnectRecord<R>> implements 
             final Map<String, Object> value = requireMap(rawValue, PURPOSE);
             final Map<String, Object> updatedValue = config.field.updateValueFrom(
                 value,
-                (map, field, v) -> map.put(field.last(), convertTimestamp(v)));
+                (orig, map, fieldPath, k) -> map.put(k, convertTimestamp(orig.get(k))));
             return newRecord(record, null, updatedValue);
         }
     }

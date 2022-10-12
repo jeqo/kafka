@@ -153,7 +153,7 @@ class FieldPathTest {
 
         FieldPath fieldPath = FieldPath.of("foo", FieldSyntaxVersion.V1);
         Map<String, Object> updated = fieldPath
-            .updateValueFrom(value, (map, f, v) -> map.put(f.last(), ((Integer) v) * 2));
+            .updateValueFrom(value, (orig, map, f, k) -> map.put(k, ((Integer) orig.get(k)) * 2));
 
         assertEquals(84, fieldPath.valueFrom(updated));
     }
@@ -164,7 +164,7 @@ class FieldPathTest {
         FieldPath fieldPath = FieldPath.of("foo.bar", FieldSyntaxVersion.V2);
         Map<String, Object> updated = fieldPath.updateValueFrom(
                 value,
-                (map, f, v) -> map.put(f.last(), ((Integer) v) * 2)
+                (original, map, f, k) -> map.put(k, ((Integer) original.get(k)) * 2)
         );
 
         assertEquals(84, fieldPath.valueFrom(updated));
@@ -176,7 +176,7 @@ class FieldPathTest {
 
         FieldPath fieldPath = FieldPath.of("foo", FieldSyntaxVersion.V1);
         Struct updated = fieldPath.updateValueFrom(schema, value, schema,
-                (oldField, updatedField, s, f, v) -> s.put(updatedField, ((Integer) v) * 2));
+                (orig, oldField, s, updatedField, f) -> s.put(updatedField, ((Integer) orig.get(oldField)) * 2));
 
         assertEquals(84, fieldPath.valueFrom(updated));
     }
@@ -188,8 +188,15 @@ class FieldPathTest {
 
         FieldPath fieldPath = FieldPath.of("foo.bar", FieldSyntaxVersion.V2);
         Struct updated = fieldPath.updateValueFrom(schema, value, schema,
-                (oldField, updatedField, s, f, v) -> s.put(updatedField, ((Integer) v) * 2));
+                (orig, oldField, s, updatedField, f) -> s.put(updatedField, ((Integer) orig.get(oldField)) * 2));
 
         assertEquals(84, fieldPath.valueFrom(updated));
+    }
+
+    @Test void shouldRenameLastV2() {
+        FieldPath path = FieldPath.ofV2("foo.bar.baz");
+        FieldPath updated = path.renameLast("baz2");
+        assertEquals("foo.bar.baz", path.toDottedPath());
+        assertEquals("foo.bar.baz2", updated.toDottedPath());
     }
 }

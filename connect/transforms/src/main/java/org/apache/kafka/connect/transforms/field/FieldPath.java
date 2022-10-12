@@ -87,6 +87,10 @@ public class FieldPath {
         }
     }
 
+    FieldPath(String[] steps) {
+        this.path = steps;
+    }
+
     FieldPath(String pathText, FieldSyntaxVersion version) {
         if (pathText == null || pathText.isEmpty()) { // empty path
             this.path = new String[] {};
@@ -327,34 +331,44 @@ public class FieldPath {
      * @return updated data value
      */
     public Map<String, Object> updateValueFrom(Map<String, Object> value, MapValueUpdater update) {
-        return updateValue(value, 0, update);
+        return updateValue(value, 0, update,
+                (originalParent, updatedParent, fieldPath, fieldName) ->
+                        updatedParent.put(fieldName, originalParent.get(fieldName)));
     }
 
     @SuppressWarnings("unchecked")
     private Map<String, Object> updateValue(
-            Map<String, Object> value,
+            Map<String, Object> originalValue,
             int step,
-            MapValueUpdater change
+            MapValueUpdater update,
+            MapValueUpdater others
     ) {
-        Map<String, Object> updated = new HashMap<>(value);
-        for (Map.Entry<String, Object> entry : value.entrySet()) {
-            if (step < path.length) {
-                if (path[step].equals(entry.getKey())) {
-                    if (step == path.length - 1) {
-                        change.apply(updated, this, entry.getValue());
+        if (originalValue == null) return null;
+        Map<String, Object> updatedParent = new HashMap<>(originalValue.size());
+        for (Map.Entry<String, Object> entry : originalValue.entrySet()) {
+            String fieldName = entry.getKey();
+            Object fieldValue = entry.getValue();
+            if (path[step].equals(fieldName)) {
+                if (step == path.length - 1) {
+                    update.apply(originalValue, updatedParent, this, fieldName);
+                } else {
+                    if (fieldValue instanceof Map) {
+                        Map<String, Object> updatedField = updateValue(
+                                (Map<String, Object>) fieldValue,
+                                step + 1,
+                                update,
+                                others);
+                        updatedParent.put(fieldName, updatedField);
                     } else {
-                        if (entry.getValue() instanceof Map) {
-                            Map<String, Object> updatedValue = updateValue(
-                                    (Map<String, Object>) entry.getValue(),
-                                    step + 1,
-                                    change);
-                            updated.put(entry.getKey(), updatedValue);
-                        }
+                        updatedParent.put(fieldName, fieldValue);
                     }
                 }
+            } else {
+                others.apply(originalValue, updatedParent, null, fieldName);
             }
         }
-        return updated;
+
+        return updatedParent;
     }
 
     /**
@@ -388,11 +402,11 @@ public class FieldPath {
                 if (path[step].equals(field.name())) {
                     if (step == path.length - 1) {
                         update.apply(
+                                originalValue,
                                 field,
-                                updateSchema.field(field.name()),
                                 updated,
-                                this,
-                                originalValue.get(field.name())
+                                updateSchema.field(field.name()),
+                                this
                         );
                     } else {
                         if (field.schema().type() == Type.STRUCT) {
@@ -429,6 +443,12 @@ public class FieldPath {
             }
         }
         return b.toString();
+    }
+
+    public FieldPath renameLast(String last) {
+        String[] path = path();
+        path[path.length - 1] = last;
+        return new FieldPath(path);
     }
 
     public String last() {
