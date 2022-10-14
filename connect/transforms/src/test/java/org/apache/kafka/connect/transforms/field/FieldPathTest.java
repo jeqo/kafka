@@ -192,11 +192,4 @@ class FieldPathTest {
 
         assertEquals(84, fieldPath.valueFrom(updated));
     }
-
-    @Test void shouldRenameLastV2() {
-        FieldPath path = FieldPath.ofV2("foo.bar.baz");
-        FieldPath updated = path.renameLast("baz2");
-        assertEquals("foo.bar.baz", path.toDottedPath());
-        assertEquals("foo.bar.baz2", updated.toDottedPath());
-    }
 }

@@ -50,9 +50,9 @@ public class FieldPath {
 
     private static final String BACKTICK = "`";
     private static final String DOT = ".";
-    public static final char BACKTICK_CHAR = '`';
-    public static final char DOT_CHAR = '.';
-    public static final char BACKSLASH_CHAR = '\\';
+    private static final char BACKTICK_CHAR = '`';
+    private static final char DOT_CHAR = '.';
+    private static final char BACKSLASH_CHAR = '\\';
 
     private static final Cache<String, FieldPath> PATHS_CACHE = new SynchronizedCache<>(new LRUCache<>(16));
 
@@ -85,10 +85,6 @@ public class FieldPath {
                 return fieldPath;
             }
         }
-    }
-
-    FieldPath(String[] steps) {
-        this.path = steps;
     }
 
     FieldPath(String pathText, FieldSyntaxVersion version) {
@@ -443,12 +439,6 @@ public class FieldPath {
             }
         }
         return b.toString();
-    }
-
-    public FieldPath renameLast(String last) {
-        String[] path = path();
-        path[path.length - 1] = last;
-        return new FieldPath(path);
     }
 
     public String last() {
