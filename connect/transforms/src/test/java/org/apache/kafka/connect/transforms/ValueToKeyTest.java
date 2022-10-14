@@ -104,6 +104,6 @@ public class ValueToKeyTest {
         final SinkRecord record = new SinkRecord("", 0, null, null, valueSchema, value, 0);
 
         DataException actual = assertThrows(DataException.class, () -> xform.apply(record));
-        assertEquals("Field does not exist: not_exist", actual.getMessage());
+        assertEquals("Field does not exist: FieldPath(path = [not_exist])", actual.getMessage());
     }
 }

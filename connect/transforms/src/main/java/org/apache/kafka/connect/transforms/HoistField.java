@@ -24,6 +24,9 @@ import org.apache.kafka.connect.connector.ConnectRecord;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.SchemaBuilder;
 import org.apache.kafka.connect.data.Struct;
+import org.apache.kafka.connect.transforms.field.FieldPath;
+import org.apache.kafka.connect.transforms.field.FieldSyntaxVersion;
+import org.apache.kafka.connect.transforms.util.Requirements;
 import org.apache.kafka.connect.transforms.util.SimpleConfig;
 
 import java.util.HashMap;
@@ -37,19 +40,37 @@ public abstract class HoistField<R extends ConnectRecord<R>> implements Transfor
                     + "or value (<code>" + Value.class.getName() + "</code>).";
 
     private static final String FIELD_CONFIG = "field";
+    private static final String HOISTED_CONFIG = "hoisted";
 
-    public static final ConfigDef CONFIG_DEF = new ConfigDef()
-            .define(FIELD_CONFIG, ConfigDef.Type.STRING, ConfigDef.NO_DEFAULT_VALUE, ConfigDef.Importance.MEDIUM,
-                    "Field name for the single field that will be created in the resulting Struct or Map.");
+    public static final ConfigDef CONFIG_DEF = FieldSyntaxVersion.baseConfigDef()
+            .define(FIELD_CONFIG,
+                    ConfigDef.Type.STRING,
+                    ConfigDef.NO_DEFAULT_VALUE,
+                    ConfigDef.Importance.MEDIUM,
+                    "Field name for the single field that will be created in the resulting Struct or Map.")
+            .define(HOISTED_CONFIG,
+                    ConfigDef.Type.STRING,
+                    "",
+                    ConfigDef.Importance.MEDIUM,
+                    "Field name/path for the field to hoist");
+
+    private static final String PURPOSE = "hoisting a field";
 
     private Cache<Schema, Schema> schemaUpdateCache;
 
     private String fieldName;
+    private FieldPath hoisted;
 
     @Override
     public void configure(Map<String, ?> props) {
         final SimpleConfig config = new SimpleConfig(CONFIG_DEF, props);
-        fieldName = config.getString("field");
+        fieldName = config.getString(FIELD_CONFIG);
+        String hoistedConfig = config.getString(HOISTED_CONFIG);
+        if (hoistedConfig == null || hoistedConfig.isEmpty()) {
+            hoisted = null;
+        } else {
+            hoisted = FieldPath.of(hoistedConfig, FieldSyntaxVersion.fromConfig(config));
+        }
         schemaUpdateCache = new SynchronizedCache<>(new LRUCache<>(16));
     }
 
@@ -60,17 +81,31 @@ public abstract class HoistField<R extends ConnectRecord<R>> implements Transfor
 
         if (schema == null) {
             Map<String, Object> updatedValue = new HashMap<>();
-            updatedValue.put(fieldName, value);
+            if (hoisted == null) {
+                updatedValue.put(fieldName, value);
+            } else {
+                updatedValue.put(fieldName, hoisted.valueFrom(Requirements.requireMap(value, PURPOSE)));
+            }
             return newRecord(record, null, updatedValue);
         } else {
             Schema updatedSchema = schemaUpdateCache.get(schema);
             if (updatedSchema == null) {
-                updatedSchema = SchemaBuilder.struct().field(fieldName, schema).build();
+                SchemaBuilder schemaBuilder = SchemaBuilder.struct();
+                if (hoisted == null) {
+                    schemaBuilder.field(fieldName, schema);
+                } else {
+                    schemaBuilder.field(fieldName, hoisted.fieldFrom(schema).schema());
+                }
+                updatedSchema = schemaBuilder.build();
                 schemaUpdateCache.put(schema, updatedSchema);
             }
 
-            final Struct updatedValue = new Struct(updatedSchema).put(fieldName, value);
-
+            final Struct updatedValue = new Struct(updatedSchema);
+            if (hoisted == null) {
+                updatedValue.put(fieldName, value);
+            } else {
+                updatedValue.put(fieldName, hoisted.valueFrom(Requirements.requireStruct(value, PURPOSE)));
+            }
             return newRecord(record, updatedSchema, updatedValue);
         }
     }
