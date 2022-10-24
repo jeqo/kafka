@@ -37,13 +37,21 @@ import java.util.stream.Collectors;
  * Multiple field paths to access data objects ({@code Struct} or {@code Map}) efficiently,
  * instead of using single {@see FieldPath} individually.
  * <p>
+ * If the SMT requires accessing a single field on the same data object,
+ * use {@code FieldPath} instead.
+ * <p>
  * Invariants:
  * <li>
  *     <ul>Tree values contain either a nested tree or a field path</ul>
  *     <ul>A tree cannot contain paths that are a subset of other paths (e.g. foo and foo.bar in V2 should collide and fail)</ul>
  * </li>
+ *
+ * See KIP-821.
+ *
+ * @see FieldPath
+ * @see FieldSyntaxVersion
  */
-public class FieldPaths {
+public class FieldPaths implements FieldPathOps {
 
     final Map<String, Object> pathTree;
     final List<FieldPath> paths;
@@ -426,58 +434,47 @@ public class FieldPaths {
         return updatedValue;
     }
 
-    /**
-     * Find the {@code Field}s at the path tree leafs, and apply an update function. If fields are not
-     * found, then no update function is applied.
-     * <p>
-     * A copy of the {@code Schema} will be used as a base for the updated schema.
-     *
-     * @return the updated schema
-     */
+    @Override
     public Schema updateSchemaFrom(
             Schema originalSchema,
-            StructSchemaUpdater update
+            StructSchemaUpdater whenFound
     ) {
         SchemaBuilder updated = SchemaUtil.copySchemaBasics(originalSchema, SchemaBuilder.struct());
-        return updateSchema(originalSchema, updated, pathTree, update,
+        return updateSchema(originalSchema, updated, pathTree, whenFound,
                 (schemaBuilder, field, fieldPath) -> { /* ignore */ },
                 (schemaBuilder, field, fieldPath) -> schemaBuilder.field(field.name(), field.schema()));
     }
 
+    @Override
     public Schema updateSchemaFrom(
             Schema originalSchema,
-            StructSchemaUpdater update,
-            StructSchemaUpdater others
+            StructSchemaUpdater whenFound,
+            StructSchemaUpdater whenNotFound
     ) {
         SchemaBuilder updated = SchemaUtil.copySchemaBasics(originalSchema, SchemaBuilder.struct());
-        return updateSchema(originalSchema, updated, pathTree, update,
+        return updateSchema(originalSchema, updated, pathTree, whenFound,
                 (schemaBuilder, field, fieldPath) -> { /* ignore */ },
-                others);
+                whenNotFound);
     }
 
+    @Override
     public Schema updateSchemaFrom(
             Schema originalSchema,
-            StructSchemaUpdater update,
-            StructSchemaUpdater notFound,
-            StructSchemaUpdater others
+            StructSchemaUpdater whenFound,
+            StructSchemaUpdater whenNotFound,
+            StructSchemaUpdater toOtherFields
     ) {
         SchemaBuilder updated = SchemaUtil.copySchemaBasics(originalSchema, SchemaBuilder.struct());
-        return updateSchema(originalSchema, updated, pathTree, update, notFound, others);
+        return updateSchema(originalSchema, updated, pathTree, whenFound, whenNotFound, toOtherFields);
     }
 
-    /**
-     * Find the {@code Field}s at the path tree leafs, and apply an update function. If fields are not
-     * found, then no update function is applied.
-     * <p>
-     *
-     * @return the updated schema
-     */
+    @Override
     public Schema updateSchemaFrom(
             Schema originalSchema,
-            SchemaBuilder baseline,
-            StructSchemaUpdater update
+            SchemaBuilder baselineSchemaBuilder,
+            StructSchemaUpdater whenFound
     ) {
-        return updateSchema(originalSchema, baseline, pathTree, update,
+        return updateSchema(originalSchema, baselineSchemaBuilder, pathTree, whenFound,
                 (schemaBuilder, field, fieldPath) -> { /* ignore */ },
                 (schemaBuilder, field, fieldPath) -> schemaBuilder.field(field.name(), field.schema()));
     }
@@ -487,9 +484,9 @@ public class FieldPaths {
             Schema originalSchema,
             SchemaBuilder baseSchemaBuilder,
             Map<String, Object> treeAt,
-            StructSchemaUpdater matching,
-            StructSchemaUpdater notFound,
-            StructSchemaUpdater others
+            StructSchemaUpdater whenFound,
+            StructSchemaUpdater whenNotFound,
+            StructSchemaUpdater toOtherFields
     ) {
         if (originalSchema.isOptional()) {
             baseSchemaBuilder.optional();
@@ -498,39 +495,39 @@ public class FieldPaths {
         for (Field field : originalSchema.fields()) {
             if (!treeAt.isEmpty()) {
                 if (!treeAt.containsKey(field.name())) {
-                    others.apply(baseSchemaBuilder, field, null);
+                    toOtherFields.apply(baseSchemaBuilder, field, null);
                 } else {
                     notFoundFields.remove(field.name());
                     if (treeAt.get(field.name()) instanceof FieldPath) {
-                        matching.apply(baseSchemaBuilder, field, (FieldPath) treeAt.get(field.name()));
+                        whenFound.apply(baseSchemaBuilder, field, (FieldPath) treeAt.get(field.name()));
                     } else {
                         if (field.schema().type() == Type.STRUCT) {
                             Schema fieldSchema = updateSchema(
                                     field.schema(),
                                     SchemaBuilder.struct(),
                                     (Map<String, Object>) treeAt.get(field.name()),
-                                    matching, notFound, others);
+                                    whenFound, whenNotFound, toOtherFields);
                             baseSchemaBuilder.field(field.name(), fieldSchema);
                         } else {
-                            others.apply(baseSchemaBuilder, field, null);
+                            toOtherFields.apply(baseSchemaBuilder, field, null);
                         }
                     }
                 }
             } else {
-                others.apply(baseSchemaBuilder, field, null);
+                toOtherFields.apply(baseSchemaBuilder, field, null);
             }
         }
         for (Map.Entry<String, Object> entry : notFoundFields.entrySet()) {
             String fieldName = entry.getKey();
             Object treeValue = entry.getValue();
             if (treeValue instanceof FieldPath) {
-                notFound.apply(baseSchemaBuilder, null, (FieldPath) treeValue);
+                whenNotFound.apply(baseSchemaBuilder, null, (FieldPath) treeValue);
             } else {
                 Schema fieldSchema = updateSchema(
                         SchemaBuilder.struct().build(),
                         SchemaBuilder.struct(),
                         (Map<String, Object>) treeValue,
-                        matching, notFound, others);
+                        whenFound, whenNotFound, toOtherFields);
                 baseSchemaBuilder.field(fieldName, fieldSchema);
             }
         }

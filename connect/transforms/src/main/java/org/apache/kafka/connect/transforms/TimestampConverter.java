@@ -86,13 +86,7 @@ public abstract class TimestampConverter<R extends ConnectRecord<R>> implements 
     public static final Schema OPTIONAL_TIMESTAMP_SCHEMA = Timestamp.builder().optional().schema();
     public static final Schema OPTIONAL_TIME_SCHEMA = Time.builder().optional().schema();
 
-    public static final ConfigDef CONFIG_DEF = new ConfigDef()
-            .define(FieldSyntaxVersion.FIELD_SYNTAX_VERSION_CONFIG,
-                    ConfigDef.Type.STRING,
-                    FieldSyntaxVersion.FIELD_SYNTAX_VERSION_DEFAULT_VALUE,
-                    FieldSyntaxVersion.FIELD_SYNTAX_VERSION_VALIDATOR,
-                    ConfigDef.Importance.HIGH,
-                    FieldSyntaxVersion.FIELD_SYNTAX_VERSION_DOC)
+    public static final ConfigDef CONFIG_DEF = FieldSyntaxVersion.baseConfigDef()
             .define(FIELD_CONFIG,
                     ConfigDef.Type.STRING,
                     FIELD_DEFAULT,
