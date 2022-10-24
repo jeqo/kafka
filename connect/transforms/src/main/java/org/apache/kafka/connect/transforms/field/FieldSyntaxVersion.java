@@ -22,14 +22,24 @@ import org.apache.kafka.common.config.ConfigException;
 
 import java.util.Arrays;
 
+/**
+ * Defines semantics of field paths by versioning.
+ * <p>
+ * See KIP-821.
+ *
+ * @see FieldPath
+ * @see FieldPaths
+ */
 public enum FieldSyntaxVersion {
     /**
-     * No support for nested fields.
+     * No support for nested fields. Only access attributes on the root data value.
+     * Backward compatibility before KIP-821.
      */
     V1("V1"),
     /**
      * Support for nested fields using dotted notation with backtick pairs to wrap field names that
      * include dots.
+     * @since 3.x
      */
     V2("V2");
 

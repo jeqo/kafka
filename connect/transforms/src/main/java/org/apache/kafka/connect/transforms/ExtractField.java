@@ -40,14 +40,7 @@ public abstract class ExtractField<R extends ConnectRecord<R>> implements Transf
 
     private static final String FIELD_CONFIG = "field";
 
-    public static final ConfigDef CONFIG_DEF = new ConfigDef()
-            .define(
-                FieldSyntaxVersion.FIELD_SYNTAX_VERSION_CONFIG,
-                ConfigDef.Type.STRING,
-                FieldSyntaxVersion.FIELD_SYNTAX_VERSION_DEFAULT_VALUE,
-                FieldSyntaxVersion.FIELD_SYNTAX_VERSION_VALIDATOR,
-                ConfigDef.Importance.HIGH,
-                FieldSyntaxVersion.FIELD_SYNTAX_VERSION_DOC)
+    public static final ConfigDef CONFIG_DEF = FieldSyntaxVersion.baseConfigDef()
             .define(
                 FIELD_CONFIG,
                 ConfigDef.Type.STRING,
