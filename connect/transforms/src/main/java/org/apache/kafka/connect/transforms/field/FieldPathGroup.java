@@ -291,7 +291,9 @@ public class FieldPathGroup implements FieldPath {
                                     matching, notFound, others);
                             updatedValue.put(fieldName, updatedField);
                         } else {
-                            updatedValue.put(fieldName, fieldValue);
+                            // add back to not found and apply others, as only leaf values are updated
+                            notFoundFields.put(fieldName, treeValue);
+                            others.apply(originalValue, updatedValue, null, fieldName);
                         }
                     }
                 } else {
@@ -377,13 +379,14 @@ public class FieldPathGroup implements FieldPath {
             if (!treeAt.isEmpty()) {
                 if (treeAt.containsKey(field.name())) {
                     notFoundFields.remove(field.name());
-                    if (treeAt.get(field.name()) instanceof SingleFieldPath) {
+                    final Object treeValue = treeAt.get(field.name());
+                    if (treeValue instanceof SingleFieldPath) {
                         matching.apply(
                                 originalValue,
                                 originalSchema.field(field.name()),
                                 updatedValue,
                                 updateSchema.field(field.name()),
-                                (SingleFieldPath) treeAt.get(field.name())
+                                (SingleFieldPath) treeValue
                         );
                     } else {
                         if (field.schema().type() == Type.STRUCT) {
@@ -391,10 +394,14 @@ public class FieldPathGroup implements FieldPath {
                                     field.schema(),
                                     originalValue.getStruct(field.name()),
                                     updateSchema.field(field.name()).schema(),
-                                    (Map<String, Object>) treeAt.get(field.name()),
+                                    (Map<String, Object>) treeValue,
                                     matching, notFound, others
                             );
                             updatedValue.put(updateSchema.field(field.name()), fieldValue);
+                        } else {
+                            // add back to not found and apply others, as only leaf values are updated
+                            notFoundFields.put(field.name(), treeValue);
+                            others.apply(originalValue, field, updatedValue, null, null);
                         }
                     }
                 } else {
