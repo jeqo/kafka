@@ -27,8 +27,8 @@ import java.util.Arrays;
  * <p>
  * See KIP-821.
  *
- * @see FieldPath
- * @see FieldPaths
+ * @see SingleFieldPath
+ * @see FieldPathGroup
  */
 public enum FieldSyntaxVersion {
     /**

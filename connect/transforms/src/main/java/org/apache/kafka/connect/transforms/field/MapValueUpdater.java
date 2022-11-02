@@ -30,7 +30,7 @@ public interface MapValueUpdater {
     void apply(
             Map<String, Object> originalParent,
             Map<String, Object> updatedParent,
-            FieldPath fieldPath,
+            SingleFieldPath fieldPath,
             String fieldName
     );
 }

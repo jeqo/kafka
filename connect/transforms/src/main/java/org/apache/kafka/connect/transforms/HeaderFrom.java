@@ -26,8 +26,8 @@ import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.header.Header;
 import org.apache.kafka.connect.header.Headers;
-import org.apache.kafka.connect.transforms.field.FieldPath;
-import org.apache.kafka.connect.transforms.field.FieldPaths;
+import org.apache.kafka.connect.transforms.field.SingleFieldPath;
+import org.apache.kafka.connect.transforms.field.FieldPathGroup;
 import org.apache.kafka.connect.transforms.field.FieldSyntaxVersion;
 import org.apache.kafka.connect.transforms.field.MapFieldAndValue;
 import org.apache.kafka.connect.transforms.field.StructFieldAndValue;
@@ -99,9 +99,9 @@ public abstract class HeaderFrom<R extends ConnectRecord<R>> implements Transfor
         }
     }
 
-    private FieldPaths fieldPaths;
+    private FieldPathGroup fieldPaths;
 
-    private Map<String, List<FieldPath>> headersMap;
+    private Map<String, List<SingleFieldPath>> headersMap;
 
     private Operation operation;
 
@@ -112,7 +112,7 @@ public abstract class HeaderFrom<R extends ConnectRecord<R>> implements Transfor
         final SimpleConfig config = new SimpleConfig(CONFIG_DEF, props);
         FieldSyntaxVersion syntaxVersion = FieldSyntaxVersion.fromConfig(config);
         List<String> fields = config.getList(FIELDS_FIELD);
-        fieldPaths = FieldPaths.of(fields, syntaxVersion);
+        fieldPaths = FieldPathGroup.of(fields, syntaxVersion);
         List<String> headers = config.getList(HEADERS_FIELD);
         if (headers.size() != fields.size()) {
             throw new ConfigException(format("'%s' config must have the same number of elements as '%s' config.",
@@ -121,13 +121,13 @@ public abstract class HeaderFrom<R extends ConnectRecord<R>> implements Transfor
         headersMap = new HashMap<>(headers.size());
         for (int i = 0; i < headers.size(); i++) {
             final String headerName = headers.get(i);
-            final FieldPath field = FieldPath.of(fields.get(i), syntaxVersion);
+            final SingleFieldPath field = SingleFieldPath.of(fields.get(i), syntaxVersion);
             headersMap.computeIfPresent(headerName, (s, p) -> {
                 p.add(field);
                 return p;
             });
             headersMap.computeIfAbsent(headerName, s -> {
-                List<FieldPath> paths = new ArrayList<>();
+                List<SingleFieldPath> paths = new ArrayList<>();
                 paths.add(field);
                 return paths;
             });
@@ -163,10 +163,10 @@ public abstract class HeaderFrom<R extends ConnectRecord<R>> implements Transfor
             updatedValue = value;
         }
 
-        Map<FieldPath, StructFieldAndValue> fieldAndValues = fieldPaths.fieldAndValuesFrom(value);
-        for (Map.Entry<String, List<FieldPath>> entry : headersMap.entrySet()) {
+        Map<SingleFieldPath, StructFieldAndValue> fieldAndValues = fieldPaths.fieldAndValuesFrom(value);
+        for (Map.Entry<String, List<SingleFieldPath>> entry : headersMap.entrySet()) {
             // headers may point to many values, though it's usually close to 1
-            for (FieldPath fieldPath : entry.getValue()) {
+            for (SingleFieldPath fieldPath : entry.getValue()) {
                 StructFieldAndValue fieldAndValue = fieldAndValues.get(fieldPath);
                 if (fieldAndValue != null) {
                     updatedHeaders.add(entry.getKey(), fieldAndValue.value(), fieldAndValue.schema());
@@ -191,16 +191,16 @@ public abstract class HeaderFrom<R extends ConnectRecord<R>> implements Transfor
         Headers updatedHeaders = record.headers().duplicate();
         Map<String, Object> value = Requirements.requireMap(operatingValue, "header " + operation);
         Map<String, Object> updatedValue = new HashMap<>(value);
-        Map<FieldPath, MapFieldAndValue> values = fieldPaths.fieldAndValuesFrom(value);
+        Map<SingleFieldPath, MapFieldAndValue> values = fieldPaths.fieldAndValuesFrom(value);
         if (operation == Operation.MOVE) {
             updatedValue = fieldPaths.updateValueFrom(
                     updatedValue,
                     (original, map, fieldPath, fieldName) -> map.remove(fieldName)
             );
         }
-        for (Map.Entry<String, List<FieldPath>> entry : headersMap.entrySet()) {
+        for (Map.Entry<String, List<SingleFieldPath>> entry : headersMap.entrySet()) {
             // headers may point to many values, though it's usually close to 1
-            for (FieldPath fieldPath : entry.getValue()) {
+            for (SingleFieldPath fieldPath : entry.getValue()) {
                 final MapFieldAndValue fieldAndValue = values.get(fieldPath);
                 updatedHeaders.add(entry.getKey(), fieldAndValue != null ? fieldAndValue.value() : null, null);
             }
