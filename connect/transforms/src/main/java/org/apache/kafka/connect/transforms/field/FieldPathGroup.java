@@ -222,18 +222,12 @@ public class FieldPathGroup implements FieldPath {
         return fieldAndValueMap;
     }
 
-    /**
-     * Find values at the path tree leafs within the {@code Map} and apply update function when found.
-     *
-     * @param originalValue  schemaless data value
-     * @param matching function to apply when found
-     * @return updated data value
-     */
+    @Override
     public Map<String, Object> updateValueFrom(
             Map<String, Object> originalValue,
-            MapValueUpdater matching
+            MapValueUpdater whenFound
     ) {
-        return updateValues(originalValue, pathTree, matching,
+        return updateValues(originalValue, pathTree, whenFound,
                 (originalParent, updatedParent, fieldPath, fieldName) -> {
                     // filter out
                 },
@@ -241,26 +235,27 @@ public class FieldPathGroup implements FieldPath {
                     updatedParent.put(fieldName, originalParent.get(fieldName)));
     }
 
+    @Override
     public Map<String, Object> updateValueFrom(
             Map<String, Object> originalValue,
-            MapValueUpdater matching,
-            MapValueUpdater notFound,
-            MapValueUpdater others
+            MapValueUpdater whenFound,
+            MapValueUpdater whenNotFound
     ) {
-        return updateValues(originalValue, pathTree, matching, notFound, others);
-    }
-
-//    @Override
-    public Map<String, Object> updateValueFrom(
-            Map<String, Object> originalValue,
-            MapValueUpdater matching,
-            MapValueUpdater others
-    ) {
-        return updateValues(originalValue, pathTree, matching,
+        return updateValues(originalValue, pathTree, whenFound,
                 (originalParent, updatedParent, fieldPath, fieldName) -> {
                     // filter out
                 },
-                others);
+                whenNotFound);
+    }
+
+    @Override
+    public Map<String, Object> updateValueFrom(
+            Map<String, Object> originalValue,
+            MapValueUpdater whenFound,
+            MapValueUpdater whenNotFound,
+            MapValueUpdater toOthers
+    ) {
+        return updateValues(originalValue, pathTree, whenFound, whenNotFound, toOthers);
     }
 
     @SuppressWarnings("unchecked")

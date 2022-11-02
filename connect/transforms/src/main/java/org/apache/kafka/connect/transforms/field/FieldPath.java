@@ -20,6 +20,8 @@ import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.SchemaBuilder;
 import org.apache.kafka.connect.data.Struct;
 
+import java.util.Map;
+
 /**
  * Operations to update data values and schemas based on field paths.
  * <p>
@@ -174,9 +176,57 @@ public interface FieldPath {
             StructValueUpdater toOthers
     );
 
-//    Map<String, Object> updateValueFrom(
-//            Map<String, Object> originalValue,
-//            MapValueUpdater matching,
-//            MapValueUpdater others
-//    );
+    /**
+     * Access {@code Map} fields and apply functions to update field values.
+     * <p>
+     * If path is not found, no function is applied, and the path is ignored.
+     * <p>
+     * Other fields keep values from original struct.
+     *
+     * @param originalValue  schema-based data value
+     * @param whenFound function to apply when current path(s) is/are found
+     * @return updated data value
+     */
+    Map<String, Object> updateValueFrom(
+            Map<String, Object> originalValue,
+            MapValueUpdater whenFound
+    );
+
+    /**
+     * Access {@code Map} fields and apply functions to update field values.
+     * <p>
+     * If path is not found, {@code whenNotFound} function is used.
+     * <p>
+     * Other fields keep values from original struct.
+     *
+     * @param originalValue  schema-based data value
+     * @param whenFound function to apply when a path found
+     * @param whenNotFound function to apply when current path(s) is/are not found
+     * @return a new struct with the updates fields
+     */
+    Map<String, Object> updateValueFrom(
+            Map<String, Object> originalValue,
+            MapValueUpdater whenFound,
+            MapValueUpdater whenNotFound
+    );
+
+    /**
+     * Access {@code Map} fields and apply functions to update field values.
+     * <p>
+     * If path is not found, {@code whenNotFound} function is used.
+     * <p>
+     * Other fields use {@code toOtherFields} function to apply when not related to the current path(s).
+     *
+     * @param originalValue  schema-based data value
+     * @param whenFound function to apply when a path found
+     * @param whenNotFound function to apply when current path(s) is/are not found
+     * @param toOthers function to apply to fields not related to current path(s)
+     * @return a new struct with the updates fields
+     */
+    Map<String, Object> updateValueFrom(
+            Map<String, Object> originalValue,
+            MapValueUpdater whenFound,
+            MapValueUpdater whenNotFound,
+            MapValueUpdater toOthers
+    );
 }
