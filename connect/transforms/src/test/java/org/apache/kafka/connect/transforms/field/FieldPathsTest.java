@@ -106,7 +106,7 @@ class FieldPathsTest {
         FieldPath fooPath = FieldPath.of("foo", FieldSyntaxVersion.V1);
         FieldPath barPath = FieldPath.of("bar", FieldSyntaxVersion.V1);
         FieldPaths fieldPaths = FieldPaths.of(fooPath, barPath);
-        Map<String, Object> updated = fieldPaths.updateValuesFrom(
+        Map<String, Object> updated = fieldPaths.updateValueFrom(
                 value,
                 (orig, map, f, k) -> map.put(k, ((Integer) orig.get(k)) * 2)
         );
@@ -125,7 +125,7 @@ class FieldPathsTest {
         FieldPath barPath = FieldPath.of("foo.bar", FieldSyntaxVersion.V2);
         FieldPath bazPath = FieldPath.of("foo.baz", FieldSyntaxVersion.V2);
         FieldPaths fieldPaths = FieldPaths.of(bazPath, barPath);
-        Map<String, Object> updated = fieldPaths.updateValuesFrom(
+        Map<String, Object> updated = fieldPaths.updateValueFrom(
                 value,
                 (orig, map, f, k) -> map.put(k, ((Integer) orig.get(k)) * 2)
         );
@@ -147,7 +147,7 @@ class FieldPathsTest {
         FieldPath bazPath = FieldPath.of("foo.baz", FieldSyntaxVersion.V1);
         FieldPath barPath = FieldPath.of("foo.bar", FieldSyntaxVersion.V1);
         FieldPaths fieldPaths = FieldPaths.of(bazPath, barPath);
-        Struct updated = fieldPaths.updateValuesFrom(schema, value, schema,
+        Struct updated = fieldPaths.updateValueFrom(schema, value, schema,
                 (orig, oldField, s, updatedField, f) -> s.put(updatedField, ((Integer) orig.get(oldField)) * 2));
 
         Map<FieldPath, StructFieldAndValue> actual = fieldPaths.fieldAndValuesFrom(updated);
@@ -170,7 +170,7 @@ class FieldPathsTest {
         FieldPath bazPath = FieldPath.of("foo.baz", FieldSyntaxVersion.V2);
         FieldPath barPath = FieldPath.of("foo.bar", FieldSyntaxVersion.V2);
         FieldPaths fieldPaths = FieldPaths.of(bazPath, barPath);
-        Struct updated = fieldPaths.updateValuesFrom(schema, value, schema,
+        Struct updated = fieldPaths.updateValueFrom(schema, value, schema,
                 (orig, oldField, s, updatedField, f) -> s.put(updatedField, ((Integer) orig.get(oldField)) * 2));
 
         Map<FieldPath, StructFieldAndValue> actual = fieldPaths.fieldAndValuesFrom(updated);

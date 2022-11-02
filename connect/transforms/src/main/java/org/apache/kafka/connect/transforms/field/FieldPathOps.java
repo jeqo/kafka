@@ -18,6 +18,7 @@ package org.apache.kafka.connect.transforms.field;
 
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.SchemaBuilder;
+import org.apache.kafka.connect.data.Struct;
 
 /**
  * Operations to update data values and schemas based on field paths.
@@ -34,7 +35,7 @@ public interface FieldPathOps {
      * <p>
      * If path is not found, no function is applied, and the path is ignored.
      * <p>
-     * Other fields will be copied from original schema.
+     * Other fields are copied from original schema.
      * @param originalSchema baseline schema
      * @param baselineSchemaBuilder baseline schema build, if changes to the baseline
      *                              are required before copying original
@@ -53,9 +54,9 @@ public interface FieldPathOps {
      * <p>
      * If path is not found, no function is applied, and the path is ignored.
      * <p>
-     * Other fields will be copied from original schema.
+     * Other fields are copied from original schema.
      * <p>
-     * A copy of the {@code Schema} will be used as a base for the updated schema.
+     * A copy of the {@code Schema} is used as a base for the updated schema.
      *
      * @param originalSchema baseline schema
      * @param whenFound function to apply when current path(s) is/are found
@@ -69,9 +70,9 @@ public interface FieldPathOps {
      * <p>
      * If path is not found, {@code whenNotFound} function is used. e.g. to create field if not found.
      * <p>
-     * Other fields will be copied from original schema.
+     * Other fields are copied from original schema.
      * <p>
-     * A copy of the {@code Schema} will be used as a base for the updated schema.
+     * A copy of the {@code Schema} is used as a base for the updated schema.
      *
      * @param originalSchema baseline schema
      * @param whenFound function to apply when current path(s) is/are found
@@ -90,20 +91,92 @@ public interface FieldPathOps {
      * <p>
      * If path is not found, {@code whenNotFound} function is used. e.g. to create field if not found.
      * <p>
-     * Other fields will use {@code toOtherFields} function to apply when field is not related to the current path(s).
+     * Other fields use {@code toOtherFields} function to apply when not related to the current path(s).
      * <p>
-     * A copy of the {@code Schema} will be used as a base for the updated schema.
+     * A copy of the {@code Schema} is used as a base for the updated schema.
      *
      * @param originalSchema baseline schema
      * @param whenFound function to apply when current path(s) is/are found
      * @param whenNotFound function to apply when current path(s) is/are not found
-     * @param toOtherFields function to apply to fields not related to current path(s)
+     * @param toOthers function to apply to fields not related to current path(s)
      * @return an updated schema. Resulting schemas are usually cached for further access
      */
     Schema updateSchemaFrom(
             Schema originalSchema,
             StructSchemaUpdater whenFound,
             StructSchemaUpdater whenNotFound,
-            StructSchemaUpdater toOtherFields
+            StructSchemaUpdater toOthers
     );
+
+    /**
+     * Access {@code Struct} fields and apply functions to update field values.
+     * <p>
+     * If path is not found, no function is applied, and the path is ignored.
+     * <p>
+     * Other fields keep values from original struct.
+     *
+     * @param originalSchema original struct schema
+     * @param originalValue  schema-based data value
+     * @param updatedSchema updated struct schema
+     * @param whenFound function to apply when current path(s) is/are found
+     * @return updated data value
+     */
+    Struct updateValueFrom(
+            Schema originalSchema,
+            Struct originalValue,
+            Schema updatedSchema,
+            StructValueUpdater whenFound
+    );
+
+    /**
+     * Access {@code Struct} fields and apply functions to update field values.
+     * <p>
+     * If path is not found, {@code whenNotFound} function is used.
+     * <p>
+     * Other fields keep values from original struct.
+     *
+     * @param originalSchema original struct schema
+     * @param originalValue  schema-based data value
+     * @param updatedSchema updated struct schema
+     * @param whenFound function to apply when a path found
+     * @param whenNotFound function to apply when current path(s) is/are not found
+     * @return a new struct with the updates fields
+     */
+    Struct updateValueFrom(
+            Schema originalSchema,
+            Struct originalValue,
+            Schema updatedSchema,
+            StructValueUpdater whenFound,
+            StructValueUpdater whenNotFound
+    );
+
+    /**
+     * Access {@code Struct} fields and apply functions to update field values.
+     * <p>
+     * If path is not found, {@code whenNotFound} function is used.
+     * <p>
+     * Other fields use {@code toOtherFields} function to apply when not related to the current path(s).
+     *
+     * @param originalSchema original struct schema
+     * @param originalValue  schema-based data value
+     * @param updatedSchema updated struct schema
+     * @param whenFound function to apply when a path found
+     * @param whenNotFound function to apply when current path(s) is/are not found
+     * @param toOthers function to apply to fields not related to current path(s)
+     * @return a new struct with the updates fields
+     */
+    Struct updateValueFrom(
+            Schema originalSchema,
+            Struct originalValue,
+            Schema updatedSchema,
+            StructValueUpdater whenFound,
+            StructValueUpdater whenNotFound,
+            StructValueUpdater toOthers
+    );
+
+//    Map<String, Object> updateValueFrom(
+//            Map<String, Object> originalValue,
+//            MapValueUpdater matching,
+//            MapValueUpdater others
+//    );
 }
