@@ -107,7 +107,7 @@ public abstract class MaskField<R extends ConnectRecord<R>> implements Transform
 
     private R applySchemaless(R record) {
         final Map<String, Object> value = requireMap(operatingValue(record), PURPOSE);
-        final Map<String, Object> updated = maskedFields.updateValuesFrom(
+        final Map<String, Object> updated = maskedFields.updateValueFrom(
                 value,
                 (originalParent, updatedValue, fieldPath, fieldName) ->
                         updatedValue.put(fieldName, masked(originalParent.get(fieldName))));
@@ -116,7 +116,7 @@ public abstract class MaskField<R extends ConnectRecord<R>> implements Transform
 
     private R applyWithSchema(R record) {
         final Struct value = requireStruct(operatingValue(record), PURPOSE);
-        final Struct updated = maskedFields.updateValuesFrom(value.schema(), value, value.schema(),
+        final Struct updated = maskedFields.updateValueFrom(value.schema(), value, value.schema(),
                 (originalParent, originalField, updatedValue, updatedField, fieldPath) ->
                   updatedValue.put(updatedField.name(), masked(originalParent.get(originalField))));
         return newRecord(record, updated);

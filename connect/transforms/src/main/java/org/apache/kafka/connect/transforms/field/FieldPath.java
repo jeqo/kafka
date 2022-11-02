@@ -308,22 +308,47 @@ public class FieldPath implements FieldPathOps {
         return updatedParent;
     }
 
-    /**
-     * Find values at the current path within the {@code Struct} and apply update function when found.
-     *
-     * @param originalSchema original struct schema
-     * @param originalValue  schema-based data value
-     * @param updatedSchema updated struct schema
-     * @param update function to apply when found
-     * @return updated data value
-     */
+    @Override
     public Struct updateValueFrom(
             Schema originalSchema,
             Struct originalValue,
             Schema updatedSchema,
-            StructValueUpdater update
+            StructValueUpdater whenFound
     ) {
-        return updateValue(originalSchema, originalValue, updatedSchema, 0, update);
+        return updateValue(originalSchema, originalValue, updatedSchema, 0, whenFound,
+                (originalParent, originalField, updatedParent, updatedField, fieldPath) -> {
+                    // filter out
+                },
+                (originalParent, originalField, updatedParent, nullUpdatedField, nullFieldPath) ->
+                        updatedParent.put(originalField.name(), originalParent.get(originalField)));
+    }
+
+    @Override
+    public Struct updateValueFrom(
+            Schema originalSchema,
+            Struct originalValue,
+            Schema updatedSchema,
+            StructValueUpdater whenFound,
+            StructValueUpdater whenNotFound,
+            StructValueUpdater toOthers
+    ) {
+        return updateValue(originalSchema, originalValue, updatedSchema, 0,
+                whenFound, whenNotFound, toOthers);
+    }
+
+    @Override
+    public Struct updateValueFrom(
+            Schema originalSchema,
+            Struct originalValue,
+            Schema updatedSchema,
+            StructValueUpdater whenFound,
+            StructValueUpdater whenNotFound
+    ) {
+        return updateValue(originalSchema, originalValue, updatedSchema, 0, whenFound,
+                (originalParent, originalField, updatedParent, updatedField, fieldPath) -> {
+                    // filter out
+                },
+                whenNotFound);
     }
 
     private Struct updateValue(
@@ -331,13 +356,16 @@ public class FieldPath implements FieldPathOps {
             Struct originalValue,
             Schema updateSchema,
             int step,
-            StructValueUpdater update
+            StructValueUpdater update,
+            StructValueUpdater notFound,
+            StructValueUpdater others
     ) {
         Struct updated = new Struct(updateSchema);
-
+        boolean matched = false;
         for (Field field : originalSchema.fields()) {
             if (step < path.length) {
                 if (path[step].equals(field.name())) {
+                    matched = true;
                     if (step == path.length - 1) {
                         update.apply(
                                 originalValue,
@@ -353,17 +381,27 @@ public class FieldPath implements FieldPathOps {
                                     originalValue.getStruct(field.name()),
                                     updateSchema.field(field.name()).schema(),
                                     step + 1,
-                                    update
+                                    update,
+                                    notFound,
+                                    others
                             );
                             updated.put(field.name(), fieldValue);
                         }
                     }
                 } else {
-                    updated.put(field.name(), originalValue.get(field));
+                    others.apply(originalValue, field, updated, null, this);
                 }
             } else {
-                updated.put(field.name(), originalValue.get(field));
+                others.apply(originalValue, field, updated, null, this);
             }
+        }
+        if (!matched) {
+            notFound.apply(
+                    originalValue,
+                    null,
+                    updated,
+                    updateSchema.field(last()),
+                    this);
         }
         return updated;
     }
@@ -404,10 +442,10 @@ public class FieldPath implements FieldPathOps {
             Schema originalSchema,
             StructSchemaUpdater whenFound,
             StructSchemaUpdater whenNotFound,
-            StructSchemaUpdater toOtherFields
+            StructSchemaUpdater toOthers
     ) {
         SchemaBuilder updated = SchemaUtil.copySchemaBasics(originalSchema, SchemaBuilder.struct());
-        return updateSchema(originalSchema, updated, 0, whenFound, whenNotFound, toOtherFields);
+        return updateSchema(originalSchema, updated, 0, whenFound, whenNotFound, toOthers);
     }
 
     // Recursive implementation to update schema at different steps.
@@ -444,10 +482,9 @@ public class FieldPath implements FieldPathOps {
                         builder.field(field.name(), fieldSchema);
                     }
                 } else {
-                    builder.field(field.name(), field.schema());
+                    others.apply(builder, field, null);
                 }
             } else {
-                //builder.field(field.name(), field.schema());
                 others.apply(builder, field, null);
             }
         }

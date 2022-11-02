@@ -229,7 +229,7 @@ public class FieldPaths implements FieldPathOps {
      * @param matching function to apply when found
      * @return updated data value
      */
-    public Map<String, Object> updateValuesFrom(
+    public Map<String, Object> updateValueFrom(
             Map<String, Object> originalValue,
             MapValueUpdater matching
     ) {
@@ -241,7 +241,7 @@ public class FieldPaths implements FieldPathOps {
                     updatedParent.put(fieldName, originalParent.get(fieldName)));
     }
 
-    public Map<String, Object> updateValuesFrom(
+    public Map<String, Object> updateValueFrom(
             Map<String, Object> originalValue,
             MapValueUpdater matching,
             MapValueUpdater notFound,
@@ -250,7 +250,8 @@ public class FieldPaths implements FieldPathOps {
         return updateValues(originalValue, pathTree, matching, notFound, others);
     }
 
-    public Map<String, Object> updateValuesFrom(
+//    @Override
+    public Map<String, Object> updateValueFrom(
             Map<String, Object> originalValue,
             MapValueUpdater matching,
             MapValueUpdater others
@@ -317,22 +318,14 @@ public class FieldPaths implements FieldPathOps {
         return updatedValue;
     }
 
-    /**
-     * Find values at the path tree leafs within the {@code Struct} and apply update function when found.
-     *
-     * @param originalSchema original struct schema
-     * @param originalValue  schema-based data value
-     * @param updatedSchema updated struct schema
-     * @param update function to apply when found
-     * @return updated data value
-     */
-    public Struct updateValuesFrom(
+    @Override
+    public Struct updateValueFrom(
             Schema originalSchema,
             Struct originalValue,
             Schema updatedSchema,
-            StructValueUpdater update
+            StructValueUpdater whenFound
     ) {
-        return updateValues(originalSchema, originalValue, updatedSchema, pathTree, update,
+        return updateValues(originalSchema, originalValue, updatedSchema, pathTree, whenFound,
                 (originalParent, originalField, updatedParent, updatedField, fieldPath) -> {
                     // filter out
                 },
@@ -340,30 +333,32 @@ public class FieldPaths implements FieldPathOps {
                         updatedParent.put(originalField.name(), originalParent.get(originalField)));
     }
 
-    public Struct updateValuesFrom(
+    @Override
+    public Struct updateValueFrom(
             Schema originalSchema,
             Struct originalValue,
             Schema updatedSchema,
-            StructValueUpdater matching,
-            StructValueUpdater notFound,
-            StructValueUpdater others
+            StructValueUpdater whenFound,
+            StructValueUpdater whenNotFound,
+            StructValueUpdater toOthers
     ) {
         return updateValues(originalSchema, originalValue, updatedSchema, pathTree,
-                matching, notFound, others);
+                whenFound, whenNotFound, toOthers);
     }
 
-    public Struct updateValuesFrom(
+    @Override
+    public Struct updateValueFrom(
             Schema originalSchema,
             Struct originalValue,
             Schema updatedSchema,
-            StructValueUpdater update,
-            StructValueUpdater others
+            StructValueUpdater whenFound,
+            StructValueUpdater whenNotFound
     ) {
-        return updateValues(originalSchema, originalValue, updatedSchema, pathTree, update,
+        return updateValues(originalSchema, originalValue, updatedSchema, pathTree, whenFound,
                 (originalParent, originalField, updatedParent, updatedField, fieldPath) -> {
                     // filter out
                 },
-                others);
+                whenNotFound);
     }
 
     @SuppressWarnings("unchecked")
@@ -462,10 +457,10 @@ public class FieldPaths implements FieldPathOps {
             Schema originalSchema,
             StructSchemaUpdater whenFound,
             StructSchemaUpdater whenNotFound,
-            StructSchemaUpdater toOtherFields
+            StructSchemaUpdater toOthers
     ) {
         SchemaBuilder updated = SchemaUtil.copySchemaBasics(originalSchema, SchemaBuilder.struct());
-        return updateSchema(originalSchema, updated, pathTree, whenFound, whenNotFound, toOtherFields);
+        return updateSchema(originalSchema, updated, pathTree, whenFound, whenNotFound, toOthers);
     }
 
     @Override
