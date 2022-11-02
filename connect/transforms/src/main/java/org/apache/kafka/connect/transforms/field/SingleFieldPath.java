@@ -269,6 +269,9 @@ public class SingleFieldPath implements FieldPath {
      */
     public Map<String, Object> updateValueFrom(Map<String, Object> value, MapValueUpdater update) {
         return updateValue(value, 0, update,
+                (originalParent, updatedParent, fieldPath, fieldName) -> {
+                    // filter out
+                },
                 (originalParent, updatedParent, fieldPath, fieldName) ->
                         updatedParent.put(fieldName, originalParent.get(fieldName)));
     }
@@ -278,31 +281,40 @@ public class SingleFieldPath implements FieldPath {
             Map<String, Object> originalValue,
             int step,
             MapValueUpdater update,
+            MapValueUpdater notFound,
             MapValueUpdater others
     ) {
         if (originalValue == null) return null;
         Map<String, Object> updatedParent = new HashMap<>(originalValue.size());
+        boolean found = false;
         for (Map.Entry<String, Object> entry : originalValue.entrySet()) {
             String fieldName = entry.getKey();
             Object fieldValue = entry.getValue();
             if (path[step].equals(fieldName)) {
-                if (step == path.length - 1) {
-                    update.apply(originalValue, updatedParent, this, fieldName);
-                } else {
+                found = true;
+                if (step < path.length - 1) {
                     if (fieldValue instanceof Map) {
                         Map<String, Object> updatedField = updateValue(
                                 (Map<String, Object>) fieldValue,
                                 step + 1,
                                 update,
+                                notFound,
                                 others);
                         updatedParent.put(fieldName, updatedField);
                     } else {
-                        updatedParent.put(fieldName, fieldValue);
+                        found = false;
+                        others.apply(originalValue, updatedParent, null, fieldName);
                     }
+                } else {
+                    update.apply(originalValue, updatedParent, this, fieldName);
                 }
             } else {
                 others.apply(originalValue, updatedParent, null, fieldName);
             }
+        }
+
+        if (!found) {
+            notFound.apply(originalValue, updatedParent, this, stepAt(step));
         }
 
         return updatedParent;
@@ -361,11 +373,11 @@ public class SingleFieldPath implements FieldPath {
             StructValueUpdater others
     ) {
         Struct updated = new Struct(updateSchema);
-        boolean matched = false;
+        boolean found = false;
         for (Field field : originalSchema.fields()) {
             if (step < path.length) {
                 if (path[step].equals(field.name())) {
-                    matched = true;
+                    found = true;
                     if (step == path.length - 1) {
                         update.apply(
                                 originalValue,
@@ -386,21 +398,22 @@ public class SingleFieldPath implements FieldPath {
                                     others
                             );
                             updated.put(field.name(), fieldValue);
+                        } else {
+                            found = false;
+                            others.apply(originalValue, field, updated, null, this);
                         }
                     }
                 } else {
                     others.apply(originalValue, field, updated, null, this);
                 }
-            } else {
-                others.apply(originalValue, field, updated, null, this);
             }
         }
-        if (!matched) {
+        if (!found) {
             notFound.apply(
                     originalValue,
                     null,
                     updated,
-                    updateSchema.field(last()),
+                    updateSchema.field(stepAt(step)),
                     this);
         }
         return updated;

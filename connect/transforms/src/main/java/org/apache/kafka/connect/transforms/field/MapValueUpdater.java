@@ -22,7 +22,7 @@ import java.util.Map;
 public interface MapValueUpdater {
 
     /**
-     *
+     * @param originalParent original data object
      * @param updatedParent data object being updated
      * @param fieldPath if match happened, null if applies to other fields
      * @param fieldName field name
