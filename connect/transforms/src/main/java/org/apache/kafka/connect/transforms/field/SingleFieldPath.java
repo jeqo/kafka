@@ -260,20 +260,40 @@ public class SingleFieldPath implements FieldPath {
         return null;
     }
 
-    /**
-     * Find values at the current path within the {@code Map} and apply update function when found.
-     *
-     * @param value  schemaless data value
-     * @param update function to apply when found
-     * @return updated data value
-     */
-    public Map<String, Object> updateValueFrom(Map<String, Object> value, MapValueUpdater update) {
-        return updateValue(value, 0, update,
+    @Override
+    public Map<String, Object> updateValueFrom(
+            Map<String, Object> value,
+            MapValueUpdater whenFound
+    ) {
+        return updateValue(value, 0, whenFound,
                 (originalParent, updatedParent, fieldPath, fieldName) -> {
                     // filter out
                 },
                 (originalParent, updatedParent, fieldPath, fieldName) ->
                         updatedParent.put(fieldName, originalParent.get(fieldName)));
+    }
+
+    @Override
+    public Map<String, Object> updateValueFrom(
+            Map<String, Object> value,
+            MapValueUpdater whenFound,
+            MapValueUpdater whenNotFound
+    ) {
+        return updateValue(value, 0, whenFound,
+                (originalParent, updatedParent, fieldPath, fieldName) -> {
+                    // filter out
+                },
+                whenNotFound);
+    }
+
+    @Override
+    public Map<String, Object> updateValueFrom(
+            Map<String, Object> value,
+            MapValueUpdater whenFound,
+            MapValueUpdater whenNotFound,
+            MapValueUpdater toOthers
+    ) {
+        return updateValue(value, 0, whenFound, whenNotFound, toOthers);
     }
 
     @SuppressWarnings("unchecked")
