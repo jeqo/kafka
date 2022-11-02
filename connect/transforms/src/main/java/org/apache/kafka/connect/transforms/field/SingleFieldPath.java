@@ -302,6 +302,7 @@ public class SingleFieldPath implements FieldPath {
                                 others);
                         updatedParent.put(fieldName, updatedField);
                     } else {
+                        // add back to not found and apply others, as only leaf values are updated
                         found = false;
                         others.apply(originalValue, updatedParent, null, fieldName);
                     }
@@ -399,6 +400,7 @@ public class SingleFieldPath implements FieldPath {
                             );
                             updated.put(field.name(), fieldValue);
                         } else {
+                            // add back to not found and apply others, as only leaf values are updated
                             found = false;
                             others.apply(originalValue, field, updated, null, this);
                         }
