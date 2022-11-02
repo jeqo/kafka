@@ -31,7 +31,7 @@ import org.apache.kafka.connect.data.Time;
 import org.apache.kafka.connect.data.Timestamp;
 import org.apache.kafka.connect.errors.ConnectException;
 import org.apache.kafka.connect.errors.DataException;
-import org.apache.kafka.connect.transforms.field.FieldPath;
+import org.apache.kafka.connect.transforms.field.SingleFieldPath;
 import org.apache.kafka.connect.transforms.field.FieldSyntaxVersion;
 import org.apache.kafka.connect.transforms.util.SchemaUtil;
 import org.apache.kafka.connect.transforms.util.SimpleConfig;
@@ -282,13 +282,13 @@ public abstract class TimestampConverter<R extends ConnectRecord<R>> implements 
     // This is a bit unusual, but allows the transformation config to be passed to static anonymous classes to customize
     // their behavior
     private static class Config {
-        Config(FieldPath field, String type, SimpleDateFormat format, String unixPrecision) {
+        Config(SingleFieldPath field, String type, SimpleDateFormat format, String unixPrecision) {
             this.field = field;
             this.type = type;
             this.format = format;
             this.unixPrecision = unixPrecision;
         }
-        final FieldPath field;
+        final SingleFieldPath field;
         final String type;
         final SimpleDateFormat format;
         final String unixPrecision;
@@ -319,7 +319,7 @@ public abstract class TimestampConverter<R extends ConnectRecord<R>> implements 
                         + formatPattern, e);
             }
         }
-        config = new Config(FieldPath.of(field, FieldSyntaxVersion.fromConfig(simpleConfig)), type,
+        config = new Config(SingleFieldPath.of(field, FieldSyntaxVersion.fromConfig(simpleConfig)), type,
                 format, unixPrecision);
     }
 

@@ -16,535 +16,167 @@
  */
 package org.apache.kafka.connect.transforms.field;
 
-import org.apache.kafka.common.cache.Cache;
-import org.apache.kafka.common.cache.LRUCache;
-import org.apache.kafka.common.cache.SynchronizedCache;
-import org.apache.kafka.connect.data.Field;
 import org.apache.kafka.connect.data.Schema;
-import org.apache.kafka.connect.data.Schema.Type;
 import org.apache.kafka.connect.data.SchemaBuilder;
 import org.apache.kafka.connect.data.Struct;
-import org.apache.kafka.connect.transforms.util.SchemaUtil;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 
 /**
- * A FieldPath is composed by one or many field names, known as steps,
- * to access values within a data object (either {@code Struct} or {@code Map<String, Object>}).a
+ * Operations to update data values and schemas based on field paths.
  * <p>
- * If the SMT requires accessing multiple fields on the same data object,
- * use {@code FieldPaths} instead.
- * <p>
- * The field path semantics are defined by the syntax version {@code FieldSyntaxVersion}.
- * <p>
- * Paths are calculated once and cached for further access.
- * <p>
- * Invariants:
- * <li>
- *     <ul>A field path can contain one or more steps</ul>
- * </li>
- *
  * See KIP-821.
  *
- * @see FieldSyntaxVersion
- * @see FieldPaths
+ * @see SingleFieldPath
+ * @see FieldPathGroup
  */
-public class FieldPath implements FieldPathOps {
-
-    private static final char BACKTICK_CHAR = '`';
-    private static final char DOT_CHAR = '.';
-    private static final char BACKSLASH_CHAR = '\\';
-
-    private static final Cache<String, FieldPath> PATHS_CACHE = new SynchronizedCache<>(new LRUCache<>(16));
-
-    private final String[] path;
-
-    static FieldPath ofV1(String field) {
-        return of(field, FieldSyntaxVersion.V1);
-    }
-
-    static FieldPath ofV2(String field) {
-        return of(field, FieldSyntaxVersion.V2);
-    }
+public interface FieldPath {
+    /**
+     * Prepares a new schema based on an original one, and applies an update function
+     * when the current path(s) is found.
+     * <p>
+     * If path is not found, no function is applied, and the path is ignored.
+     * <p>
+     * Other fields are copied from original schema.
+     * @param originalSchema baseline schema
+     * @param baselineSchemaBuilder baseline schema build, if changes to the baseline
+     *                              are required before copying original
+     * @param whenFound function to apply when current path(s) is/are found.
+     * @return an updated schema. Resulting schemas are usually cached for further access.
+     */
+    Schema updateSchemaFrom(
+            Schema originalSchema,
+            SchemaBuilder baselineSchemaBuilder,
+            StructSchemaUpdater whenFound
+    );
 
     /**
-     * If version is V2, then paths are cached for further access.
+     * Prepares a new schema based on an original one, and applies an update function
+     * when the current path(s) is found.
+     * <p>
+     * If path is not found, no function is applied, and the path is ignored.
+     * <p>
+     * Other fields are copied from original schema.
+     * <p>
+     * A copy of the {@code Schema} is used as a base for the updated schema.
      *
-     * @param field   field path expression
-     * @param version field syntax version
+     * @param originalSchema baseline schema
+     * @param whenFound function to apply when current path(s) is/are found
+     * @return an updated schema. Resulting schemas are usually cached for further access
      */
-    public static FieldPath of(String field, FieldSyntaxVersion version) {
-        if ((field == null || field.isEmpty()) // empty path
-                || version.equals(FieldSyntaxVersion.V1)) { // or V1
-            return new FieldPath(field, version);
-        } else { // use cache when V2
-            final FieldPath found = PATHS_CACHE.get(field);
-            if (found != null) {
-                return found;
-            } else {
-                final FieldPath fieldPath = new FieldPath(field, version);
-                PATHS_CACHE.put(field, fieldPath);
-                return fieldPath;
-            }
-        }
-    }
-
-    FieldPath(String pathText, FieldSyntaxVersion version) {
-        if (pathText == null || pathText.isEmpty()) { // empty path
-            this.path = new String[] {};
-        } else {
-            switch (version) {
-                case V1: // backward compatibility
-                    this.path = new String[] {pathText};
-                    break;
-                case V2:
-                    path = buildFieldPathV2(pathText);
-                    break;
-                default:
-                    throw new IllegalArgumentException("Unknown syntax version: " + version);
-            }
-        }
-    }
-
-    private String[] buildFieldPathV2(String pathText) {
-        // if no dots or wrapping backticks are used, then return path with single step
-        if (!pathText.contains(String.valueOf(DOT_CHAR))) {
-            return new String[] {pathText};
-        } else {
-            // prepare for tracking path steps
-            final List<String> steps = new ArrayList<>();
-            // avoid creating new string on changes
-            final StringBuilder s = new StringBuilder(pathText);
-
-            while (s.length() > 0) { // until path is traversed
-                // start processing backtick pair, if any
-                if (s.charAt(0) == BACKTICK_CHAR) {
-                    s.deleteCharAt(0);
-
-                    // find backtick closing pair
-                    int idx = 0;
-                    while (idx >= 0) {
-                        idx = s.indexOf(String.valueOf(BACKTICK_CHAR), idx);
-                        if (idx == -1) { // if not found, fail
-                            throw new IllegalArgumentException("Incomplete backtick pair at [...]`" + s);
-                        }
-                        // check that it is not escaped or wrapped in another backticks pair
-                        if (idx < s.length() - 1 // not wrapping the whole field path
-                                && (s.charAt(idx + 1) != DOT_CHAR // not wrapping
-                                || s.charAt(idx - 1) == BACKSLASH_CHAR)) { // ... or escaped
-                            idx++; // move index forward and keep searching
-                        } else { // it's the closing pair
-                            steps.add(escapeBackticks(s.substring(0, idx)));
-                            s.delete(0, idx + 2); // rm backtick and dot
-                            break;
-                        }
-                    }
-                } else { // process dots in path
-                    final int atDot = s.indexOf(String.valueOf(DOT_CHAR));
-                    if (atDot > 0) { // get path step and move forward
-                        steps.add(escapeBackticks(s.substring(0, atDot)));
-                        s.delete(0, atDot + 1);
-                    } else { // add all
-                        steps.add(escapeBackticks(s.toString()));
-                        s.delete(0, s.length());
-                    }
-                }
-            }
-
-            return steps.toArray(new String[0]);
-        }
-    }
+    Schema updateSchemaFrom(Schema originalSchema, StructSchemaUpdater whenFound);
 
     /**
-     * Return field name with escaped backticks, if any.
+     * Prepares a new schema based on an original one, and applies an update function
+     * when the current path(s) is found.
+     * <p>
+     * If path is not found, {@code whenNotFound} function is used. e.g. to create field if not found.
+     * <p>
+     * Other fields are copied from original schema.
+     * <p>
+     * A copy of the {@code Schema} is used as a base for the updated schema.
      *
-     * @param field potentially containing backticks
-     * @throws IllegalArgumentException when there are incomplete backtick pairs
+     * @param originalSchema baseline schema
+     * @param whenFound function to apply when current path(s) is/are found
+     * @param whenNotFound function to apply when current path(s) is/are not found
+     * @return an updated schema. Resulting schemas are usually cached for further access
      */
-    private String escapeBackticks(String field) {
-        final StringBuilder s = new StringBuilder(field);
-        int idx = 0;
-        while (idx >= 0) {
-            idx = s.indexOf(String.valueOf(BACKTICK_CHAR), idx + 1);
-            if (idx >= 1 && s.length() > 2) {
-                if (s.charAt(idx - 1) == DOT_CHAR
-                        || (idx < s.length() - 1 && s.charAt(idx + 1) == DOT_CHAR
-                        && s.charAt(idx - 1) != BACKSLASH_CHAR)) {
-                    throw new IllegalArgumentException("Incomplete backtick pair at [...]" + field);
-                }
-                if (s.charAt(idx - 1) == BACKSLASH_CHAR) { // escape backtick
-                    if ((idx == 1 && s.charAt(0) == BACKSLASH_CHAR) // at the beginning: \`foo[...]
-                            || idx == s.length() - 1) { // at the end: [...]baz\`
-                        s.deleteCharAt(idx - 1);
-                    } else if ((idx > 2 && s.charAt(idx - 2) == DOT_CHAR) // after a dot: [...].\`bar[...]
-                            || (idx < s.length() - 1 && s.charAt(idx + 1) == DOT_CHAR)) { // before a dot: [...]bar\`.[...]
-                        s.deleteCharAt(idx - 1);
-                    }
-                }
-            }
-        }
-        return s.toString();
-    }
+    Schema updateSchemaFrom(
+            Schema originalSchema,
+            StructSchemaUpdater whenFound,
+            StructSchemaUpdater whenNotFound
+    );
 
     /**
-     * Access a {@code Field} at the current path within a schema {@code Schema}
-     * If field is not found, then {@code null} is returned.
-     */
-    public Field fieldFrom(Schema schema) {
-        if (path.length == 1) {
-            return schema.field(path[0]);
-        } else {
-            Schema current = schema;
-            for (int i = 0; i < path.length; i++) {
-                if (current == null) {
-                    return null;
-                }
-                if (i == path.length - 1) { // get value
-                    return current.field(path[i]);
-                } else { // iterate
-                    current = current.field(path[i]).schema();
-                }
-            }
-        }
-        return null;
-    }
-
-    /**
-     * Access a value at the current path within a schema-based {@code Struct}
-     * If object is not found, then {@code null} is returned.
-     */
-    public Object valueFrom(Struct struct) {
-        if (path.length == 1) {
-            return struct.get(path[0]);
-        } else {
-            Struct current = struct;
-            for (int i = 0; i < path.length; i++) {
-                if (current == null) {
-                    return null;
-                }
-                if (i == path.length - 1) { // get value
-                    return current.get(path[i]);
-                } else { // iterate
-                    current = current.getStruct(path[i]);
-                }
-            }
-        }
-        return null;
-    }
-
-    /**
-     * Access a value at the current path within a schemaless {@code Map<String, Object>}.
-     * If object is not found, then {@code null} is returned.
-     */
-    @SuppressWarnings("unchecked")
-    public Object valueFrom(Map<String, Object> map) {
-        if (path.length == 1) {
-            return map.get(path[0]);
-        } else {
-            Map<String, Object> current = map;
-            for (int i = 0; i < path.length; i++) {
-                if (current == null) {
-                    return null;
-                }
-                if (i == path.length - 1) {
-                    return current.get(path[i]);
-                } else {
-                    current = (Map<String, Object>) current.get(path[i]);
-                }
-            }
-        }
-        return null;
-    }
-
-    /**
-     * Find values at the current path within the {@code Map} and apply update function when found.
+     * Prepares a new schema based on an original one, and applies an update function
+     * when the current path(s) is found.
+     * <p>
+     * If path is not found, {@code whenNotFound} function is used. e.g. to create field if not found.
+     * <p>
+     * Other fields use {@code toOtherFields} function to apply when not related to the current path(s).
+     * <p>
+     * A copy of the {@code Schema} is used as a base for the updated schema.
      *
-     * @param value  schemaless data value
-     * @param update function to apply when found
+     * @param originalSchema baseline schema
+     * @param whenFound function to apply when current path(s) is/are found
+     * @param whenNotFound function to apply when current path(s) is/are not found
+     * @param toOthers function to apply to fields not related to current path(s)
+     * @return an updated schema. Resulting schemas are usually cached for further access
+     */
+    Schema updateSchemaFrom(
+            Schema originalSchema,
+            StructSchemaUpdater whenFound,
+            StructSchemaUpdater whenNotFound,
+            StructSchemaUpdater toOthers
+    );
+
+    /**
+     * Access {@code Struct} fields and apply functions to update field values.
+     * <p>
+     * If path is not found, no function is applied, and the path is ignored.
+     * <p>
+     * Other fields keep values from original struct.
+     *
+     * @param originalSchema original struct schema
+     * @param originalValue  schema-based data value
+     * @param updatedSchema updated struct schema
+     * @param whenFound function to apply when current path(s) is/are found
      * @return updated data value
      */
-    public Map<String, Object> updateValueFrom(Map<String, Object> value, MapValueUpdater update) {
-        return updateValue(value, 0, update,
-                (originalParent, updatedParent, fieldPath, fieldName) ->
-                        updatedParent.put(fieldName, originalParent.get(fieldName)));
-    }
-
-    @SuppressWarnings("unchecked")
-    private Map<String, Object> updateValue(
-            Map<String, Object> originalValue,
-            int step,
-            MapValueUpdater update,
-            MapValueUpdater others
-    ) {
-        if (originalValue == null) return null;
-        Map<String, Object> updatedParent = new HashMap<>(originalValue.size());
-        for (Map.Entry<String, Object> entry : originalValue.entrySet()) {
-            String fieldName = entry.getKey();
-            Object fieldValue = entry.getValue();
-            if (path[step].equals(fieldName)) {
-                if (step == path.length - 1) {
-                    update.apply(originalValue, updatedParent, this, fieldName);
-                } else {
-                    if (fieldValue instanceof Map) {
-                        Map<String, Object> updatedField = updateValue(
-                                (Map<String, Object>) fieldValue,
-                                step + 1,
-                                update,
-                                others);
-                        updatedParent.put(fieldName, updatedField);
-                    } else {
-                        updatedParent.put(fieldName, fieldValue);
-                    }
-                }
-            } else {
-                others.apply(originalValue, updatedParent, null, fieldName);
-            }
-        }
-
-        return updatedParent;
-    }
-
-    @Override
-    public Struct updateValueFrom(
+    Struct updateValueFrom(
             Schema originalSchema,
             Struct originalValue,
             Schema updatedSchema,
             StructValueUpdater whenFound
-    ) {
-        return updateValue(originalSchema, originalValue, updatedSchema, 0, whenFound,
-                (originalParent, originalField, updatedParent, updatedField, fieldPath) -> {
-                    // filter out
-                },
-                (originalParent, originalField, updatedParent, nullUpdatedField, nullFieldPath) ->
-                        updatedParent.put(originalField.name(), originalParent.get(originalField)));
-    }
+    );
 
-    @Override
-    public Struct updateValueFrom(
+    /**
+     * Access {@code Struct} fields and apply functions to update field values.
+     * <p>
+     * If path is not found, {@code whenNotFound} function is used.
+     * <p>
+     * Other fields keep values from original struct.
+     *
+     * @param originalSchema original struct schema
+     * @param originalValue  schema-based data value
+     * @param updatedSchema updated struct schema
+     * @param whenFound function to apply when a path found
+     * @param whenNotFound function to apply when current path(s) is/are not found
+     * @return a new struct with the updates fields
+     */
+    Struct updateValueFrom(
+            Schema originalSchema,
+            Struct originalValue,
+            Schema updatedSchema,
+            StructValueUpdater whenFound,
+            StructValueUpdater whenNotFound
+    );
+
+    /**
+     * Access {@code Struct} fields and apply functions to update field values.
+     * <p>
+     * If path is not found, {@code whenNotFound} function is used.
+     * <p>
+     * Other fields use {@code toOtherFields} function to apply when not related to the current path(s).
+     *
+     * @param originalSchema original struct schema
+     * @param originalValue  schema-based data value
+     * @param updatedSchema updated struct schema
+     * @param whenFound function to apply when a path found
+     * @param whenNotFound function to apply when current path(s) is/are not found
+     * @param toOthers function to apply to fields not related to current path(s)
+     * @return a new struct with the updates fields
+     */
+    Struct updateValueFrom(
             Schema originalSchema,
             Struct originalValue,
             Schema updatedSchema,
             StructValueUpdater whenFound,
             StructValueUpdater whenNotFound,
             StructValueUpdater toOthers
-    ) {
-        return updateValue(originalSchema, originalValue, updatedSchema, 0,
-                whenFound, whenNotFound, toOthers);
-    }
+    );
 
-    @Override
-    public Struct updateValueFrom(
-            Schema originalSchema,
-            Struct originalValue,
-            Schema updatedSchema,
-            StructValueUpdater whenFound,
-            StructValueUpdater whenNotFound
-    ) {
-        return updateValue(originalSchema, originalValue, updatedSchema, 0, whenFound,
-                (originalParent, originalField, updatedParent, updatedField, fieldPath) -> {
-                    // filter out
-                },
-                whenNotFound);
-    }
-
-    private Struct updateValue(
-            Schema originalSchema,
-            Struct originalValue,
-            Schema updateSchema,
-            int step,
-            StructValueUpdater update,
-            StructValueUpdater notFound,
-            StructValueUpdater others
-    ) {
-        Struct updated = new Struct(updateSchema);
-        boolean matched = false;
-        for (Field field : originalSchema.fields()) {
-            if (step < path.length) {
-                if (path[step].equals(field.name())) {
-                    matched = true;
-                    if (step == path.length - 1) {
-                        update.apply(
-                                originalValue,
-                                field,
-                                updated,
-                                updateSchema.field(field.name()),
-                                this
-                        );
-                    } else {
-                        if (field.schema().type() == Type.STRUCT) {
-                            Struct fieldValue = updateValue(
-                                    field.schema(),
-                                    originalValue.getStruct(field.name()),
-                                    updateSchema.field(field.name()).schema(),
-                                    step + 1,
-                                    update,
-                                    notFound,
-                                    others
-                            );
-                            updated.put(field.name(), fieldValue);
-                        }
-                    }
-                } else {
-                    others.apply(originalValue, field, updated, null, this);
-                }
-            } else {
-                others.apply(originalValue, field, updated, null, this);
-            }
-        }
-        if (!matched) {
-            notFound.apply(
-                    originalValue,
-                    null,
-                    updated,
-                    updateSchema.field(last()),
-                    this);
-        }
-        return updated;
-    }
-
-    @Override
-    public Schema updateSchemaFrom(Schema originalSchema, StructSchemaUpdater whenFound) {
-        SchemaBuilder updated = SchemaUtil.copySchemaBasics(originalSchema, SchemaBuilder.struct());
-        return updateSchema(originalSchema, updated, 0, whenFound,
-                (schemaBuilder, field, fieldPath) -> { /* ignore */ },
-                (schemaBuilder, field, fieldPath) -> schemaBuilder.field(field.name(), field.schema()));
-    }
-
-    @Override
-    public Schema updateSchemaFrom(
-            Schema originalSchema,
-            SchemaBuilder baselineSchemaBuilder,
-            StructSchemaUpdater whenFound
-    ) {
-        return updateSchema(originalSchema, baselineSchemaBuilder, 0, whenFound,
-                (schemaBuilder, field, fieldPath) -> { /* ignore */ },
-                (schemaBuilder, field, fieldPath) -> schemaBuilder.field(field.name(), field.schema()));
-    }
-
-    @Override
-    public Schema updateSchemaFrom(
-            Schema originalSchema,
-            StructSchemaUpdater whenFound,
-            StructSchemaUpdater whenNotFound
-    ) {
-        SchemaBuilder updated = SchemaUtil.copySchemaBasics(originalSchema, SchemaBuilder.struct());
-        return updateSchema(originalSchema, updated, 0, whenFound,
-                (schemaBuilder, field, fieldPath) -> { /* ignore */ },
-                whenNotFound);
-    }
-
-    @Override
-    public Schema updateSchemaFrom(
-            Schema originalSchema,
-            StructSchemaUpdater whenFound,
-            StructSchemaUpdater whenNotFound,
-            StructSchemaUpdater toOthers
-    ) {
-        SchemaBuilder updated = SchemaUtil.copySchemaBasics(originalSchema, SchemaBuilder.struct());
-        return updateSchema(originalSchema, updated, 0, whenFound, whenNotFound, toOthers);
-    }
-
-    // Recursive implementation to update schema at different steps.
-    // Consider that resulting schemas are usually cached.
-    private Schema updateSchema(
-            Schema operatingSchema,
-            SchemaBuilder builder,
-            int step,
-            StructSchemaUpdater matching,
-            StructSchemaUpdater notFound,
-            StructSchemaUpdater others
-    ) {
-        if (operatingSchema.isOptional()) {
-            builder.optional();
-        }
-        if (operatingSchema.defaultValue() != null) {
-            builder.defaultValue(operatingSchema.defaultValue());
-        }
-        boolean matched = false;
-        for (Field field : operatingSchema.fields()) {
-            if (step < path.length) {
-                if (path[step].equals(field.name())) {
-                    matched = true;
-                    if (step == path.length - 1) {
-                        matching.apply(builder, field, this);
-                    } else {
-                        Schema fieldSchema = updateSchema(
-                                field.schema(),
-                                SchemaBuilder.struct(),
-                                step + 1,
-                                matching,
-                                notFound,
-                                others);
-                        builder.field(field.name(), fieldSchema);
-                    }
-                } else {
-                    others.apply(builder, field, null);
-                }
-            } else {
-                others.apply(builder, field, null);
-            }
-        }
-        if (!matched) {
-            notFound.apply(builder, null, this);
-        }
-        return builder.build();
-    }
-
-    public String toDottedPath() {
-        StringBuilder b = new StringBuilder();
-        for (String step : path) {
-            if (b.length() != 0) {
-                b.append(".");
-            }
-            if (step.contains(".")) {
-                b.append("`").append(step).append("`");
-            } else {
-                b.append(step);
-            }
-        }
-        return b.toString();
-    }
-
-    public String last() {
-        return path[path.length - 1];
-    }
-
-    public boolean isEmpty() {
-        return path.length == 0;
-    }
-
-    public String stepAt(int i) {
-        return i < path.length ? path[i] : null;
-    }
-
-    // For testing
-    String[] path() {
-        return Arrays.copyOf(path, path.length);
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) {
-            return true;
-        }
-        if (o == null || getClass() != o.getClass()) {
-            return false;
-        }
-        FieldPath fieldPath = (FieldPath) o;
-        return Arrays.equals(path, fieldPath.path);
-    }
-
-    @Override
-    public int hashCode() {
-        return Arrays.hashCode(path);
-    }
-
-    @Override
-    public String toString() {
-        return "FieldPath(path = " + Arrays.toString(path) + ")";
-    }
+//    Map<String, Object> updateValueFrom(
+//            Map<String, Object> originalValue,
+//            MapValueUpdater matching,
+//            MapValueUpdater others
+//    );
 }

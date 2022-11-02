@@ -48,15 +48,15 @@ import java.util.stream.Collectors;
  *
  * See KIP-821.
  *
- * @see FieldPath
+ * @see SingleFieldPath
  * @see FieldSyntaxVersion
  */
-public class FieldPaths implements FieldPathOps {
+public class FieldPathGroup implements FieldPath {
 
     final Map<String, Object> pathTree;
-    final List<FieldPath> paths;
+    final List<SingleFieldPath> paths;
 
-    FieldPaths(List<FieldPath> paths) {
+    FieldPathGroup(List<SingleFieldPath> paths) {
         this.paths = paths.stream().filter(Objects::nonNull).collect(Collectors.toList());
         pathTree = buildPathTree(this.paths, 0, new HashMap<>());
     }
@@ -65,33 +65,33 @@ public class FieldPaths implements FieldPathOps {
         return new Builder(syntaxVersion);
     }
 
-    public static FieldPaths of(FieldPath path) {
-        return new FieldPaths(Collections.singletonList(path));
+    public static FieldPathGroup of(SingleFieldPath path) {
+        return new FieldPathGroup(Collections.singletonList(path));
     }
 
-    public static FieldPaths of(FieldPath... paths) {
-        return new FieldPaths(Arrays.asList(paths));
+    public static FieldPathGroup of(SingleFieldPath... paths) {
+        return new FieldPathGroup(Arrays.asList(paths));
     }
 
-    public static FieldPaths of(List<FieldPath> paths) {
-        return new FieldPaths(paths);
+    public static FieldPathGroup of(List<SingleFieldPath> paths) {
+        return new FieldPathGroup(paths);
     }
 
-    public static FieldPaths of(Set<String> fields, FieldSyntaxVersion syntaxVersion) {
-        return new FieldPaths(fields.stream()
-                .map(f -> FieldPath.of(f, syntaxVersion))
+    public static FieldPathGroup of(Set<String> fields, FieldSyntaxVersion syntaxVersion) {
+        return new FieldPathGroup(fields.stream()
+                .map(f -> SingleFieldPath.of(f, syntaxVersion))
                 .collect(Collectors.toList()));
     }
 
-    public static FieldPaths of(List<String> fields, FieldSyntaxVersion syntaxVersion) {
-        return new FieldPaths(fields.stream()
-                .map(f -> FieldPath.of(f, syntaxVersion))
+    public static FieldPathGroup of(List<String> fields, FieldSyntaxVersion syntaxVersion) {
+        return new FieldPathGroup(fields.stream()
+                .map(f -> SingleFieldPath.of(f, syntaxVersion))
                 .collect(Collectors.toList()));
     }
 
-    Map<String, Object> buildPathTree(List<FieldPath> paths, int stepIdx, Map<String, Object> pathTree) {
+    Map<String, Object> buildPathTree(List<SingleFieldPath> paths, int stepIdx, Map<String, Object> pathTree) {
         if (paths.size() == 1) { // optimize for paths with a single member
-            FieldPath path = paths.get(0);
+            SingleFieldPath path = paths.get(0);
             if (path != null) {
                 if (path.stepAt(stepIdx + 1) == null) { // if last path step
                     pathTree.put(path.stepAt(stepIdx), path);
@@ -102,13 +102,13 @@ public class FieldPaths implements FieldPathOps {
             }
         } else {
             // group paths by prefix
-            final Map<String, List<FieldPath>> groups = new HashMap<>();
-            for (FieldPath path : paths) {
+            final Map<String, List<SingleFieldPath>> groups = new HashMap<>();
+            for (SingleFieldPath path : paths) {
                 if (path != null) {
                     String step = path.stepAt(stepIdx);
                     if (step != null) {
                         groups.computeIfPresent(step, (s, fieldPaths) -> {
-                            for (FieldPath other : fieldPaths) {
+                            for (SingleFieldPath other : fieldPaths) {
                                 // avoid overlapping paths
                                 if (!path.equals(other)
                                         && (other.stepAt(stepIdx + 1) == null
@@ -124,7 +124,7 @@ public class FieldPaths implements FieldPathOps {
                             return fieldPaths;
                         });
                         groups.computeIfAbsent(step, s -> {
-                            List<FieldPath> fieldPaths = new ArrayList<>();
+                            List<SingleFieldPath> fieldPaths = new ArrayList<>();
                             fieldPaths.add(path);
                             return fieldPaths;
                         });
@@ -133,9 +133,9 @@ public class FieldPaths implements FieldPathOps {
             }
 
             // create tree from grouped paths
-            for (Map.Entry<String, List<FieldPath>> entry : groups.entrySet()) {
+            for (Map.Entry<String, List<SingleFieldPath>> entry : groups.entrySet()) {
                 if (entry.getValue().size() == 1) {
-                    final FieldPath path = entry.getValue().get(0);
+                    final SingleFieldPath path = entry.getValue().get(0);
                     if (path.stepAt(stepIdx + 1) == null) { // if it is the last path step
                         pathTree.put(entry.getKey(), path);
                     } else {
@@ -156,24 +156,24 @@ public class FieldPaths implements FieldPathOps {
      * @param struct data value
      * @return map of field paths and field/values
      */
-    public Map<FieldPath, StructFieldAndValue> fieldAndValuesFrom(Struct struct) {
+    public Map<SingleFieldPath, StructFieldAndValue> fieldAndValuesFrom(Struct struct) {
         return findFieldAndValues(struct, pathTree, new HashMap<>());
     }
 
     @SuppressWarnings("unchecked")
-    private Map<FieldPath, StructFieldAndValue> findFieldAndValues(
+    private Map<SingleFieldPath, StructFieldAndValue> findFieldAndValues(
             Struct originalValue,
             Map<String, Object> treeAt,
-            Map<FieldPath, StructFieldAndValue> fieldAndValueMap
+            Map<SingleFieldPath, StructFieldAndValue> fieldAndValueMap
     ) {
         for (Map.Entry<String, Object> step : treeAt.entrySet()) {
             Field field = originalValue.schema().field(step.getKey());
-            if (step.getValue() instanceof FieldPath) {
+            if (step.getValue() instanceof SingleFieldPath) {
                 StructFieldAndValue fieldAndValue =
                         field != null
                                 ? new StructFieldAndValue(field, originalValue.get(field))
                                 : null;
-                fieldAndValueMap.put((FieldPath) step.getValue(), fieldAndValue);
+                fieldAndValueMap.put((SingleFieldPath) step.getValue(), fieldAndValue);
             } else {
                 if (field.schema().type() == Type.STRUCT) {
                     findFieldAndValues(
@@ -192,21 +192,21 @@ public class FieldPaths implements FieldPathOps {
      * @param value data value
      * @return map of field paths and field/values
      */
-    public Map<FieldPath, MapFieldAndValue> fieldAndValuesFrom(Map<String, Object> value) {
+    public Map<SingleFieldPath, MapFieldAndValue> fieldAndValuesFrom(Map<String, Object> value) {
         return findFieldAndValues(value, pathTree, new HashMap<>());
     }
 
     @SuppressWarnings("unchecked")
-    private Map<FieldPath, MapFieldAndValue> findFieldAndValues(
+    private Map<SingleFieldPath, MapFieldAndValue> findFieldAndValues(
             Map<String, Object> value,
             Map<String, Object> treeAt,
-            Map<FieldPath, MapFieldAndValue> fieldAndValueMap
+            Map<SingleFieldPath, MapFieldAndValue> fieldAndValueMap
     ) {
         for (Map.Entry<String, Object> step : treeAt.entrySet()) {
             Object fieldValue = value.get(step.getKey());
-            if (step.getValue() instanceof FieldPath) {
+            if (step.getValue() instanceof SingleFieldPath) {
                 fieldAndValueMap.put((
-                        FieldPath) step.getValue(),
+                                SingleFieldPath) step.getValue(),
                         new MapFieldAndValue(step.getKey(), fieldValue)
                 );
             } else {
@@ -281,8 +281,8 @@ public class FieldPaths implements FieldPathOps {
                 if (treeAt.containsKey(fieldName)) {
                     notFoundFields.remove(fieldName);
                     Object treeValue = treeAt.get(fieldName);
-                    if (treeValue instanceof FieldPath) {
-                        matching.apply(originalValue, updatedValue, (FieldPath) treeValue, fieldName);
+                    if (treeValue instanceof SingleFieldPath) {
+                        matching.apply(originalValue, updatedValue, (SingleFieldPath) treeValue, fieldName);
                     } else {
                         if (fieldValue instanceof Map) {
                             Map<String, Object> updatedField = updateValues(
@@ -304,8 +304,8 @@ public class FieldPaths implements FieldPathOps {
         for (Map.Entry<String, Object> entry : notFoundFields.entrySet()) {
             String fieldName = entry.getKey();
             Object treeValue = entry.getValue();
-            if (treeValue instanceof FieldPath) {
-                notFound.apply(originalValue, updatedValue, (FieldPath) treeValue, fieldName);
+            if (treeValue instanceof SingleFieldPath) {
+                notFound.apply(originalValue, updatedValue, (SingleFieldPath) treeValue, fieldName);
             } else {
                 Map<String, Object> updatedField = updateValues(
                         new HashMap<>(),
@@ -377,13 +377,13 @@ public class FieldPaths implements FieldPathOps {
             if (!treeAt.isEmpty()) {
                 if (treeAt.containsKey(field.name())) {
                     notFoundFields.remove(field.name());
-                    if (treeAt.get(field.name()) instanceof FieldPath) {
+                    if (treeAt.get(field.name()) instanceof SingleFieldPath) {
                         matching.apply(
                                 originalValue,
                                 originalSchema.field(field.name()),
                                 updatedValue,
                                 updateSchema.field(field.name()),
-                                (FieldPath) treeAt.get(field.name())
+                                (SingleFieldPath) treeAt.get(field.name())
                         );
                     } else {
                         if (field.schema().type() == Type.STRUCT) {
@@ -407,13 +407,13 @@ public class FieldPaths implements FieldPathOps {
         for (Map.Entry<String, Object> entry : notFoundFields.entrySet()) {
             String fieldName = entry.getKey();
             Object treeValue = entry.getValue();
-            if (treeValue instanceof FieldPath) {
+            if (treeValue instanceof SingleFieldPath) {
                 notFound.apply(
                         originalValue,
                         null,
                         updatedValue,
                         updateSchema.field(fieldName),
-                        (FieldPath) treeValue
+                        (SingleFieldPath) treeValue
                 );
             } else {
                 Struct fieldValue = updateValues(
@@ -493,8 +493,8 @@ public class FieldPaths implements FieldPathOps {
                     toOtherFields.apply(baseSchemaBuilder, field, null);
                 } else {
                     notFoundFields.remove(field.name());
-                    if (treeAt.get(field.name()) instanceof FieldPath) {
-                        whenFound.apply(baseSchemaBuilder, field, (FieldPath) treeAt.get(field.name()));
+                    if (treeAt.get(field.name()) instanceof SingleFieldPath) {
+                        whenFound.apply(baseSchemaBuilder, field, (SingleFieldPath) treeAt.get(field.name()));
                     } else {
                         if (field.schema().type() == Type.STRUCT) {
                             Schema fieldSchema = updateSchema(
@@ -515,8 +515,8 @@ public class FieldPaths implements FieldPathOps {
         for (Map.Entry<String, Object> entry : notFoundFields.entrySet()) {
             String fieldName = entry.getKey();
             Object treeValue = entry.getValue();
-            if (treeValue instanceof FieldPath) {
-                whenNotFound.apply(baseSchemaBuilder, null, (FieldPath) treeValue);
+            if (treeValue instanceof SingleFieldPath) {
+                whenNotFound.apply(baseSchemaBuilder, null, (SingleFieldPath) treeValue);
             } else {
                 Schema fieldSchema = updateSchema(
                         SchemaBuilder.struct().build(),
@@ -541,7 +541,7 @@ public class FieldPaths implements FieldPathOps {
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        FieldPaths that = (FieldPaths) o;
+        FieldPathGroup that = (FieldPathGroup) o;
         return Objects.equals(pathTree, that.pathTree);
     }
 
@@ -556,7 +556,7 @@ public class FieldPaths implements FieldPathOps {
     }
 
     public static class Builder {
-        List<FieldPath> paths = new ArrayList<>();
+        List<SingleFieldPath> paths = new ArrayList<>();
 
         final FieldSyntaxVersion syntaxVersion;
 
@@ -564,13 +564,13 @@ public class FieldPaths implements FieldPathOps {
             this.syntaxVersion = syntaxVersion;
         }
 
-        public Builder add(FieldPath fieldPath) {
+        public Builder add(SingleFieldPath fieldPath) {
             paths.add(fieldPath);
             return this;
         }
 
-        public FieldPaths build() {
-            return new FieldPaths(paths);
+        public FieldPathGroup build() {
+            return new FieldPathGroup(paths);
         }
     }
 }

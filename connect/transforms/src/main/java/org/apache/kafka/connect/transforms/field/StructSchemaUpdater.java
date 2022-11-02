@@ -22,7 +22,7 @@ import org.apache.kafka.connect.data.SchemaBuilder;
 /**
  * Function to update Struct schemas based on Field Paths.
  *
- * @see FieldPathOps
+ * @see FieldPath
  * @see org.apache.kafka.connect.data.Schema
  */
 @FunctionalInterface
@@ -35,5 +35,5 @@ public interface StructSchemaUpdater {
      * @param field nullable when updating fields that do not exist. e.g. paths not found.
      * @param fieldPath nullable when updating a field that is not related to a path.
      */
-    void apply(SchemaBuilder schemaBuilder, Field field, FieldPath fieldPath);
+    void apply(SchemaBuilder schemaBuilder, Field field, SingleFieldPath fieldPath);
 }
