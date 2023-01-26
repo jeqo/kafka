@@ -30,31 +30,31 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-class FieldPathGroupTest {
+class MultiFieldPathsTest {
     @Test void shouldBuildPathWithSinglePathV1() {
         SingleFieldPath path = SingleFieldPath.of("foo.bar.baz", FieldSyntaxVersion.V1);
-        FieldPathGroup paths = FieldPathGroup.of(path);
+        MultiFieldPaths paths = MultiFieldPaths.of(path);
         assertEquals(1, paths.pathTree.size());
         assertEquals(path, paths.pathTree.get("foo.bar.baz"));
     }
 
     @Test void shouldBuildPathWithSamePathV1() {
         SingleFieldPath path = SingleFieldPath.of("foo.bar.baz", FieldSyntaxVersion.V1);
-        FieldPathGroup paths = FieldPathGroup.of(path, path);
+        MultiFieldPaths paths = MultiFieldPaths.of(path, path);
         assertEquals(1, paths.pathTree.size());
         assertEquals(path, paths.pathTree.get("foo.bar.baz"));
     }
 
     @Test void shouldBuildPathWithSinglePathV2() {
         SingleFieldPath path = SingleFieldPath.of("foo.bar.baz", FieldSyntaxVersion.V2);
-        FieldPathGroup paths = FieldPathGroup.of(path);
+        MultiFieldPaths paths = MultiFieldPaths.of(path);
         assertEquals(1, paths.pathTree.size());
         assertEquals(path, ((Map<?, ?>) ((Map<?, ?>) paths.pathTree.get("foo")).get("bar")).get("baz"));
     }
 
     @Test void shouldFailWhenPathsCollide() {
         assertThrows(IllegalArgumentException.class,
-            () -> FieldPathGroup.of(SingleFieldPath.ofV2("foo"), SingleFieldPath.ofV2("foo.bar")));
+            () -> MultiFieldPaths.of(SingleFieldPath.ofV2("foo"), SingleFieldPath.ofV2("foo.bar")));
     }
 
     @Test void shouldRenameSchemaV1Fields() {
@@ -64,7 +64,7 @@ class FieldPathGroupTest {
                 .field("baz", Schema.INT32_SCHEMA)
                 .build();
 
-        FieldPathGroup fieldPath = FieldPathGroup.of(Arrays.asList("foo", "bar"), FieldSyntaxVersion.V1);
+        MultiFieldPaths fieldPath = MultiFieldPaths.of(Arrays.asList("foo", "bar"), FieldSyntaxVersion.V1);
         SchemaBuilder updated = SchemaUtil.copySchemaBasics(schema, SchemaBuilder.struct());
         Schema result = fieldPath.updateSchemaFrom(
                 schema,
@@ -86,7 +86,7 @@ class FieldPathGroupTest {
                 .field("foo", nested)
                 .build();
 
-        FieldPathGroup fieldPath = FieldPathGroup.of(Arrays.asList("foo.baz", "foo.bar"), FieldSyntaxVersion.V2);
+        MultiFieldPaths fieldPath = MultiFieldPaths.of(Arrays.asList("foo.baz", "foo.bar"), FieldSyntaxVersion.V2);
         Schema result = fieldPath.updateSchemaFrom(
                 schema,
                 (builder, field, path) -> builder.field(field.name() + "_other", field.schema())
@@ -105,7 +105,7 @@ class FieldPathGroupTest {
 
         SingleFieldPath fooPath = SingleFieldPath.of("foo", FieldSyntaxVersion.V1);
         SingleFieldPath barPath = SingleFieldPath.of("bar", FieldSyntaxVersion.V1);
-        FieldPathGroup fieldPaths = FieldPathGroup.of(fooPath, barPath);
+        MultiFieldPaths fieldPaths = MultiFieldPaths.of(fooPath, barPath);
         Map<String, Object> updated = fieldPaths.updateValueFrom(
                 value,
                 (orig, map, f, k) -> map.put(k, ((Integer) orig.get(k)) * 2)
@@ -124,7 +124,7 @@ class FieldPathGroupTest {
 
         SingleFieldPath barPath = SingleFieldPath.of("foo.bar", FieldSyntaxVersion.V2);
         SingleFieldPath bazPath = SingleFieldPath.of("foo.baz", FieldSyntaxVersion.V2);
-        FieldPathGroup fieldPaths = FieldPathGroup.of(bazPath, barPath);
+        MultiFieldPaths fieldPaths = MultiFieldPaths.of(bazPath, barPath);
         Map<String, Object> updated = fieldPaths.updateValueFrom(
                 value,
                 (orig, map, f, k) -> map.put(k, ((Integer) orig.get(k)) * 2)
@@ -146,7 +146,7 @@ class FieldPathGroupTest {
 
         SingleFieldPath bazPath = SingleFieldPath.of("foo.baz", FieldSyntaxVersion.V1);
         SingleFieldPath barPath = SingleFieldPath.of("foo.bar", FieldSyntaxVersion.V1);
-        FieldPathGroup fieldPaths = FieldPathGroup.of(bazPath, barPath);
+        MultiFieldPaths fieldPaths = MultiFieldPaths.of(bazPath, barPath);
         Struct updated = fieldPaths.updateValueFrom(schema, value, schema,
                 (orig, oldField, s, updatedField, f) -> s.put(updatedField, ((Integer) orig.get(oldField)) * 2));
 
@@ -169,7 +169,7 @@ class FieldPathGroupTest {
 
         SingleFieldPath bazPath = SingleFieldPath.of("foo.baz", FieldSyntaxVersion.V2);
         SingleFieldPath barPath = SingleFieldPath.of("foo.bar", FieldSyntaxVersion.V2);
-        FieldPathGroup fieldPaths = FieldPathGroup.of(bazPath, barPath);
+        MultiFieldPaths fieldPaths = MultiFieldPaths.of(bazPath, barPath);
         Struct updated = fieldPaths.updateValueFrom(schema, value, schema,
                 (orig, oldField, s, updatedField, f) -> s.put(updatedField, ((Integer) orig.get(oldField)) * 2));
 

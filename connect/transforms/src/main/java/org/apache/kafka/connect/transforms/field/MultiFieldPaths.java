@@ -35,7 +35,7 @@ import java.util.stream.Collectors;
 
 /**
  * Multiple field paths to access data objects ({@code Struct} or {@code Map}) efficiently,
- * instead of using single {@see FieldPath} individually.
+ * instead of using {@see SingleFieldPath} individually.
  * <p>
  * If the SMT requires accessing a single field on the same data object,
  * use {@code FieldPath} instead.
@@ -51,12 +51,12 @@ import java.util.stream.Collectors;
  * @see SingleFieldPath
  * @see FieldSyntaxVersion
  */
-public class FieldPathGroup implements FieldPath {
+public class MultiFieldPaths implements FieldPath {
 
     final Map<String, Object> pathTree;
     final List<SingleFieldPath> paths;
 
-    FieldPathGroup(List<SingleFieldPath> paths) {
+    MultiFieldPaths(List<SingleFieldPath> paths) {
         this.paths = paths.stream().filter(Objects::nonNull).collect(Collectors.toList());
         pathTree = buildPathTree(this.paths, 0, new HashMap<>());
     }
@@ -65,26 +65,26 @@ public class FieldPathGroup implements FieldPath {
         return new Builder(syntaxVersion);
     }
 
-    public static FieldPathGroup of(SingleFieldPath path) {
-        return new FieldPathGroup(Collections.singletonList(path));
+    public static MultiFieldPaths of(SingleFieldPath path) {
+        return new MultiFieldPaths(Collections.singletonList(path));
     }
 
-    public static FieldPathGroup of(SingleFieldPath... paths) {
-        return new FieldPathGroup(Arrays.asList(paths));
+    public static MultiFieldPaths of(SingleFieldPath... paths) {
+        return new MultiFieldPaths(Arrays.asList(paths));
     }
 
-    public static FieldPathGroup of(List<SingleFieldPath> paths) {
-        return new FieldPathGroup(paths);
+    public static MultiFieldPaths of(List<SingleFieldPath> paths) {
+        return new MultiFieldPaths(paths);
     }
 
-    public static FieldPathGroup of(Set<String> fields, FieldSyntaxVersion syntaxVersion) {
-        return new FieldPathGroup(fields.stream()
+    public static MultiFieldPaths of(Set<String> fields, FieldSyntaxVersion syntaxVersion) {
+        return new MultiFieldPaths(fields.stream()
                 .map(f -> SingleFieldPath.of(f, syntaxVersion))
                 .collect(Collectors.toList()));
     }
 
-    public static FieldPathGroup of(List<String> fields, FieldSyntaxVersion syntaxVersion) {
-        return new FieldPathGroup(fields.stream()
+    public static MultiFieldPaths of(List<String> fields, FieldSyntaxVersion syntaxVersion) {
+        return new MultiFieldPaths(fields.stream()
                 .map(f -> SingleFieldPath.of(f, syntaxVersion))
                 .collect(Collectors.toList()));
     }
@@ -543,7 +543,7 @@ public class FieldPathGroup implements FieldPath {
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        FieldPathGroup that = (FieldPathGroup) o;
+        MultiFieldPaths that = (MultiFieldPaths) o;
         return Objects.equals(pathTree, that.pathTree);
     }
 
@@ -571,8 +571,8 @@ public class FieldPathGroup implements FieldPath {
             return this;
         }
 
-        public FieldPathGroup build() {
-            return new FieldPathGroup(paths);
+        public MultiFieldPaths build() {
+            return new MultiFieldPaths(paths);
         }
     }
 }

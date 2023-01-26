@@ -51,7 +51,7 @@ import java.util.Map;
  * See KIP-821.
  *
  * @see FieldSyntaxVersion
- * @see FieldPathGroup
+ * @see MultiFieldPaths
  */
 public class SingleFieldPath implements FieldPath {
 

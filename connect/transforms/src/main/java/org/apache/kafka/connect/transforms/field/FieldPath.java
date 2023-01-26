@@ -28,7 +28,7 @@ import java.util.Map;
  * See KIP-821.
  *
  * @see SingleFieldPath
- * @see FieldPathGroup
+ * @see MultiFieldPaths
  */
 public interface FieldPath {
     /**
