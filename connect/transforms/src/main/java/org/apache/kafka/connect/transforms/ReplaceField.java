@@ -26,9 +26,9 @@ import org.apache.kafka.common.utils.ConfigUtils;
 import org.apache.kafka.connect.connector.ConnectRecord;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
-import org.apache.kafka.connect.transforms.field.FieldPath;
-import org.apache.kafka.connect.transforms.field.FieldPaths;
 import org.apache.kafka.connect.transforms.field.FieldSyntaxVersion;
+import org.apache.kafka.connect.transforms.field.MultiFieldPaths;
+import org.apache.kafka.connect.transforms.field.SingleFieldPath;
 import org.apache.kafka.connect.transforms.util.SimpleConfig;
 
 import java.util.ArrayList;
@@ -95,11 +95,11 @@ public abstract class ReplaceField<R extends ConnectRecord<R>> implements Transf
 
     private static final String PURPOSE = "field replacement";
 
-    private FieldPaths fields;
-    private List<FieldPath> exclude;
-    private List<FieldPath> include;
-    private Map<FieldPath, String> renames;
-    private Map<String, FieldPath> reverseRenames;
+    private MultiFieldPaths fields;
+    private List<SingleFieldPath> exclude;
+    private List<SingleFieldPath> include;
+    private Map<SingleFieldPath, String> renames;
+    private Map<String, SingleFieldPath> reverseRenames;
     private Cache<Schema, Schema> schemaUpdateCache;
 
     @Override
@@ -112,11 +112,11 @@ public abstract class ReplaceField<R extends ConnectRecord<R>> implements Transf
 
         FieldSyntaxVersion syntaxVersion = FieldSyntaxVersion.fromConfig(config);
         exclude = config.getList(ConfigName.EXCLUDE).stream()
-                .map(f -> FieldPath.of(f, syntaxVersion))
+                .map(f -> SingleFieldPath.of(f, syntaxVersion))
                 .collect(Collectors.toList());
-        List<FieldPath> paths = new ArrayList<>(exclude);
+        List<SingleFieldPath> paths = new ArrayList<>(exclude);
         include = config.getList(ConfigName.INCLUDE).stream()
-                .map(f -> FieldPath.of(f, syntaxVersion))
+                .map(f -> SingleFieldPath.of(f, syntaxVersion))
                 .collect(Collectors.toList());
         paths.addAll(include);
         renames = parseRenameMappings(config.getList(ConfigName.RENAME), syntaxVersion);
@@ -130,46 +130,46 @@ public abstract class ReplaceField<R extends ConnectRecord<R>> implements Transf
 //            this.renamed.add(renamed);
 //        }
 
-        fields = FieldPaths.of(paths);
+        fields = MultiFieldPaths.of(paths);
 
         schemaUpdateCache = new SynchronizedCache<>(new LRUCache<>(16));
     }
 
-    static Map<FieldPath, String> parseRenameMappings(
+    static Map<SingleFieldPath, String> parseRenameMappings(
             List<String> mappings,
             FieldSyntaxVersion syntaxVersion
     ) {
-        final Map<FieldPath, String> m = new HashMap<>();
+        final Map<SingleFieldPath, String> m = new HashMap<>();
         for (String mapping : mappings) {
             final String[] parts = mapping.split(":");
             if (parts.length != 2) {
                 throw new ConfigException(ConfigName.RENAME, mappings,
                         "Invalid rename mapping: " + mapping);
             }
-            m.put(FieldPath.of(parts[0], syntaxVersion), parts[1]);
+            m.put(SingleFieldPath.of(parts[0], syntaxVersion), parts[1]);
         }
         return m;
     }
 
-    static Map<String, FieldPath> invert(Map<FieldPath, String> source) {
-        final Map<String, FieldPath> m = new HashMap<>();
-        for (Map.Entry<FieldPath, String> e : source.entrySet()) {
+    static Map<String, SingleFieldPath> invert(Map<SingleFieldPath, String> source) {
+        final Map<String, SingleFieldPath> m = new HashMap<>();
+        for (Map.Entry<SingleFieldPath, String> e : source.entrySet()) {
             m.put(e.getValue(), e.getKey());
         }
         return m;
     }
 
-    boolean filter(FieldPath fieldName) {
+    boolean filter(SingleFieldPath fieldName) {
         return !exclude.contains(fieldName) && (include.isEmpty() || include.contains(fieldName));
     }
 
-    String renamed(FieldPath fieldPath, String defaultName) {
+    String renamed(SingleFieldPath fieldPath, String defaultName) {
         final String mapping = renames.get(fieldPath);
         return mapping == null ? defaultName : mapping;
     }
 
-    FieldPath reverseRenamed(String fieldName, FieldPath defaultPath) {
-        final FieldPath mapping = reverseRenames.get(fieldName);
+    SingleFieldPath reverseRenamed(String fieldName, SingleFieldPath defaultPath) {
+        final SingleFieldPath mapping = reverseRenames.get(fieldName);
         return mapping == null ? defaultPath : mapping;
     }
 
@@ -187,7 +187,7 @@ public abstract class ReplaceField<R extends ConnectRecord<R>> implements Transf
     private R applySchemaless(R record) {
         final Map<String, Object> value = requireMap(operatingValue(record), PURPOSE);
 
-        final Map<String, Object> updated = fields.updateValuesFrom(
+        final Map<String, Object> updated = fields.updateValueFrom(
                 value,
                 (originalParent, updatedValue, fieldPath, fieldName) -> {
                     if (filter(fieldPath)) {
@@ -211,7 +211,7 @@ public abstract class ReplaceField<R extends ConnectRecord<R>> implements Transf
             schemaUpdateCache.put(value.schema(), updatedSchema);
         }
 
-        final Struct updatedValue = fields.updateValuesFrom(value.schema(), value, updatedSchema,
+        final Struct updatedValue = fields.updateValueFrom(value.schema(), value, updatedSchema,
                 (originalParent, originalField, updatedParent, updatedField, fieldPath) -> {
                     if (filter(fieldPath)) {
                         updatedParent.put(renamed(fieldPath, originalField.name()), originalParent.get(originalField));

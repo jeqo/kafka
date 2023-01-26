@@ -24,8 +24,8 @@ import org.apache.kafka.connect.connector.ConnectRecord;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.SchemaBuilder;
 import org.apache.kafka.connect.data.Struct;
-import org.apache.kafka.connect.transforms.field.FieldPath;
 import org.apache.kafka.connect.transforms.field.FieldSyntaxVersion;
+import org.apache.kafka.connect.transforms.field.SingleFieldPath;
 import org.apache.kafka.connect.transforms.util.Requirements;
 import org.apache.kafka.connect.transforms.util.SimpleConfig;
 
@@ -59,7 +59,7 @@ public abstract class HoistField<R extends ConnectRecord<R>> implements Transfor
     private Cache<Schema, Schema> schemaUpdateCache;
 
     private String fieldName;
-    private FieldPath hoisted;
+    private SingleFieldPath hoisted;
 
     @Override
     public void configure(Map<String, ?> props) {
@@ -69,7 +69,7 @@ public abstract class HoistField<R extends ConnectRecord<R>> implements Transfor
         if (hoistedConfig == null || hoistedConfig.isEmpty()) {
             hoisted = null;
         } else {
-            hoisted = FieldPath.of(hoistedConfig, FieldSyntaxVersion.fromConfig(config));
+            hoisted = SingleFieldPath.of(hoistedConfig, FieldSyntaxVersion.fromConfig(config));
         }
         schemaUpdateCache = new SynchronizedCache<>(new LRUCache<>(16));
     }

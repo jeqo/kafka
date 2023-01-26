@@ -27,9 +27,10 @@ import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.data.Timestamp;
 import org.apache.kafka.connect.transforms.field.FieldPath;
-import org.apache.kafka.connect.transforms.field.FieldPaths;
 import org.apache.kafka.connect.transforms.field.FieldSyntaxVersion;
 import org.apache.kafka.connect.transforms.field.MapValueUpdater;
+import org.apache.kafka.connect.transforms.field.MultiFieldPaths;
+import org.apache.kafka.connect.transforms.field.SingleFieldPath;
 import org.apache.kafka.connect.transforms.field.StructSchemaUpdater;
 import org.apache.kafka.connect.transforms.field.StructValueUpdater;
 import org.apache.kafka.connect.transforms.util.SimpleConfig;
@@ -85,11 +86,11 @@ public abstract class InsertField<R extends ConnectRecord<R>> implements Transfo
 
     private static final class InsertionSpec {
 
-        final FieldPath path;
+        final SingleFieldPath path;
         final boolean optional;
 
         private InsertionSpec(String name, boolean optional, FieldSyntaxVersion syntaxVersion) {
-            this.path = FieldPath.of(name, syntaxVersion);
+            this.path = SingleFieldPath.of(name, syntaxVersion);
             this.optional = optional;
         }
 
@@ -114,7 +115,7 @@ public abstract class InsertField<R extends ConnectRecord<R>> implements Transfo
     private InsertionSpec timestampField;
     private InsertionSpec staticField;
     private String staticValue;
-    private FieldPaths fieldPaths;
+    private MultiFieldPaths fieldPaths;
 
     private Cache<Schema, Schema> schemaUpdateCache;
 
@@ -146,8 +147,8 @@ public abstract class InsertField<R extends ConnectRecord<R>> implements Transfo
         schemaUpdateCache = new SynchronizedCache<>(new LRUCache<>(16));
     }
 
-    private FieldPaths prepareFieldPaths(SimpleConfig config) {
-        FieldPaths.Builder builder = FieldPaths.newBuilder(FieldSyntaxVersion.fromConfig(config));
+    private MultiFieldPaths prepareFieldPaths(SimpleConfig config) {
+        MultiFieldPaths.Builder builder = MultiFieldPaths.newBuilder(FieldSyntaxVersion.fromConfig(config));
         if (topicField != null) {
             builder.add(topicField.path);
         }
@@ -180,7 +181,7 @@ public abstract class InsertField<R extends ConnectRecord<R>> implements Transfo
     private R applySchemaless(R record) {
         final Map<String, Object> value = requireMap(operatingValue(record), PURPOSE);
 
-        final Map<String, Object> updatedValue = fieldPaths.updateValuesFrom(
+        final Map<String, Object> updatedValue = fieldPaths.updateValueFrom(
                 value,
                 updateMapFields(record),
                 insertMapFields(record),
@@ -241,7 +242,7 @@ public abstract class InsertField<R extends ConnectRecord<R>> implements Transfo
             schemaUpdateCache.put(value.schema(), updatedSchema);
         }
 
-        final Struct updatedValue = fieldPaths.updateValuesFrom(value.schema(), value, updatedSchema,
+        final Struct updatedValue = fieldPaths.updateValueFrom(value.schema(), value, updatedSchema,
                 // matching, then update
                 updateStructFields(record),
                 // not found, then insert

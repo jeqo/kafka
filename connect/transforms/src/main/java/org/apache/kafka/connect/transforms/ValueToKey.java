@@ -25,10 +25,10 @@ import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.SchemaBuilder;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.errors.DataException;
-import org.apache.kafka.connect.transforms.field.FieldPath;
-import org.apache.kafka.connect.transforms.field.FieldPaths;
 import org.apache.kafka.connect.transforms.field.FieldSyntaxVersion;
 import org.apache.kafka.connect.transforms.field.MapFieldAndValue;
+import org.apache.kafka.connect.transforms.field.MultiFieldPaths;
+import org.apache.kafka.connect.transforms.field.SingleFieldPath;
 import org.apache.kafka.connect.transforms.field.StructFieldAndValue;
 import org.apache.kafka.connect.transforms.util.NonEmptyListValidator;
 import org.apache.kafka.connect.transforms.util.SimpleConfig;
@@ -63,14 +63,14 @@ public class ValueToKey<R extends ConnectRecord<R>> implements Transformation<R>
 
     private static final String PURPOSE = "copying fields from value to key";
 
-    private FieldPaths fields;
+    private MultiFieldPaths fields;
 
     private Cache<Schema, Schema> valueToKeySchemaCache;
 
     @Override
     public void configure(Map<String, ?> configs) {
         final SimpleConfig config = new SimpleConfig(CONFIG_DEF, configs);
-        fields = FieldPaths.of(config.getList(FIELDS_CONFIG), FieldSyntaxVersion.fromConfig(config));
+        fields = MultiFieldPaths.of(config.getList(FIELDS_CONFIG), FieldSyntaxVersion.fromConfig(config));
         valueToKeySchemaCache = new SynchronizedCache<>(new LRUCache<>(16));
     }
 
@@ -85,10 +85,10 @@ public class ValueToKey<R extends ConnectRecord<R>> implements Transformation<R>
 
     private R applySchemaless(R record) {
         final Map<String, Object> value = requireMap(record.value(), PURPOSE);
-        final Map<FieldPath, MapFieldAndValue> values = fields.fieldAndValuesFrom(value);
+        final Map<SingleFieldPath, MapFieldAndValue> values = fields.fieldAndValuesFrom(value);
 
         final Map<String, Object> key = new HashMap<>(fields.size());
-        for (Map.Entry<FieldPath, MapFieldAndValue> fieldAndValue : values.entrySet()) {
+        for (Map.Entry<SingleFieldPath, MapFieldAndValue> fieldAndValue : values.entrySet()) {
             key.put(fieldAndValue.getKey().toDottedPath(), fieldAndValue.getValue().value());
         }
         return record.newRecord(
@@ -104,12 +104,12 @@ public class ValueToKey<R extends ConnectRecord<R>> implements Transformation<R>
 
     private R applyWithSchema(R record) {
         final Struct value = requireStruct(record.value(), PURPOSE);
-        final Map<FieldPath, StructFieldAndValue> values = fields.fieldAndValuesFrom(value);
+        final Map<SingleFieldPath, StructFieldAndValue> values = fields.fieldAndValuesFrom(value);
 
         Schema keySchema = valueToKeySchemaCache.get(value.schema());
         if (keySchema == null) {
             final SchemaBuilder keySchemaBuilder = SchemaBuilder.struct();
-            for (Map.Entry<FieldPath, StructFieldAndValue> fieldAndValue : values.entrySet()) {
+            for (Map.Entry<SingleFieldPath, StructFieldAndValue> fieldAndValue : values.entrySet()) {
                 if (fieldAndValue.getValue() == null) {
                     throw new DataException("Field does not exist: " + fieldAndValue.getKey());
                 }
@@ -120,7 +120,7 @@ public class ValueToKey<R extends ConnectRecord<R>> implements Transformation<R>
         }
 
         final Struct key = new Struct(keySchema);
-        for (Map.Entry<FieldPath, StructFieldAndValue> fieldAndValue : values.entrySet()) {
+        for (Map.Entry<SingleFieldPath, StructFieldAndValue> fieldAndValue : values.entrySet()) {
             key.put(fieldAndValue.getKey().toDottedPath(), fieldAndValue.getValue().value());
         }
 

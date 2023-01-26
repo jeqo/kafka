@@ -34,9 +34,9 @@ import org.apache.kafka.connect.data.Time;
 import org.apache.kafka.connect.data.Timestamp;
 import org.apache.kafka.connect.data.Values;
 import org.apache.kafka.connect.errors.DataException;
-import org.apache.kafka.connect.transforms.field.FieldPath;
-import org.apache.kafka.connect.transforms.field.FieldPaths;
 import org.apache.kafka.connect.transforms.field.FieldSyntaxVersion;
+import org.apache.kafka.connect.transforms.field.MultiFieldPaths;
+import org.apache.kafka.connect.transforms.field.SingleFieldPath;
 import org.apache.kafka.connect.transforms.util.SchemaUtil;
 import org.apache.kafka.connect.transforms.util.SimpleConfig;
 import org.slf4j.Logger;
@@ -113,10 +113,10 @@ public abstract class Cast<R extends ConnectRecord<R>> implements Transformation
 
     // As a special case for casting the entire value (e.g. the incoming key is an int64, but you know it could be an
     // int32 and want the smaller width), we use an otherwise invalid field name in the cast spec to track this.
-    private static final FieldPath WHOLE_VALUE_CAST = null;
+    private static final SingleFieldPath WHOLE_VALUE_CAST = null;
 
-    private Map<FieldPath, Schema.Type> casts;
-    private FieldPaths fields;
+    private Map<SingleFieldPath, Schema.Type> casts;
+    private MultiFieldPaths fields;
     private Schema.Type wholeValueCastType;
     private Cache<Schema, Schema> schemaUpdateCache;
 
@@ -124,7 +124,7 @@ public abstract class Cast<R extends ConnectRecord<R>> implements Transformation
     public void configure(Map<String, ?> props) {
         final SimpleConfig config = new SimpleConfig(CONFIG_DEF, props);
         casts = parseFieldTypes(config.getList(SPEC_CONFIG), FieldSyntaxVersion.fromConfig(config));
-        fields = FieldPaths.of(casts.keySet().toArray(new FieldPath[0]));
+        fields = MultiFieldPaths.of(casts.keySet().toArray(new SingleFieldPath[0]));
         wholeValueCastType = casts.get(WHOLE_VALUE_CAST);
         schemaUpdateCache = new SynchronizedCache<>(new LRUCache<>(16));
     }
@@ -158,7 +158,7 @@ public abstract class Cast<R extends ConnectRecord<R>> implements Transformation
         }
 
         final Map<String, Object> value = requireMap(operatingValue(record), PURPOSE);
-        final Map<String, Object> updated = fields.updateValuesFrom(
+        final Map<String, Object> updated = fields.updateValueFrom(
                 value,
                 (originalParent, updatedValue, fieldPath, fieldName) -> {
                     final Object fieldValue = originalParent.get(fieldName);
@@ -180,7 +180,7 @@ public abstract class Cast<R extends ConnectRecord<R>> implements Transformation
         // Casting within a struct
         final Struct value = requireStruct(operatingValue(record), PURPOSE);
 
-        final Struct updatedValue = fields.updateValuesFrom(valueSchema, value, updatedSchema,
+        final Struct updatedValue = fields.updateValueFrom(valueSchema, value, updatedSchema,
                 (originalParent, originalField, updatedParent, updatedField, fieldPath) -> {
                     final Schema.Type targetType = casts.get(fieldPath);
                     final Object fieldValue = originalParent.get(originalField);
@@ -396,8 +396,8 @@ public abstract class Cast<R extends ConnectRecord<R>> implements Transformation
 
     protected abstract R newRecord(R record, Schema updatedSchema, Object updatedValue);
 
-    private static Map<FieldPath, Schema.Type> parseFieldTypes(List<String> mappings, FieldSyntaxVersion syntaxVersion) {
-        final Map<FieldPath, Schema.Type> m = new HashMap<>();
+    private static Map<SingleFieldPath, Schema.Type> parseFieldTypes(List<String> mappings, FieldSyntaxVersion syntaxVersion) {
+        final Map<SingleFieldPath, Schema.Type> m = new HashMap<>();
         boolean isWholeValueCast = false;
         for (String mapping : mappings) {
             final String[] parts = mapping.split(":");
@@ -415,7 +415,7 @@ public abstract class Cast<R extends ConnectRecord<R>> implements Transformation
                 } catch (IllegalArgumentException e) {
                     throw new ConfigException("Invalid type found in casting spec: " + parts[1].trim(), e);
                 }
-                m.put(FieldPath.of(parts[0].trim(), syntaxVersion), validCastType(type, FieldType.OUTPUT));
+                m.put(SingleFieldPath.of(parts[0].trim(), syntaxVersion), validCastType(type, FieldType.OUTPUT));
             }
         }
         if (isWholeValueCast && mappings.size() > 1) {
