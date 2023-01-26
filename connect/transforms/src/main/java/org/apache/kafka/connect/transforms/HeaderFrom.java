@@ -27,7 +27,7 @@ import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.header.Header;
 import org.apache.kafka.connect.header.Headers;
 import org.apache.kafka.connect.transforms.field.SingleFieldPath;
-import org.apache.kafka.connect.transforms.field.FieldPathGroup;
+import org.apache.kafka.connect.transforms.field.MultiFieldPaths;
 import org.apache.kafka.connect.transforms.field.FieldSyntaxVersion;
 import org.apache.kafka.connect.transforms.field.MapFieldAndValue;
 import org.apache.kafka.connect.transforms.field.StructFieldAndValue;
@@ -99,7 +99,7 @@ public abstract class HeaderFrom<R extends ConnectRecord<R>> implements Transfor
         }
     }
 
-    private FieldPathGroup fieldPaths;
+    private MultiFieldPaths fieldPaths;
 
     private Map<String, List<SingleFieldPath>> headersMap;
 
@@ -112,7 +112,7 @@ public abstract class HeaderFrom<R extends ConnectRecord<R>> implements Transfor
         final SimpleConfig config = new SimpleConfig(CONFIG_DEF, props);
         FieldSyntaxVersion syntaxVersion = FieldSyntaxVersion.fromConfig(config);
         List<String> fields = config.getList(FIELDS_FIELD);
-        fieldPaths = FieldPathGroup.of(fields, syntaxVersion);
+        fieldPaths = MultiFieldPaths.of(fields, syntaxVersion);
         List<String> headers = config.getList(HEADERS_FIELD);
         if (headers.size() != fields.size()) {
             throw new ConfigException(format("'%s' config must have the same number of elements as '%s' config.",
