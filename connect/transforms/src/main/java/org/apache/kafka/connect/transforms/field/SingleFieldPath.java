@@ -529,7 +529,7 @@ public class SingleFieldPath implements FieldPath {
         return builder.build();
     }
 
-    public String toDottedPath() {
+    public String toDottedNotation() {
         StringBuilder b = new StringBuilder();
         for (String step : path) {
             if (b.length() != 0) {
