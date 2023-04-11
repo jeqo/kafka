@@ -1435,7 +1435,12 @@ public final class Utils {
     public static void drain(InputStream stream, String name) {
         try {
             log.warn("Draining {} input stream with {} bytes available", name, stream.available());
-            log.warn("{} input stream with drained: {} bytes", name, stream.readAllBytes());
+            int i = 0;
+            while (stream.read() != 0) {
+                // Do nothing.
+                i++;
+            }
+            log.warn("{} input stream with drained with {} bytes", name, i);
         } catch (IOException ignored) {
             // Stream may be self closed by HTTP client so we ignore any failures.
         }
