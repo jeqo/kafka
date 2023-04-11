@@ -1432,12 +1432,13 @@ public final class Utils {
                 .toArray(String[]::new);
     }
 
-    public static void drain(InputStream stream) {
+    public static void drain(InputStream stream, String name) {
         try {
-            log.warn("Draining input stream with {} bytes available", stream.available());
+            log.warn("Draining {} input stream with {} bytes available", name, stream.available());
             while (stream.read() != -1) {
                 // Do nothing.
             }
+            log.warn("{} input stream with drained", name);
         } catch (IOException ignored) {
             // Stream may be self closed by HTTP client so we ignore any failures.
         }
