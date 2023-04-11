@@ -650,11 +650,11 @@ class RemoteLogManager(fetchLog: TopicPartition => Option[UnifiedLog],
         s"Received request for offset $offset for partition $tp which does not exist in remote tier. Try again later.")
     }
 
-    val startPos = lookupPositionForOffset(rlsMetadata.get(), offset, offset + maxBytes)
+    val startPos = lookupPositionForOffset(rlsMetadata.get(), offset)
     var remoteSegInputStream: InputStream = null
     try {
       // Search forward for the position of the last offset that is greater than or equal to the target offset
-      remoteSegInputStream = remoteLogStorageManager.fetchLogSegment(rlsMetadata.get(), startPos)
+      remoteSegInputStream = remoteLogStorageManager.fetchLogSegment(rlsMetadata.get(), startPos, startPos + maxBytes)
       val remoteLogInputStream = new RemoteLogInputStream(remoteSegInputStream)
 
       def findFirstBatch(): RecordBatch = {
