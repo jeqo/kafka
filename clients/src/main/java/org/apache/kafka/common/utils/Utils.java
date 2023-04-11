@@ -1434,6 +1434,7 @@ public final class Utils {
 
     public static void drain(InputStream stream) {
         try {
+            log.warn("Draining input stream with {} bytes available", stream.available());
             while (stream.read() != -1) {
                 // Do nothing.
             }
