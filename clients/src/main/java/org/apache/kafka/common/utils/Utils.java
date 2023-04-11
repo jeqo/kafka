@@ -1432,4 +1432,14 @@ public final class Utils {
                 .toArray(String[]::new);
     }
 
+    public static void drain(InputStream stream) {
+        try {
+            while (stream.read() != -1) {
+                // Do nothing.
+            }
+        } catch (IOException ignored) {
+            // Stream may be self closed by HTTP client so we ignore any failures.
+        }
+    }
+
 }

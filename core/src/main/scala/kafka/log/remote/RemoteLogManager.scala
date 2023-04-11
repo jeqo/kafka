@@ -703,6 +703,7 @@ class RemoteLogManager(fetchLog: TopicPartition => Option[UnifiedLog],
       }
       fetchDataInfo
     } finally {
+      Utils.drain(remoteSegInputStream)
       Utils.closeQuietly(remoteSegInputStream, "RemoteLogSegmentInputStream")
     }
   }
