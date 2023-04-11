@@ -701,6 +701,7 @@ class RemoteLogManager(fetchLog: TopicPartition => Option[UnifiedLog],
       if (includeAbortedTxns) {
         fetchDataInfo = addAbortedTransactions(firstBatch.baseOffset(), rlsMetadata.get(), fetchDataInfo)
       }
+      Utils.drain(remoteSegInputStream, "RemoteLogSegmentInputStream")
       fetchDataInfo
     } finally {
       Utils.closeQuietly(remoteSegInputStream, "RemoteLogSegmentInputStream")
