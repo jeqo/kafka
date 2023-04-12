@@ -16,6 +16,7 @@
  */
 package org.apache.kafka.connect.transforms.field;
 
+import org.apache.kafka.connect.data.Field;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.SchemaBuilder;
 import org.apache.kafka.connect.data.Struct;
@@ -150,9 +151,9 @@ class MultiFieldPathsTest {
         Struct updated = fieldPaths.updateValueFrom(schema, value, schema,
                 (orig, oldField, s, updatedField, f) -> s.put(updatedField, ((Integer) orig.get(oldField)) * 2));
 
-        Map<SingleFieldPath, StructFieldAndValue> actual = fieldPaths.fieldAndValuesFrom(updated);
-        assertEquals(84, actual.get(bazPath).value());
-        assertEquals(42, actual.get(barPath).value());
+        Map<SingleFieldPath, Map.Entry<Field, Object>> actual = fieldPaths.fieldAndValuesFrom(updated);
+        assertEquals(84, actual.get(bazPath).getValue());
+        assertEquals(42, actual.get(barPath).getValue());
     }
 
     @Test void shouldUpdateNestedValueV2WithSchema() {
@@ -173,8 +174,8 @@ class MultiFieldPathsTest {
         Struct updated = fieldPaths.updateValueFrom(schema, value, schema,
                 (orig, oldField, s, updatedField, f) -> s.put(updatedField, ((Integer) orig.get(oldField)) * 2));
 
-        Map<SingleFieldPath, StructFieldAndValue> actual = fieldPaths.fieldAndValuesFrom(updated);
-        assertEquals(84, actual.get(bazPath).value());
-        assertEquals(42, actual.get(barPath).value());
+        Map<SingleFieldPath, Map.Entry<Field, Object>> actual = fieldPaths.fieldAndValuesFrom(updated);
+        assertEquals(84, actual.get(bazPath).getValue());
+        assertEquals(42, actual.get(barPath).getValue());
     }
 }

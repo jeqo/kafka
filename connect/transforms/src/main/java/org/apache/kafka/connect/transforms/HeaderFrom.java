@@ -22,6 +22,7 @@ import org.apache.kafka.common.cache.SynchronizedCache;
 import org.apache.kafka.common.config.ConfigDef;
 import org.apache.kafka.common.config.ConfigException;
 import org.apache.kafka.connect.connector.ConnectRecord;
+import org.apache.kafka.connect.data.Field;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.header.Header;
@@ -30,7 +31,6 @@ import org.apache.kafka.connect.transforms.field.SingleFieldPath;
 import org.apache.kafka.connect.transforms.field.MultiFieldPaths;
 import org.apache.kafka.connect.transforms.field.FieldSyntaxVersion;
 import org.apache.kafka.connect.transforms.field.MapFieldAndValue;
-import org.apache.kafka.connect.transforms.field.StructFieldAndValue;
 import org.apache.kafka.connect.transforms.util.NonEmptyListValidator;
 import org.apache.kafka.connect.transforms.util.Requirements;
 import org.apache.kafka.connect.transforms.util.SimpleConfig;
@@ -163,13 +163,13 @@ public abstract class HeaderFrom<R extends ConnectRecord<R>> implements Transfor
             updatedValue = value;
         }
 
-        Map<SingleFieldPath, StructFieldAndValue> fieldAndValues = fieldPaths.fieldAndValuesFrom(value);
+        Map<SingleFieldPath, Map.Entry<Field, Object>> fieldAndValues = fieldPaths.fieldAndValuesFrom(value);
         for (Map.Entry<String, List<SingleFieldPath>> entry : headersMap.entrySet()) {
             // headers may point to many values, though it's usually close to 1
             for (SingleFieldPath fieldPath : entry.getValue()) {
-                StructFieldAndValue fieldAndValue = fieldAndValues.get(fieldPath);
+                Map.Entry<Field, Object> fieldAndValue = fieldAndValues.get(fieldPath);
                 if (fieldAndValue != null) {
-                    updatedHeaders.add(entry.getKey(), fieldAndValue.value(), fieldAndValue.schema());
+                    updatedHeaders.add(entry.getKey(), fieldAndValue.getValue(), fieldAndValue.getKey().schema());
                 }
             }
         }

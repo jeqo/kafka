@@ -23,6 +23,7 @@ import org.apache.kafka.connect.data.SchemaBuilder;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.transforms.util.SchemaUtil;
 
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -59,10 +60,6 @@ public class MultiFieldPaths implements FieldPath {
     MultiFieldPaths(List<SingleFieldPath> paths) {
         this.paths = paths.stream().filter(Objects::nonNull).collect(Collectors.toList());
         pathTree = buildPathTree(this.paths, 0, new HashMap<>());
-    }
-
-    public static Builder newBuilder(FieldSyntaxVersion syntaxVersion) {
-        return new Builder(syntaxVersion);
     }
 
     public static MultiFieldPaths of(SingleFieldPath path) {
@@ -156,22 +153,22 @@ public class MultiFieldPaths implements FieldPath {
      * @param struct data value
      * @return map of field paths and field/values
      */
-    public Map<SingleFieldPath, StructFieldAndValue> fieldAndValuesFrom(Struct struct) {
+    public Map<SingleFieldPath, Map.Entry<Field, Object>> fieldAndValuesFrom(Struct struct) {
         return findFieldAndValues(struct, pathTree, new HashMap<>());
     }
 
     @SuppressWarnings("unchecked")
-    private Map<SingleFieldPath, StructFieldAndValue> findFieldAndValues(
+    private Map<SingleFieldPath, Map.Entry<Field, Object>> findFieldAndValues(
             Struct originalValue,
             Map<String, Object> treeAt,
-            Map<SingleFieldPath, StructFieldAndValue> fieldAndValueMap
+            Map<SingleFieldPath, Map.Entry<Field, Object>> fieldAndValueMap
     ) {
         for (Map.Entry<String, Object> step : treeAt.entrySet()) {
             Field field = originalValue.schema().field(step.getKey());
             if (step.getValue() instanceof SingleFieldPath) {
-                StructFieldAndValue fieldAndValue =
+                Map.Entry<Field, Object> fieldAndValue =
                         field != null
-                                ? new StructFieldAndValue(field, originalValue.get(field))
+                                ? new AbstractMap.SimpleImmutableEntry<>(field, originalValue.get(field))
                                 : null;
                 fieldAndValueMap.put((SingleFieldPath) step.getValue(), fieldAndValue);
             } else {
