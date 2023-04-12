@@ -35,13 +35,13 @@ public enum FieldSyntaxVersion {
      * No support for nested fields. Only access attributes on the root data value.
      * Backward compatibility before KIP-821.
      */
-    V1("V1"),
+    V1,
     /**
      * Support for nested fields using dotted notation with backtick pairs to wrap field names that
      * include dots.
      * @since 3.x
      */
-    V2("V2");
+    V2;
 
     public static final String FIELD_SYNTAX_VERSION_CONFIG = "field.syntax.version";
     public static final String FIELD_SYNTAX_VERSION_DOC =
@@ -65,12 +65,6 @@ public enum FieldSyntaxVersion {
                         FieldSyntaxVersion.FIELD_SYNTAX_VERSION_VALIDATOR,
                         ConfigDef.Importance.HIGH,
                         FieldSyntaxVersion.FIELD_SYNTAX_VERSION_DOC);
-    }
-
-    public final String name;
-
-    FieldSyntaxVersion(final String name) {
-        this.name = name;
     }
 
     public static FieldSyntaxVersion fromConfig(AbstractConfig config) {
