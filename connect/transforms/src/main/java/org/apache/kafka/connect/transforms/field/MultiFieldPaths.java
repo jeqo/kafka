@@ -189,22 +189,22 @@ public class MultiFieldPaths implements FieldPath {
      * @param value data value
      * @return map of field paths and field/values
      */
-    public Map<SingleFieldPath, MapFieldAndValue> fieldAndValuesFrom(Map<String, Object> value) {
+    public Map<SingleFieldPath, Map.Entry<String, Object>> fieldAndValuesFrom(Map<String, Object> value) {
         return findFieldAndValues(value, pathTree, new HashMap<>());
     }
 
     @SuppressWarnings("unchecked")
-    private Map<SingleFieldPath, MapFieldAndValue> findFieldAndValues(
+    private Map<SingleFieldPath, Map.Entry<String, Object>> findFieldAndValues(
             Map<String, Object> value,
             Map<String, Object> treeAt,
-            Map<SingleFieldPath, MapFieldAndValue> fieldAndValueMap
+            Map<SingleFieldPath, Map.Entry<String, Object>> fieldAndValueMap
     ) {
         for (Map.Entry<String, Object> step : treeAt.entrySet()) {
             Object fieldValue = value.get(step.getKey());
             if (step.getValue() instanceof SingleFieldPath) {
                 fieldAndValueMap.put((
                                 SingleFieldPath) step.getValue(),
-                        new MapFieldAndValue(step.getKey(), fieldValue)
+                        new AbstractMap.SimpleImmutableEntry<>(step.getKey(), fieldValue)
                 );
             } else {
                 if (fieldValue instanceof Map) {

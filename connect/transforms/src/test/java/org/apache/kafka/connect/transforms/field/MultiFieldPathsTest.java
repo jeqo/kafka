@@ -112,9 +112,9 @@ class MultiFieldPathsTest {
                 (orig, map, f, k) -> map.put(k, ((Integer) orig.get(k)) * 2)
         );
 
-        Map<SingleFieldPath, MapFieldAndValue> actual = fieldPaths.fieldAndValuesFrom(updated);
-        assertEquals(84, actual.get(fooPath).value());
-        assertEquals(42, actual.get(barPath).value());
+        Map<SingleFieldPath, Map.Entry<String, Object>> actual = fieldPaths.fieldAndValuesFrom(updated);
+        assertEquals(84, actual.get(fooPath).getValue());
+        assertEquals(42, actual.get(barPath).getValue());
     }
 
     @Test void shouldUpdateNestedValuesV2FromSchemaless() {
@@ -131,9 +131,9 @@ class MultiFieldPathsTest {
                 (orig, map, f, k) -> map.put(k, ((Integer) orig.get(k)) * 2)
         );
 
-        Map<SingleFieldPath, MapFieldAndValue> actual = fieldPaths.fieldAndValuesFrom(updated);
-        assertEquals(84, actual.get(bazPath).value());
-        assertEquals(42, actual.get(barPath).value());
+        Map<SingleFieldPath, Map.Entry<String, Object>> actual = fieldPaths.fieldAndValuesFrom(updated);
+        assertEquals(84, actual.get(bazPath).getValue());
+        assertEquals(42, actual.get(barPath).getValue());
     }
 
     @Test void shouldUpdateValueV1WithSchema() {

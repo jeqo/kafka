@@ -30,7 +30,6 @@ import org.apache.kafka.connect.header.Headers;
 import org.apache.kafka.connect.transforms.field.SingleFieldPath;
 import org.apache.kafka.connect.transforms.field.MultiFieldPaths;
 import org.apache.kafka.connect.transforms.field.FieldSyntaxVersion;
-import org.apache.kafka.connect.transforms.field.MapFieldAndValue;
 import org.apache.kafka.connect.transforms.util.NonEmptyListValidator;
 import org.apache.kafka.connect.transforms.util.Requirements;
 import org.apache.kafka.connect.transforms.util.SimpleConfig;
@@ -191,7 +190,7 @@ public abstract class HeaderFrom<R extends ConnectRecord<R>> implements Transfor
         Headers updatedHeaders = record.headers().duplicate();
         Map<String, Object> value = Requirements.requireMap(operatingValue, "header " + operation);
         Map<String, Object> updatedValue = new HashMap<>(value);
-        Map<SingleFieldPath, MapFieldAndValue> values = fieldPaths.fieldAndValuesFrom(value);
+        Map<SingleFieldPath, Map.Entry<String, Object>> values = fieldPaths.fieldAndValuesFrom(value);
         if (operation == Operation.MOVE) {
             updatedValue = fieldPaths.updateValueFrom(
                     updatedValue,
@@ -201,8 +200,8 @@ public abstract class HeaderFrom<R extends ConnectRecord<R>> implements Transfor
         for (Map.Entry<String, List<SingleFieldPath>> entry : headersMap.entrySet()) {
             // headers may point to many values, though it's usually close to 1
             for (SingleFieldPath fieldPath : entry.getValue()) {
-                final MapFieldAndValue fieldAndValue = values.get(fieldPath);
-                updatedHeaders.add(entry.getKey(), fieldAndValue != null ? fieldAndValue.value() : null, null);
+                final Map.Entry<String, Object> fieldAndValue = values.get(fieldPath);
+                updatedHeaders.add(entry.getKey(), fieldAndValue != null ? fieldAndValue.getValue() : null, null);
             }
         }
         return newRecord(record, null, updatedValue, updatedHeaders);
