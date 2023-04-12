@@ -77,43 +77,39 @@ public class MultiFieldPaths implements FieldPath {
     Map<String, Object> buildPathTree(List<SingleFieldPath> paths, int stepIdx, Map<String, Object> pathTree) {
         if (paths.size() == 1) { // optimize for paths with a single member
             SingleFieldPath path = paths.get(0);
-            if (path != null) {
-                if (path.stepAt(stepIdx + 1) == null) { // if last path step
-                    pathTree.put(path.stepAt(stepIdx), path);
-                } else {
-                    pathTree.put(path.stepAt(stepIdx),
-                            buildPathTree(paths, stepIdx + 1, new HashMap<>()));
-                }
+            if (path.stepAt(stepIdx + 1) == null) { // if last path step
+                pathTree.put(path.stepAt(stepIdx), path);
+            } else {
+                pathTree.put(path.stepAt(stepIdx),
+                        buildPathTree(paths, stepIdx + 1, new HashMap<>()));
             }
         } else {
             // group paths by prefix
             final Map<String, List<SingleFieldPath>> groups = new HashMap<>();
             for (SingleFieldPath path : paths) {
-                if (path != null) {
-                    String step = path.stepAt(stepIdx);
-                    if (step != null) {
-                        groups.computeIfPresent(step, (s, fieldPaths) -> {
-                            for (SingleFieldPath other : fieldPaths) {
-                                // avoid overlapping paths
-                                if (!path.equals(other)
-                                        && (other.stepAt(stepIdx + 1) == null
-                                        || path.stepAt(stepIdx + 1) == null)) {
-                                    throw new IllegalArgumentException(
-                                            "Path " + other + " and " + path + " are overlapping. "
-                                                    + "Paths need to point to leaf values");
-                                }
+                String step = path.stepAt(stepIdx);
+                if (step != null) {
+                    groups.computeIfPresent(step, (s, fieldPaths) -> {
+                        for (SingleFieldPath other : fieldPaths) {
+                            // avoid overlapping paths
+                            if (!path.equals(other)
+                                    && (other.stepAt(stepIdx + 1) == null
+                                    || path.stepAt(stepIdx + 1) == null)) {
+                                throw new IllegalArgumentException(
+                                        "Path " + other + " and " + path + " are overlapping. "
+                                                + "Paths need to point to leaf values");
                             }
-                            if (!fieldPaths.contains(path)) {
-                                fieldPaths.add(path);
-                            }
-                            return fieldPaths;
-                        });
-                        groups.computeIfAbsent(step, s -> {
-                            List<SingleFieldPath> fieldPaths = new ArrayList<>();
+                        }
+                        if (!fieldPaths.contains(path)) {
                             fieldPaths.add(path);
-                            return fieldPaths;
-                        });
-                    }
+                        }
+                        return fieldPaths;
+                    });
+                    groups.computeIfAbsent(step, s -> {
+                        List<SingleFieldPath> fieldPaths = new ArrayList<>();
+                        fieldPaths.add(path);
+                        return fieldPaths;
+                    });
                 }
             }
 
