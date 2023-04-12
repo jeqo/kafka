@@ -31,7 +31,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -55,11 +54,10 @@ import java.util.stream.Collectors;
 public class MultiFieldPaths implements FieldPath {
 
     final Map<String, Object> pathTree;
-    final List<SingleFieldPath> paths;
 
     MultiFieldPaths(List<SingleFieldPath> paths) {
-        this.paths = paths.stream().filter(Objects::nonNull).collect(Collectors.toList());
-        pathTree = buildPathTree(this.paths, 0, new HashMap<>());
+        List<SingleFieldPath> nonEmptyPaths = paths.stream().filter(Objects::nonNull).collect(Collectors.toList());
+        pathTree = buildPathTree(nonEmptyPaths, 0, new HashMap<>());
     }
 
     public static MultiFieldPaths of(SingleFieldPath path) {
@@ -68,16 +66,6 @@ public class MultiFieldPaths implements FieldPath {
 
     public static MultiFieldPaths of(SingleFieldPath... paths) {
         return new MultiFieldPaths(Arrays.asList(paths));
-    }
-
-    public static MultiFieldPaths of(List<SingleFieldPath> paths) {
-        return new MultiFieldPaths(paths);
-    }
-
-    public static MultiFieldPaths of(Set<String> fields, FieldSyntaxVersion syntaxVersion) {
-        return new MultiFieldPaths(fields.stream()
-                .map(f -> SingleFieldPath.of(f, syntaxVersion))
-                .collect(Collectors.toList()));
     }
 
     public static MultiFieldPaths of(List<String> fields, FieldSyntaxVersion syntaxVersion) {
@@ -526,10 +514,6 @@ public class MultiFieldPaths implements FieldPath {
             }
         }
         return baseSchemaBuilder.build();
-    }
-
-    public int size() {
-        return paths.size();
     }
 
     @Override
