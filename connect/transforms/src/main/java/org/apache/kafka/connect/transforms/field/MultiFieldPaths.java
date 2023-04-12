@@ -554,22 +554,4 @@ public class MultiFieldPaths implements FieldPath {
         return "FieldPaths(pathTree = " + pathTree + ")";
     }
 
-    public static class Builder {
-        List<SingleFieldPath> paths = new ArrayList<>();
-
-        final FieldSyntaxVersion syntaxVersion;
-
-        public Builder(FieldSyntaxVersion syntaxVersion) {
-            this.syntaxVersion = syntaxVersion;
-        }
-
-        public Builder add(SingleFieldPath fieldPath) {
-            paths.add(fieldPath);
-            return this;
-        }
-
-        public MultiFieldPaths build() {
-            return new MultiFieldPaths(paths);
-        }
-    }
 }
