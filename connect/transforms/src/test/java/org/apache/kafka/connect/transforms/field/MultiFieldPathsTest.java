@@ -34,28 +34,28 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class MultiFieldPathsTest {
     @Test void shouldBuildPathWithSinglePathV1() {
         SingleFieldPath path = SingleFieldPath.of("foo.bar.baz", FieldSyntaxVersion.V1);
-        MultiFieldPaths paths = MultiFieldPaths.of(path);
+        MultiFieldPaths paths = createMultiFieldPaths(path);
         assertEquals(1, paths.pathTree.size());
         assertEquals(path, paths.pathTree.get("foo.bar.baz"));
     }
 
     @Test void shouldBuildPathWithSamePathV1() {
         SingleFieldPath path = SingleFieldPath.of("foo.bar.baz", FieldSyntaxVersion.V1);
-        MultiFieldPaths paths = MultiFieldPaths.of(path, path);
+        MultiFieldPaths paths = createMultiFieldPaths(path, path);
         assertEquals(1, paths.pathTree.size());
         assertEquals(path, paths.pathTree.get("foo.bar.baz"));
     }
 
     @Test void shouldBuildPathWithSinglePathV2() {
         SingleFieldPath path = SingleFieldPath.of("foo.bar.baz", FieldSyntaxVersion.V2);
-        MultiFieldPaths paths = MultiFieldPaths.of(path);
+        MultiFieldPaths paths = createMultiFieldPaths(path);
         assertEquals(1, paths.pathTree.size());
         assertEquals(path, ((Map<?, ?>) ((Map<?, ?>) paths.pathTree.get("foo")).get("bar")).get("baz"));
     }
 
     @Test void shouldFailWhenPathsCollide() {
         assertThrows(IllegalArgumentException.class,
-            () -> MultiFieldPaths.of(SingleFieldPath.ofV2("foo"), SingleFieldPath.ofV2("foo.bar")));
+            () -> createMultiFieldPaths(SingleFieldPath.ofV2("foo"), SingleFieldPath.ofV2("foo.bar")));
     }
 
     @Test void shouldRenameSchemaV1Fields() {
@@ -106,7 +106,7 @@ class MultiFieldPathsTest {
 
         SingleFieldPath fooPath = SingleFieldPath.of("foo", FieldSyntaxVersion.V1);
         SingleFieldPath barPath = SingleFieldPath.of("bar", FieldSyntaxVersion.V1);
-        MultiFieldPaths fieldPaths = MultiFieldPaths.of(fooPath, barPath);
+        MultiFieldPaths fieldPaths = createMultiFieldPaths(fooPath, barPath);
         Map<String, Object> updated = fieldPaths.updateValueFrom(
                 value,
                 (orig, map, f, k) -> map.put(k, ((Integer) orig.get(k)) * 2)
@@ -125,7 +125,7 @@ class MultiFieldPathsTest {
 
         SingleFieldPath barPath = SingleFieldPath.of("foo.bar", FieldSyntaxVersion.V2);
         SingleFieldPath bazPath = SingleFieldPath.of("foo.baz", FieldSyntaxVersion.V2);
-        MultiFieldPaths fieldPaths = MultiFieldPaths.of(bazPath, barPath);
+        MultiFieldPaths fieldPaths = createMultiFieldPaths(bazPath, barPath);
         Map<String, Object> updated = fieldPaths.updateValueFrom(
                 value,
                 (orig, map, f, k) -> map.put(k, ((Integer) orig.get(k)) * 2)
@@ -147,7 +147,7 @@ class MultiFieldPathsTest {
 
         SingleFieldPath bazPath = SingleFieldPath.of("foo.baz", FieldSyntaxVersion.V1);
         SingleFieldPath barPath = SingleFieldPath.of("foo.bar", FieldSyntaxVersion.V1);
-        MultiFieldPaths fieldPaths = MultiFieldPaths.of(bazPath, barPath);
+        MultiFieldPaths fieldPaths = createMultiFieldPaths(bazPath, barPath);
         Struct updated = fieldPaths.updateValueFrom(schema, value, schema,
                 (orig, oldField, s, updatedField, f) -> s.put(updatedField, ((Integer) orig.get(oldField)) * 2));
 
@@ -170,12 +170,16 @@ class MultiFieldPathsTest {
 
         SingleFieldPath bazPath = SingleFieldPath.of("foo.baz", FieldSyntaxVersion.V2);
         SingleFieldPath barPath = SingleFieldPath.of("foo.bar", FieldSyntaxVersion.V2);
-        MultiFieldPaths fieldPaths = MultiFieldPaths.of(bazPath, barPath);
+        MultiFieldPaths fieldPaths = createMultiFieldPaths(bazPath, barPath);
         Struct updated = fieldPaths.updateValueFrom(schema, value, schema,
                 (orig, oldField, s, updatedField, f) -> s.put(updatedField, ((Integer) orig.get(oldField)) * 2));
 
         Map<SingleFieldPath, Map.Entry<Field, Object>> actual = fieldPaths.fieldAndValuesFrom(updated);
         assertEquals(84, actual.get(bazPath).getValue());
         assertEquals(42, actual.get(barPath).getValue());
+    }
+    
+    static MultiFieldPaths createMultiFieldPaths(SingleFieldPath... fields) {
+        return new MultiFieldPaths(Arrays.asList(fields));
     }
 }

@@ -67,50 +67,6 @@ public interface FieldPath {
     Schema updateSchemaFrom(Schema originalSchema, StructSchemaUpdater whenFound);
 
     /**
-     * Prepares a new schema based on an original one, and applies an update function
-     * when the current path(s) is found.
-     * <p>
-     * If path is not found, {@code whenNotFound} function is used. e.g. to create field if not found.
-     * <p>
-     * Other fields are copied from original schema.
-     * <p>
-     * A copy of the {@code Schema} is used as a base for the updated schema.
-     *
-     * @param originalSchema baseline schema
-     * @param whenFound function to apply when current path(s) is/are found
-     * @param whenNotFound function to apply when current path(s) is/are not found
-     * @return an updated schema. Resulting schemas are usually cached for further access
-     */
-    Schema updateSchemaFrom(
-            Schema originalSchema,
-            StructSchemaUpdater whenFound,
-            StructSchemaUpdater whenNotFound
-    );
-
-    /**
-     * Prepares a new schema based on an original one, and applies an update function
-     * when the current path(s) is found.
-     * <p>
-     * If path is not found, {@code whenNotFound} function is used. e.g. to create field if not found.
-     * <p>
-     * Other fields use {@code toOtherFields} function to apply when not related to the current path(s).
-     * <p>
-     * A copy of the {@code Schema} is used as a base for the updated schema.
-     *
-     * @param originalSchema baseline schema
-     * @param whenFound function to apply when current path(s) is/are found
-     * @param whenNotFound function to apply when current path(s) is/are not found
-     * @param toOthers function to apply to fields not related to current path(s)
-     * @return an updated schema. Resulting schemas are usually cached for further access
-     */
-    Schema updateSchemaFrom(
-            Schema originalSchema,
-            StructSchemaUpdater whenFound,
-            StructSchemaUpdater whenNotFound,
-            StructSchemaUpdater toOthers
-    );
-
-    /**
      * Access {@code Struct} fields and apply functions to update field values.
      * <p>
      * If path is not found, no function is applied, and the path is ignored.
@@ -131,52 +87,6 @@ public interface FieldPath {
     );
 
     /**
-     * Access {@code Struct} fields and apply functions to update field values.
-     * <p>
-     * If path is not found, {@code whenNotFound} function is used.
-     * <p>
-     * Other fields keep values from original struct.
-     *
-     * @param originalSchema original struct schema
-     * @param originalValue  schema-based data value
-     * @param updatedSchema updated struct schema
-     * @param whenFound function to apply when a path found
-     * @param whenNotFound function to apply when current path(s) is/are not found
-     * @return a new struct with the updates fields
-     */
-    Struct updateValueFrom(
-            Schema originalSchema,
-            Struct originalValue,
-            Schema updatedSchema,
-            StructValueUpdater whenFound,
-            StructValueUpdater whenNotFound
-    );
-
-    /**
-     * Access {@code Struct} fields and apply functions to update field values.
-     * <p>
-     * If path is not found, {@code whenNotFound} function is used.
-     * <p>
-     * Other fields use {@code toOtherFields} function to apply when not related to the current path(s).
-     *
-     * @param originalSchema original struct schema
-     * @param originalValue  schema-based data value
-     * @param updatedSchema updated struct schema
-     * @param whenFound function to apply when a path found
-     * @param whenNotFound function to apply when current path(s) is/are not found
-     * @param toOthers function to apply to fields not related to current path(s)
-     * @return a new struct with the updates fields
-     */
-    Struct updateValueFrom(
-            Schema originalSchema,
-            Struct originalValue,
-            Schema updatedSchema,
-            StructValueUpdater whenFound,
-            StructValueUpdater whenNotFound,
-            StructValueUpdater toOthers
-    );
-
-    /**
      * Access {@code Map} fields and apply functions to update field values.
      * <p>
      * If path is not found, no function is applied, and the path is ignored.
@@ -190,43 +100,5 @@ public interface FieldPath {
     Map<String, Object> updateValueFrom(
             Map<String, Object> originalValue,
             MapValueUpdater whenFound
-    );
-
-    /**
-     * Access {@code Map} fields and apply functions to update field values.
-     * <p>
-     * If path is not found, {@code whenNotFound} function is used.
-     * <p>
-     * Other fields keep values from original struct.
-     *
-     * @param originalValue  schema-based data value
-     * @param whenFound function to apply when a path found
-     * @param whenNotFound function to apply when current path(s) is/are not found
-     * @return a new struct with the updates fields
-     */
-    Map<String, Object> updateValueFrom(
-            Map<String, Object> originalValue,
-            MapValueUpdater whenFound,
-            MapValueUpdater whenNotFound
-    );
-
-    /**
-     * Access {@code Map} fields and apply functions to update field values.
-     * <p>
-     * If path is not found, {@code whenNotFound} function is used.
-     * <p>
-     * Other fields use {@code toOtherFields} function to apply when not related to the current path(s).
-     *
-     * @param originalValue  schema-based data value
-     * @param whenFound function to apply when a path found
-     * @param whenNotFound function to apply when current path(s) is/are not found
-     * @param toOthers function to apply to fields not related to current path(s)
-     * @return a new struct with the updates fields
-     */
-    Map<String, Object> updateValueFrom(
-            Map<String, Object> originalValue,
-            MapValueUpdater whenFound,
-            MapValueUpdater whenNotFound,
-            MapValueUpdater toOthers
     );
 }

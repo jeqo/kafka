@@ -64,10 +64,6 @@ public class MultiFieldPaths implements FieldPath {
         return new MultiFieldPaths(Collections.singletonList(path));
     }
 
-    public static MultiFieldPaths of(SingleFieldPath... paths) {
-        return new MultiFieldPaths(Arrays.asList(paths));
-    }
-
     public static MultiFieldPaths of(List<String> fields, FieldSyntaxVersion syntaxVersion) {
         return new MultiFieldPaths(fields.stream()
                 .map(f -> SingleFieldPath.of(f, syntaxVersion))
@@ -216,29 +212,6 @@ public class MultiFieldPaths implements FieldPath {
                     updatedParent.put(fieldName, originalParent.get(fieldName)));
     }
 
-    @Override
-    public Map<String, Object> updateValueFrom(
-            Map<String, Object> originalValue,
-            MapValueUpdater whenFound,
-            MapValueUpdater whenNotFound
-    ) {
-        return updateValues(originalValue, pathTree, whenFound,
-                (originalParent, updatedParent, fieldPath, fieldName) -> {
-                    // filter out
-                },
-                whenNotFound);
-    }
-
-    @Override
-    public Map<String, Object> updateValueFrom(
-            Map<String, Object> originalValue,
-            MapValueUpdater whenFound,
-            MapValueUpdater whenNotFound,
-            MapValueUpdater toOthers
-    ) {
-        return updateValues(originalValue, pathTree, whenFound, whenNotFound, toOthers);
-    }
-
     @SuppressWarnings("unchecked")
     private Map<String, Object> updateValues(
             Map<String, Object> originalValue,
@@ -309,34 +282,6 @@ public class MultiFieldPaths implements FieldPath {
                 },
                 (originalParent, originalField, updatedParent, nullUpdatedField, nullFieldPath) ->
                         updatedParent.put(originalField.name(), originalParent.get(originalField)));
-    }
-
-    @Override
-    public Struct updateValueFrom(
-            Schema originalSchema,
-            Struct originalValue,
-            Schema updatedSchema,
-            StructValueUpdater whenFound,
-            StructValueUpdater whenNotFound,
-            StructValueUpdater toOthers
-    ) {
-        return updateValues(originalSchema, originalValue, updatedSchema, pathTree,
-                whenFound, whenNotFound, toOthers);
-    }
-
-    @Override
-    public Struct updateValueFrom(
-            Schema originalSchema,
-            Struct originalValue,
-            Schema updatedSchema,
-            StructValueUpdater whenFound,
-            StructValueUpdater whenNotFound
-    ) {
-        return updateValues(originalSchema, originalValue, updatedSchema, pathTree, whenFound,
-                (originalParent, originalField, updatedParent, updatedField, fieldPath) -> {
-                    // filter out
-                },
-                whenNotFound);
     }
 
     @SuppressWarnings("unchecked")
@@ -421,29 +366,6 @@ public class MultiFieldPaths implements FieldPath {
         return updateSchema(originalSchema, updated, pathTree, whenFound,
                 (schemaBuilder, field, fieldPath) -> { /* ignore */ },
                 (schemaBuilder, field, fieldPath) -> schemaBuilder.field(field.name(), field.schema()));
-    }
-
-    @Override
-    public Schema updateSchemaFrom(
-            Schema originalSchema,
-            StructSchemaUpdater whenFound,
-            StructSchemaUpdater whenNotFound
-    ) {
-        SchemaBuilder updated = SchemaUtil.copySchemaBasics(originalSchema, SchemaBuilder.struct());
-        return updateSchema(originalSchema, updated, pathTree, whenFound,
-                (schemaBuilder, field, fieldPath) -> { /* ignore */ },
-                whenNotFound);
-    }
-
-    @Override
-    public Schema updateSchemaFrom(
-            Schema originalSchema,
-            StructSchemaUpdater whenFound,
-            StructSchemaUpdater whenNotFound,
-            StructSchemaUpdater toOthers
-    ) {
-        SchemaBuilder updated = SchemaUtil.copySchemaBasics(originalSchema, SchemaBuilder.struct());
-        return updateSchema(originalSchema, updated, pathTree, whenFound, whenNotFound, toOthers);
     }
 
     @Override

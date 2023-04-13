@@ -273,29 +273,6 @@ public class SingleFieldPath implements FieldPath {
                         updatedParent.put(fieldName, originalParent.get(fieldName)));
     }
 
-    @Override
-    public Map<String, Object> updateValueFrom(
-            Map<String, Object> value,
-            MapValueUpdater whenFound,
-            MapValueUpdater whenNotFound
-    ) {
-        return updateValue(value, 0, whenFound,
-                (originalParent, updatedParent, fieldPath, fieldName) -> {
-                    // filter out
-                },
-                whenNotFound);
-    }
-
-    @Override
-    public Map<String, Object> updateValueFrom(
-            Map<String, Object> value,
-            MapValueUpdater whenFound,
-            MapValueUpdater whenNotFound,
-            MapValueUpdater toOthers
-    ) {
-        return updateValue(value, 0, whenFound, whenNotFound, toOthers);
-    }
-
     @SuppressWarnings("unchecked")
     private Map<String, Object> updateValue(
             Map<String, Object> originalValue,
@@ -354,34 +331,6 @@ public class SingleFieldPath implements FieldPath {
                 },
                 (originalParent, originalField, updatedParent, nullUpdatedField, nullFieldPath) ->
                         updatedParent.put(originalField.name(), originalParent.get(originalField)));
-    }
-
-    @Override
-    public Struct updateValueFrom(
-            Schema originalSchema,
-            Struct originalValue,
-            Schema updatedSchema,
-            StructValueUpdater whenFound,
-            StructValueUpdater whenNotFound,
-            StructValueUpdater toOthers
-    ) {
-        return updateValue(originalSchema, originalValue, updatedSchema, 0,
-                whenFound, whenNotFound, toOthers);
-    }
-
-    @Override
-    public Struct updateValueFrom(
-            Schema originalSchema,
-            Struct originalValue,
-            Schema updatedSchema,
-            StructValueUpdater whenFound,
-            StructValueUpdater whenNotFound
-    ) {
-        return updateValue(originalSchema, originalValue, updatedSchema, 0, whenFound,
-                (originalParent, originalField, updatedParent, updatedField, fieldPath) -> {
-                    // filter out
-                },
-                whenNotFound);
     }
 
     private Struct updateValue(
@@ -460,29 +409,6 @@ public class SingleFieldPath implements FieldPath {
                 (schemaBuilder, field, fieldPath) -> schemaBuilder.field(field.name(), field.schema()));
     }
 
-    @Override
-    public Schema updateSchemaFrom(
-            Schema originalSchema,
-            StructSchemaUpdater whenFound,
-            StructSchemaUpdater whenNotFound
-    ) {
-        SchemaBuilder updated = SchemaUtil.copySchemaBasics(originalSchema, SchemaBuilder.struct());
-        return updateSchema(originalSchema, updated, 0, whenFound,
-                (schemaBuilder, field, fieldPath) -> { /* ignore */ },
-                whenNotFound);
-    }
-
-    @Override
-    public Schema updateSchemaFrom(
-            Schema originalSchema,
-            StructSchemaUpdater whenFound,
-            StructSchemaUpdater whenNotFound,
-            StructSchemaUpdater toOthers
-    ) {
-        SchemaBuilder updated = SchemaUtil.copySchemaBasics(originalSchema, SchemaBuilder.struct());
-        return updateSchema(originalSchema, updated, 0, whenFound, whenNotFound, toOthers);
-    }
-
     // Recursive implementation to update schema at different steps.
     // Consider that resulting schemas are usually cached.
     private Schema updateSchema(
@@ -527,21 +453,6 @@ public class SingleFieldPath implements FieldPath {
             notFound.apply(builder, null, this);
         }
         return builder.build();
-    }
-
-    public String toDottedNotation() {
-        StringBuilder b = new StringBuilder();
-        for (String step : path) {
-            if (b.length() != 0) {
-                b.append(".");
-            }
-            if (step.contains(".")) {
-                b.append("`").append(step).append("`");
-            } else {
-                b.append(step);
-            }
-        }
-        return b.toString();
     }
 
     public String last() {
