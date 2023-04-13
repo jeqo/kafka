@@ -39,14 +39,14 @@ import java.util.Map;
  * If the SMT requires accessing multiple fields on the same data object,
  * use {@code FieldPaths} instead.
  * <p>
- * The field path semantics are defined by the syntax version {@code FieldSyntaxVersion}.
+ * The field path semantics are defined by the {@link FieldSyntaxVersion syntax version}.
  * <p>
  * Paths are calculated once and cached for further access.
  * <p>
  * Invariants:
- * <li>
- *     <ul>A field path can contain one or more steps</ul>
- * </li>
+ * <ul>
+ *     <li>A field path can contain one or more steps</li>
+ * </ul>
  *
  * See KIP-821.
  *
@@ -55,9 +55,9 @@ import java.util.Map;
  */
 public class SingleFieldPath implements FieldPath {
 
-    private static final char BACKTICK_CHAR = '`';
-    private static final char DOT_CHAR = '.';
-    private static final char BACKSLASH_CHAR = '\\';
+    private static final char BACKTICK = '`';
+    private static final char DOT = '.';
+    private static final char BACKSLASH = '\\';
 
     private static final Cache<String, SingleFieldPath> PATHS_CACHE = new SynchronizedCache<>(new LRUCache<>(16));
 
