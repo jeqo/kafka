@@ -31,8 +31,12 @@ class SingleFieldPathTest {
     final static String[] EMPTY_PATH = new String[]{};
 
     @Test void shouldBuildV1WithDotsAndBacktickPair() {
-        assertArrayEquals(new String[] {"foo.bar.baz"}, SingleFieldPath.ofV1("foo.bar.baz").path());
-        assertArrayEquals(new String[] {"foo.`bar.baz`"}, SingleFieldPath.ofV1("foo.`bar.baz`").path());
+        assertArrayEquals(
+                new String[] {"foo.bar.baz"},
+                new SingleFieldPath("foo.bar.baz", FieldSyntaxVersion.V1).path());
+        assertArrayEquals(
+                new String[] {"foo.`bar.baz`"},
+                new SingleFieldPath("foo.`bar.baz`", FieldSyntaxVersion.V1).path());
     }
 
     @Test void shouldBuildV2WithEmptyPath() {

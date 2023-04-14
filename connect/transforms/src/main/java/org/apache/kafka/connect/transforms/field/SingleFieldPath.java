@@ -63,14 +63,6 @@ public class SingleFieldPath implements FieldPath {
 
     private final String[] path;
 
-    static SingleFieldPath ofV1(String field) {
-        return of(field, FieldSyntaxVersion.V1);
-    }
-
-    static SingleFieldPath ofV2(String field) {
-        return of(field, FieldSyntaxVersion.V2);
-    }
-
     /**
      * If version is V2, then paths are cached for further access.
      *

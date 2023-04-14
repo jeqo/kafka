@@ -55,7 +55,10 @@ class MultiFieldPathsTest {
 
     @Test void shouldFailWhenPathsCollide() {
         assertThrows(IllegalArgumentException.class,
-            () -> createMultiFieldPaths(SingleFieldPath.ofV2("foo"), SingleFieldPath.ofV2("foo.bar")));
+            () -> createMultiFieldPaths(
+                    SingleFieldPath.of("foo", FieldSyntaxVersion.V2),
+                    SingleFieldPath.of("foo.bar", FieldSyntaxVersion.V2)
+            ));
     }
 
     @Test void shouldRenameSchemaV1Fields() {
@@ -178,7 +181,7 @@ class MultiFieldPathsTest {
         assertEquals(84, actual.get(bazPath).getValue());
         assertEquals(42, actual.get(barPath).getValue());
     }
-    
+
     static MultiFieldPaths createMultiFieldPaths(SingleFieldPath... fields) {
         return new MultiFieldPaths(Arrays.asList(fields));
     }
