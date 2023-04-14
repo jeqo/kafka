@@ -112,7 +112,7 @@ public class SingleFieldPath implements FieldPath {
 
     private String[] buildFieldPathV2(String pathText) {
         // if no dots or wrapping backticks are used, then return path with single step
-        if (!pathText.contains(String.valueOf(DOT_CHAR))) {
+        if (!pathText.contains(String.valueOf(DOT))) {
             return new String[] {pathText};
         } else {
             // prepare for tracking path steps
@@ -122,20 +122,20 @@ public class SingleFieldPath implements FieldPath {
 
             while (s.length() > 0) { // until path is traversed
                 // start processing backtick pair, if any
-                if (s.charAt(0) == BACKTICK_CHAR) {
+                if (s.charAt(0) == BACKTICK) {
                     s.deleteCharAt(0);
 
                     // find backtick closing pair
                     int idx = 0;
                     while (idx >= 0) {
-                        idx = s.indexOf(String.valueOf(BACKTICK_CHAR), idx);
+                        idx = s.indexOf(String.valueOf(BACKTICK), idx);
                         if (idx == -1) { // if not found, fail
                             throw new IllegalArgumentException("Incomplete backtick pair at [...]`" + s);
                         }
                         // check that it is not escaped or wrapped in another backticks pair
                         if (idx < s.length() - 1 // not wrapping the whole field path
-                                && (s.charAt(idx + 1) != DOT_CHAR // not wrapping
-                                || s.charAt(idx - 1) == BACKSLASH_CHAR)) { // ... or escaped
+                                && (s.charAt(idx + 1) != DOT // not wrapping
+                                || s.charAt(idx - 1) == BACKSLASH)) { // ... or escaped
                             idx++; // move index forward and keep searching
                         } else { // it's the closing pair
                             steps.add(escapeBackticks(s.substring(0, idx)));
@@ -144,7 +144,7 @@ public class SingleFieldPath implements FieldPath {
                         }
                     }
                 } else { // process dots in path
-                    final int atDot = s.indexOf(String.valueOf(DOT_CHAR));
+                    final int atDot = s.indexOf(String.valueOf(DOT));
                     if (atDot > 0) { // get path step and move forward
                         steps.add(escapeBackticks(s.substring(0, atDot)));
                         s.delete(0, atDot + 1);
@@ -169,19 +169,19 @@ public class SingleFieldPath implements FieldPath {
         final StringBuilder s = new StringBuilder(field);
         int idx = 0;
         while (idx >= 0) {
-            idx = s.indexOf(String.valueOf(BACKTICK_CHAR), idx + 1);
+            idx = s.indexOf(String.valueOf(BACKTICK), idx + 1);
             if (idx >= 1 && s.length() > 2) {
-                if (s.charAt(idx - 1) == DOT_CHAR
-                        || (idx < s.length() - 1 && s.charAt(idx + 1) == DOT_CHAR
-                        && s.charAt(idx - 1) != BACKSLASH_CHAR)) {
+                if (s.charAt(idx - 1) == DOT
+                        || (idx < s.length() - 1 && s.charAt(idx + 1) == DOT
+                        && s.charAt(idx - 1) != BACKSLASH)) {
                     throw new IllegalArgumentException("Incomplete backtick pair at [...]" + field);
                 }
-                if (s.charAt(idx - 1) == BACKSLASH_CHAR) { // escape backtick
-                    if ((idx == 1 && s.charAt(0) == BACKSLASH_CHAR) // at the beginning: \`foo[...]
+                if (s.charAt(idx - 1) == BACKSLASH) { // escape backtick
+                    if ((idx == 1 && s.charAt(0) == BACKSLASH) // at the beginning: \`foo[...]
                             || idx == s.length() - 1) { // at the end: [...]baz\`
                         s.deleteCharAt(idx - 1);
-                    } else if ((idx > 2 && s.charAt(idx - 2) == DOT_CHAR) // after a dot: [...].\`bar[...]
-                            || (idx < s.length() - 1 && s.charAt(idx + 1) == DOT_CHAR)) { // before a dot: [...]bar\`.[...]
+                    } else if ((idx > 2 && s.charAt(idx - 2) == DOT) // after a dot: [...].\`bar[...]
+                            || (idx < s.length() - 1 && s.charAt(idx + 1) == DOT)) { // before a dot: [...]bar\`.[...]
                         s.deleteCharAt(idx - 1);
                     }
                 }
