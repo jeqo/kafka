@@ -94,7 +94,12 @@ public class SingleFieldPath implements FieldPath {
                     this.path = new String[] {pathText};
                     break;
                 case V2:
-                    path = buildFieldPathV2(pathText);
+                    // if no dots or wrapping backticks are used, then return path with single step
+                    if (!pathText.contains(String.valueOf(DOT))) {
+                        path = new String[] {pathText};
+                    } else {
+                        path = buildFieldPathV2(pathText);
+                    }
                     break;
                 default:
                     throw new IllegalArgumentException("Unknown syntax version: " + version);
@@ -103,52 +108,47 @@ public class SingleFieldPath implements FieldPath {
     }
 
     private String[] buildFieldPathV2(String pathText) {
-        // if no dots or wrapping backticks are used, then return path with single step
-        if (!pathText.contains(String.valueOf(DOT))) {
-            return new String[] {pathText};
-        } else {
-            // prepare for tracking path steps
-            final List<String> steps = new ArrayList<>();
-            // avoid creating new string on changes
-            final StringBuilder s = new StringBuilder(pathText);
+        // prepare for tracking path steps
+        final List<String> steps = new ArrayList<>();
+        // avoid creating new string on changes
+        final StringBuilder s = new StringBuilder(pathText);
 
-            while (s.length() > 0) { // until path is traversed
-                // start processing backtick pair, if any
-                if (s.charAt(0) == BACKTICK) {
-                    s.deleteCharAt(0);
+        while (s.length() > 0) { // until path is traversed
+            // start processing backtick pair, if any
+            if (s.charAt(0) == BACKTICK) {
+                s.deleteCharAt(0);
 
-                    // find backtick closing pair
-                    int idx = 0;
-                    while (idx >= 0) {
-                        idx = s.indexOf(String.valueOf(BACKTICK), idx);
-                        if (idx == -1) { // if not found, fail
-                            throw new IllegalArgumentException("Incomplete backtick pair at [...]`" + s);
-                        }
-                        // check that it is not escaped or wrapped in another backticks pair
-                        if (idx < s.length() - 1 // not wrapping the whole field path
-                                && (s.charAt(idx + 1) != DOT // not wrapping
-                                || s.charAt(idx - 1) == BACKSLASH)) { // ... or escaped
-                            idx++; // move index forward and keep searching
-                        } else { // it's the closing pair
-                            steps.add(escapeBackticks(s.substring(0, idx)));
-                            s.delete(0, idx + 2); // rm backtick and dot
-                            break;
-                        }
+                // find backtick closing pair
+                int idx = 0;
+                while (idx >= 0) {
+                    idx = s.indexOf(String.valueOf(BACKTICK), idx);
+                    if (idx == -1) { // if not found, fail
+                        throw new IllegalArgumentException("Incomplete backtick pair at [...]`" + s);
                     }
-                } else { // process dots in path
-                    final int atDot = s.indexOf(String.valueOf(DOT));
-                    if (atDot > 0) { // get path step and move forward
-                        steps.add(escapeBackticks(s.substring(0, atDot)));
-                        s.delete(0, atDot + 1);
-                    } else { // add all
-                        steps.add(escapeBackticks(s.toString()));
-                        s.delete(0, s.length());
+                    // check that it is not escaped or wrapped in another backticks pair
+                    if (idx < s.length() - 1 // not wrapping the whole field path
+                            && (s.charAt(idx + 1) != DOT // not wrapping
+                            || s.charAt(idx - 1) == BACKSLASH)) { // ... or escaped
+                        idx++; // move index forward and keep searching
+                    } else { // it's the closing pair
+                        steps.add(escapeBackticks(s.substring(0, idx)));
+                        s.delete(0, idx + 2); // rm backtick and dot
+                        break;
                     }
                 }
+            } else { // process dots in path
+                final int atDot = s.indexOf(String.valueOf(DOT));
+                if (atDot > 0) { // get path step and move forward
+                    steps.add(escapeBackticks(s.substring(0, atDot)));
+                    s.delete(0, atDot + 1);
+                } else { // add all
+                    steps.add(escapeBackticks(s.toString()));
+                    s.delete(0, s.length());
+                }
             }
-
-            return steps.toArray(new String[0]);
         }
+
+        return steps.toArray(new String[0]);
     }
 
     /**
