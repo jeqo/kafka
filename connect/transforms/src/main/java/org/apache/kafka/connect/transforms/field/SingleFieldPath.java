@@ -157,7 +157,7 @@ public class SingleFieldPath implements FieldPath {
      * @param field potentially containing backticks
      * @throws IllegalArgumentException when there are incomplete backtick pairs
      */
-    private String escapeBackticks(String field) {
+    private static String escapeBackticks(String field) {
         final StringBuilder s = new StringBuilder(field);
         int idx = 0;
         while (idx >= 0) {
