@@ -56,7 +56,7 @@ public abstract class ExtractField<R extends ConnectRecord<R>> implements Transf
     @Override
     public void configure(Map<String, ?> props) {
         final SimpleConfig config = new SimpleConfig(CONFIG_DEF, props);
-        fieldPath = SingleFieldPath.of(config.getString(FIELD_CONFIG), FieldSyntaxVersion.fromConfig(config));
+        fieldPath = new SingleFieldPath(config.getString(FIELD_CONFIG), FieldSyntaxVersion.fromConfig(config));
     }
 
     @Override

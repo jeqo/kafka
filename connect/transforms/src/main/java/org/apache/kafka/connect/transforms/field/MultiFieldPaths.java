@@ -64,7 +64,7 @@ public class MultiFieldPaths implements FieldPath {
 
     public static MultiFieldPaths of(List<String> fields, FieldSyntaxVersion syntaxVersion) {
         return new MultiFieldPaths(fields.stream()
-                .map(f -> SingleFieldPath.of(f, syntaxVersion))
+                .map(f -> new SingleFieldPath(f, syntaxVersion))
                 .collect(Collectors.toSet()));
     }
 

@@ -121,7 +121,7 @@ public abstract class HeaderFrom<R extends ConnectRecord<R>> implements Transfor
         headersMap = new HashMap<>(headers.size());
         for (int i = 0; i < headers.size(); i++) {
             final String headerName = headers.get(i);
-            final SingleFieldPath field = SingleFieldPath.of(fields.get(i), syntaxVersion);
+            final SingleFieldPath field = new SingleFieldPath(fields.get(i), syntaxVersion);
             headersMap.computeIfPresent(headerName, (s, p) -> {
                 p.add(field);
                 return p;

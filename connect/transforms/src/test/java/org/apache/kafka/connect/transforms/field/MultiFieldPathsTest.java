@@ -33,30 +33,30 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class MultiFieldPathsTest {
     @Test void shouldBuildPathWithSinglePathV1() {
-        SingleFieldPath path = SingleFieldPath.of("foo.bar.baz", FieldSyntaxVersion.V1);
+        SingleFieldPath path = new SingleFieldPath("foo.bar.baz", FieldSyntaxVersion.V1);
         MultiFieldPaths paths = createMultiFieldPaths(path);
         assertEquals(1, paths.pathTree.size());
         assertEquals(path, paths.pathTree.get("foo.bar.baz"));
     }
 
     @Test void shouldBuildPathWithSamePathV1() {
-        SingleFieldPath path = SingleFieldPath.of("foo.bar.baz", FieldSyntaxVersion.V1);
+        SingleFieldPath path = new SingleFieldPath("foo.bar.baz", FieldSyntaxVersion.V1);
         MultiFieldPaths paths = createMultiFieldPaths(path, path);
         assertEquals(1, paths.pathTree.size());
         assertEquals(path, paths.pathTree.get("foo.bar.baz"));
     }
 
     @Test void shouldBuildPathWithSinglePathV2() {
-        SingleFieldPath path = SingleFieldPath.of("foo.bar.baz", FieldSyntaxVersion.V2);
+        SingleFieldPath path = new SingleFieldPath("foo.bar.baz", FieldSyntaxVersion.V2);
         MultiFieldPaths paths = createMultiFieldPaths(path);
         assertEquals(1, paths.pathTree.size());
         assertEquals(path, ((Map<?, ?>) ((Map<?, ?>) paths.pathTree.get("foo")).get("bar")).get("baz"));
     }
 
     @Test void shouldConflatePathsWithSameParent() {
-        SingleFieldPath foobar = SingleFieldPath.of("foo.bar", FieldSyntaxVersion.V2);
+        SingleFieldPath foobar = new SingleFieldPath("foo.bar", FieldSyntaxVersion.V2);
         MultiFieldPaths path = createMultiFieldPaths(
-            SingleFieldPath.of("foo", FieldSyntaxVersion.V2),
+            new SingleFieldPath("foo", FieldSyntaxVersion.V2),
             foobar
         );
         assertEquals(1, path.pathTree.size());
@@ -109,8 +109,8 @@ class MultiFieldPathsTest {
         value.put("foo", 42);
         value.put("bar", 21);
 
-        SingleFieldPath fooPath = SingleFieldPath.of("foo", FieldSyntaxVersion.V1);
-        SingleFieldPath barPath = SingleFieldPath.of("bar", FieldSyntaxVersion.V1);
+        SingleFieldPath fooPath = new SingleFieldPath("foo", FieldSyntaxVersion.V1);
+        SingleFieldPath barPath = new SingleFieldPath("bar", FieldSyntaxVersion.V1);
         MultiFieldPaths fieldPaths = createMultiFieldPaths(fooPath, barPath);
         Map<String, Object> updated = fieldPaths.updateValueFrom(
                 value,
@@ -128,8 +128,8 @@ class MultiFieldPathsTest {
         nested.put("baz", 42);
         Map<String, Object> value = Collections.singletonMap("foo", nested);
 
-        SingleFieldPath barPath = SingleFieldPath.of("foo.bar", FieldSyntaxVersion.V2);
-        SingleFieldPath bazPath = SingleFieldPath.of("foo.baz", FieldSyntaxVersion.V2);
+        SingleFieldPath barPath = new SingleFieldPath("foo.bar", FieldSyntaxVersion.V2);
+        SingleFieldPath bazPath = new SingleFieldPath("foo.baz", FieldSyntaxVersion.V2);
         MultiFieldPaths fieldPaths = createMultiFieldPaths(bazPath, barPath);
         Map<String, Object> updated = fieldPaths.updateValueFrom(
                 value,
@@ -150,8 +150,8 @@ class MultiFieldPathsTest {
                 .put("foo.bar", 21)
                 .put("foo.baz", 42);
 
-        SingleFieldPath bazPath = SingleFieldPath.of("foo.baz", FieldSyntaxVersion.V1);
-        SingleFieldPath barPath = SingleFieldPath.of("foo.bar", FieldSyntaxVersion.V1);
+        SingleFieldPath bazPath = new SingleFieldPath("foo.baz", FieldSyntaxVersion.V1);
+        SingleFieldPath barPath = new SingleFieldPath("foo.bar", FieldSyntaxVersion.V1);
         MultiFieldPaths fieldPaths = createMultiFieldPaths(bazPath, barPath);
         Struct updated = fieldPaths.updateValueFrom(schema, value, schema,
                 (orig, oldField, s, updatedField, f) -> s.put(updatedField, ((Integer) orig.get(oldField)) * 2));
@@ -173,8 +173,8 @@ class MultiFieldPathsTest {
                 .put("baz", 42);
         Struct value = new Struct(schema).put("foo", nested);
 
-        SingleFieldPath bazPath = SingleFieldPath.of("foo.baz", FieldSyntaxVersion.V2);
-        SingleFieldPath barPath = SingleFieldPath.of("foo.bar", FieldSyntaxVersion.V2);
+        SingleFieldPath bazPath = new SingleFieldPath("foo.baz", FieldSyntaxVersion.V2);
+        SingleFieldPath barPath = new SingleFieldPath("foo.bar", FieldSyntaxVersion.V2);
         MultiFieldPaths fieldPaths = createMultiFieldPaths(bazPath, barPath);
         Struct updated = fieldPaths.updateValueFrom(schema, value, schema,
                 (orig, oldField, s, updatedField, f) -> s.put(updatedField, ((Integer) orig.get(oldField)) * 2));

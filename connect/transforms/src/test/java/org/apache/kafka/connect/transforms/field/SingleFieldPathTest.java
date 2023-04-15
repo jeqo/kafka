@@ -40,42 +40,42 @@ class SingleFieldPathTest {
     }
 
     @Test void shouldBuildV2WithEmptyPath() {
-        assertArrayEquals(EMPTY_PATH, SingleFieldPath.of("", FieldSyntaxVersion.V2).path());
+        assertArrayEquals(EMPTY_PATH, new SingleFieldPath("", FieldSyntaxVersion.V2).path());
     }
 
     @Test void shouldBuildV2WithNullPath() {
-        assertArrayEquals(EMPTY_PATH, SingleFieldPath.of(null, FieldSyntaxVersion.V2).path());
+        assertArrayEquals(EMPTY_PATH, new SingleFieldPath(null, FieldSyntaxVersion.V2).path());
     }
 
     @Test void shouldBuildV2WithoutDots() {
-        assertArrayEquals(new String[] {"foobarbaz"}, SingleFieldPath.of("foobarbaz", FieldSyntaxVersion.V2).path());
+        assertArrayEquals(new String[] {"foobarbaz"}, new SingleFieldPath("foobarbaz", FieldSyntaxVersion.V2).path());
     }
     @Test void shouldBuildV2WithoutWrappingBackticks() {
-        assertArrayEquals(new String[] {"foo`bar`baz"}, SingleFieldPath.of("foo`bar`baz", FieldSyntaxVersion.V2).path());
+        assertArrayEquals(new String[] {"foo`bar`baz"}, new SingleFieldPath("foo`bar`baz", FieldSyntaxVersion.V2).path());
     }
 
     @Test void shouldBuildV2WhenIncludesDots() {
-        assertArrayEquals(new String[] {"foo", "bar", "baz"}, SingleFieldPath.of("foo.bar.baz", FieldSyntaxVersion.V2).path());
+        assertArrayEquals(new String[] {"foo", "bar", "baz"}, new SingleFieldPath("foo.bar.baz", FieldSyntaxVersion.V2).path());
     }
 
     @Test void shouldBuildV2WhenIncludesDotsAndBacktickPair() {
-        assertArrayEquals(new String[] {"foo", "bar.baz"}, SingleFieldPath.of("foo.`bar.baz`", FieldSyntaxVersion.V2).path());
-        assertArrayEquals(new String[] {"foo", "bar", "baz"}, SingleFieldPath.of("foo.`bar`.baz", FieldSyntaxVersion.V2).path());
+        assertArrayEquals(new String[] {"foo", "bar.baz"}, new SingleFieldPath("foo.`bar.baz`", FieldSyntaxVersion.V2).path());
+        assertArrayEquals(new String[] {"foo", "bar", "baz"}, new SingleFieldPath("foo.`bar`.baz", FieldSyntaxVersion.V2).path());
     }
 
     @Test void shouldBuildV2AndIgnoreBackticksThatAreNotWrapping() {
-        assertArrayEquals(new String[] {"foo", "ba`r.baz"}, SingleFieldPath.of("foo.`ba`r.baz`", FieldSyntaxVersion.V2).path());
-        assertArrayEquals(new String[] {"foo", "ba`r", "baz"}, SingleFieldPath.of("foo.ba`r.baz", FieldSyntaxVersion.V2).path());
+        assertArrayEquals(new String[] {"foo", "ba`r.baz"}, new SingleFieldPath("foo.`ba`r.baz`", FieldSyntaxVersion.V2).path());
+        assertArrayEquals(new String[] {"foo", "ba`r", "baz"}, new SingleFieldPath("foo.ba`r.baz", FieldSyntaxVersion.V2).path());
     }
 
     @Test void shouldBuildV2AndEscapeBackticks() {
-        assertArrayEquals(new String[] {"foo", "bar`.`baz"}, SingleFieldPath.of("foo.`bar\\`.\\`baz`", FieldSyntaxVersion.V2).path());
-        assertArrayEquals(new String[] {"foo", "bar\\`.`baz"}, SingleFieldPath.of("foo.`bar\\\\`.\\`baz`", FieldSyntaxVersion.V2).path());
+        assertArrayEquals(new String[] {"foo", "bar`.`baz"}, new SingleFieldPath("foo.`bar\\`.\\`baz`", FieldSyntaxVersion.V2).path());
+        assertArrayEquals(new String[] {"foo", "bar\\`.`baz"}, new SingleFieldPath("foo.`bar\\\\`.\\`baz`", FieldSyntaxVersion.V2).path());
     }
 
     @Test void shouldBuildV2WithBackticksWrappingBackticks() {
-        assertArrayEquals(new String[] {"foo", "`bar`", "baz"}, SingleFieldPath.of("foo.`\\`bar\\``.baz", FieldSyntaxVersion.V2).path());
-        assertArrayEquals(new String[] {"`foo.bar.baz`"}, SingleFieldPath.of("`\\`foo.bar.baz\\``", FieldSyntaxVersion.V2).path());
+        assertArrayEquals(new String[] {"foo", "`bar`", "baz"}, new SingleFieldPath("foo.`\\`bar\\``.baz", FieldSyntaxVersion.V2).path());
+        assertArrayEquals(new String[] {"`foo.bar.baz`"}, new SingleFieldPath("`\\`foo.bar.baz\\``", FieldSyntaxVersion.V2).path());
     }
 
     @Test void shouldFilterSchemaV1Fields() {
@@ -85,7 +85,7 @@ class SingleFieldPathTest {
             .build();
 
         SchemaBuilder updated = SchemaUtil.copySchemaBasics(schema, SchemaBuilder.struct());
-        Schema result = SingleFieldPath.of("foo", FieldSyntaxVersion.V1)
+        Schema result = new SingleFieldPath("foo", FieldSyntaxVersion.V1)
             .updateSchemaFrom(schema, updated, (builder, field, path) -> {
                 // ignore field
             });
@@ -101,7 +101,7 @@ class SingleFieldPathTest {
             .build();
 
         SchemaBuilder updated = SchemaUtil.copySchemaBasics(schema, SchemaBuilder.struct());
-        SingleFieldPath fieldPath = SingleFieldPath.of("foo.baz", FieldSyntaxVersion.V2);
+        SingleFieldPath fieldPath = new SingleFieldPath("foo.baz", FieldSyntaxVersion.V2);
         Schema result = fieldPath.updateSchemaFrom(
                 schema,
                 updated, (builder, field, path) -> {
@@ -120,7 +120,7 @@ class SingleFieldPathTest {
                 .field("baz", Schema.INT32_SCHEMA)
                 .build();
 
-        SingleFieldPath fieldPath = SingleFieldPath.of("foo", FieldSyntaxVersion.V1);
+        SingleFieldPath fieldPath = new SingleFieldPath("foo", FieldSyntaxVersion.V1);
         Schema result = fieldPath.updateSchemaFrom(
                 schema,
                 (builder, field, path) -> builder.field("other", field.schema())
@@ -140,7 +140,7 @@ class SingleFieldPathTest {
                 .field("foo", nested)
                 .build();
 
-        SingleFieldPath fieldPath = SingleFieldPath.of("foo.baz", FieldSyntaxVersion.V2);
+        SingleFieldPath fieldPath = new SingleFieldPath("foo.baz", FieldSyntaxVersion.V2);
         Schema result = fieldPath.updateSchemaFrom(
                 schema,
                 (builder, field, path) -> builder.field("other", field.schema())
@@ -155,7 +155,7 @@ class SingleFieldPathTest {
     @Test void shouldUpdateValueV1FromSchemaless() {
         Map<String, Object> value = Collections.singletonMap("foo", 42);
 
-        SingleFieldPath fieldPath = SingleFieldPath.of("foo", FieldSyntaxVersion.V1);
+        SingleFieldPath fieldPath = new SingleFieldPath("foo", FieldSyntaxVersion.V1);
         Map<String, Object> updated = fieldPath
             .updateValueFrom(value, (orig, map, f, k) -> map.put(k, ((Integer) orig.get(k)) * 2));
 
@@ -165,7 +165,7 @@ class SingleFieldPathTest {
     @Test void shouldUpdateNestedValueV2FromSchemaless() {
         Map<String, Object> value = Collections.singletonMap("foo", Collections.singletonMap("bar", 42));
 
-        SingleFieldPath fieldPath = SingleFieldPath.of("foo.bar", FieldSyntaxVersion.V2);
+        SingleFieldPath fieldPath = new SingleFieldPath("foo.bar", FieldSyntaxVersion.V2);
         Map<String, Object> updated = fieldPath.updateValueFrom(
                 value,
                 (original, map, f, k) -> map.put(k, ((Integer) original.get(k)) * 2)
@@ -178,7 +178,7 @@ class SingleFieldPathTest {
         Schema schema = SchemaBuilder.struct().field("foo", Schema.INT32_SCHEMA).build();
         Struct value = new Struct(schema).put("foo", 42);
 
-        SingleFieldPath fieldPath = SingleFieldPath.of("foo", FieldSyntaxVersion.V1);
+        SingleFieldPath fieldPath = new SingleFieldPath("foo", FieldSyntaxVersion.V1);
         Struct updated = fieldPath.updateValueFrom(schema, value, schema,
                 (orig, oldField, s, updatedField, f) -> s.put(updatedField, ((Integer) orig.get(oldField)) * 2));
 
@@ -190,7 +190,7 @@ class SingleFieldPathTest {
         Schema schema = SchemaBuilder.struct().field("foo", barSchema).build();
         Struct value = new Struct(schema).put("foo", new Struct(barSchema).put("bar", 42));
 
-        SingleFieldPath fieldPath = SingleFieldPath.of("foo.bar", FieldSyntaxVersion.V2);
+        SingleFieldPath fieldPath = new SingleFieldPath("foo.bar", FieldSyntaxVersion.V2);
         Struct updated = fieldPath.updateValueFrom(schema, value, schema,
                 (orig, oldField, s, updatedField, f) -> s.put(updatedField, ((Integer) orig.get(oldField)) * 2));
 

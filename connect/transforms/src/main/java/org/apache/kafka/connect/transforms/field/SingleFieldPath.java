@@ -16,9 +16,6 @@
  */
 package org.apache.kafka.connect.transforms.field;
 
-import org.apache.kafka.common.cache.Cache;
-import org.apache.kafka.common.cache.LRUCache;
-import org.apache.kafka.common.cache.SynchronizedCache;
 import org.apache.kafka.connect.data.Field;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Schema.Type;
@@ -59,33 +56,9 @@ public class SingleFieldPath implements FieldPath {
     private static final char DOT = '.';
     private static final char BACKSLASH = '\\';
 
-    private static final Cache<String, SingleFieldPath> PATHS_CACHE = new SynchronizedCache<>(new LRUCache<>(16));
-
     private final String[] path;
 
-    /**
-     * If version is V2, then paths are cached for further access.
-     *
-     * @param field   field path expression
-     * @param version field syntax version
-     */
-    public static SingleFieldPath of(String field, FieldSyntaxVersion version) {
-        if ((field == null || field.isEmpty()) // empty path
-                || version.equals(FieldSyntaxVersion.V1)) { // or V1
-            return new SingleFieldPath(field, version);
-        } else { // use cache when V2
-            final SingleFieldPath found = PATHS_CACHE.get(field);
-            if (found != null) {
-                return found;
-            } else {
-                final SingleFieldPath fieldPath = new SingleFieldPath(field, version);
-                PATHS_CACHE.put(field, fieldPath);
-                return fieldPath;
-            }
-        }
-    }
-
-    SingleFieldPath(String pathText, FieldSyntaxVersion version) {
+    public SingleFieldPath(String pathText, FieldSyntaxVersion version) {
         if (pathText == null || pathText.isEmpty()) { // empty path
             this.path = new String[] {};
         } else {

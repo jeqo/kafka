@@ -134,7 +134,7 @@ public class MaskFieldTest {
     }
 
     private static void checkReplacementWithSchema(SinkRecord record, String maskField, Object replacement, FieldSyntaxVersion version) {
-        final SingleFieldPath fieldPath = SingleFieldPath.of(maskField, version);
+        final SingleFieldPath fieldPath = new SingleFieldPath(maskField, version);
         final Struct updatedValue =
                 (Struct) transform(singletonList(maskField), String.valueOf(replacement), version)
                         .apply(record)
@@ -169,7 +169,7 @@ public class MaskFieldTest {
                         .apply(record)
                         .value();
         for (String maskField : maskFields) {
-            assertEquals(replacement, SingleFieldPath.of(maskField, version).valueFrom(updatedValue), "Invalid replacement for " + maskField + " value");
+            assertEquals(replacement, new SingleFieldPath(maskField, version).valueFrom(updatedValue), "Invalid replacement for " + maskField + " value");
         }
     }
 
@@ -210,20 +210,20 @@ public class MaskFieldTest {
                         .apply(record(null, NESTED_VALUES))
                         .value();
 
-        assertEquals(42, SingleFieldPath.of("foo.magic", FieldSyntaxVersion.V2).valueFrom(updatedValue));
-        assertEquals(false, SingleFieldPath.of("foo.bool", FieldSyntaxVersion.V2).valueFrom(updatedValue));
-        assertEquals((byte) 0, SingleFieldPath.of("foo.byte", FieldSyntaxVersion.V2).valueFrom(updatedValue));
-        assertEquals((short) 0, SingleFieldPath.of("foo.short", FieldSyntaxVersion.V2).valueFrom(updatedValue));
-        assertEquals(0, SingleFieldPath.of("foo.int", FieldSyntaxVersion.V2).valueFrom(updatedValue));
-        assertEquals(0L, SingleFieldPath.of("foo.long", FieldSyntaxVersion.V2).valueFrom(updatedValue));
-        assertEquals(0f, SingleFieldPath.of("foo.float", FieldSyntaxVersion.V2).valueFrom(updatedValue));
-        assertEquals(0d, SingleFieldPath.of("foo.double", FieldSyntaxVersion.V2).valueFrom(updatedValue));
-        assertEquals("", SingleFieldPath.of("foo.string", FieldSyntaxVersion.V2).valueFrom(updatedValue));
-        assertEquals(new Date(0), SingleFieldPath.of("foo.date", FieldSyntaxVersion.V2).valueFrom(updatedValue));
-        assertEquals(BigInteger.ZERO, SingleFieldPath.of("foo.bigint", FieldSyntaxVersion.V2).valueFrom(updatedValue));
-        assertEquals(BigDecimal.ZERO, SingleFieldPath.of("foo.bigdec", FieldSyntaxVersion.V2).valueFrom(updatedValue));
-        assertEquals(Collections.emptyList(), SingleFieldPath.of("foo.list", FieldSyntaxVersion.V2).valueFrom(updatedValue));
-        assertEquals(Collections.emptyMap(), SingleFieldPath.of("foo.map", FieldSyntaxVersion.V2).valueFrom(updatedValue));
+        assertEquals(42, new SingleFieldPath("foo.magic", FieldSyntaxVersion.V2).valueFrom(updatedValue));
+        assertEquals(false, new SingleFieldPath("foo.bool", FieldSyntaxVersion.V2).valueFrom(updatedValue));
+        assertEquals((byte) 0, new SingleFieldPath("foo.byte", FieldSyntaxVersion.V2).valueFrom(updatedValue));
+        assertEquals((short) 0, new SingleFieldPath("foo.short", FieldSyntaxVersion.V2).valueFrom(updatedValue));
+        assertEquals(0, new SingleFieldPath("foo.int", FieldSyntaxVersion.V2).valueFrom(updatedValue));
+        assertEquals(0L, new SingleFieldPath("foo.long", FieldSyntaxVersion.V2).valueFrom(updatedValue));
+        assertEquals(0f, new SingleFieldPath("foo.float", FieldSyntaxVersion.V2).valueFrom(updatedValue));
+        assertEquals(0d, new SingleFieldPath("foo.double", FieldSyntaxVersion.V2).valueFrom(updatedValue));
+        assertEquals("", new SingleFieldPath("foo.string", FieldSyntaxVersion.V2).valueFrom(updatedValue));
+        assertEquals(new Date(0), new SingleFieldPath("foo.date", FieldSyntaxVersion.V2).valueFrom(updatedValue));
+        assertEquals(BigInteger.ZERO, new SingleFieldPath("foo.bigint", FieldSyntaxVersion.V2).valueFrom(updatedValue));
+        assertEquals(BigDecimal.ZERO, new SingleFieldPath("foo.bigdec", FieldSyntaxVersion.V2).valueFrom(updatedValue));
+        assertEquals(Collections.emptyList(), new SingleFieldPath("foo.list", FieldSyntaxVersion.V2).valueFrom(updatedValue));
+        assertEquals(Collections.emptyMap(), new SingleFieldPath("foo.map", FieldSyntaxVersion.V2).valueFrom(updatedValue));
     }
 
     @Test
@@ -271,21 +271,21 @@ public class MaskFieldTest {
                         .apply(record(NESTED_SCHEMA, NESTED_VALUES_WITH_SCHEMA))
                         .value();
 
-        assertEquals(42, SingleFieldPath.of("foo.magic", FieldSyntaxVersion.V2).valueFrom(updatedValue));
-        assertEquals(false, SingleFieldPath.of("foo.bool", FieldSyntaxVersion.V2).valueFrom(updatedValue));
-        assertEquals((byte) 0, SingleFieldPath.of("foo.byte", FieldSyntaxVersion.V2).valueFrom(updatedValue));
-        assertEquals((short) 0, SingleFieldPath.of("foo.short", FieldSyntaxVersion.V2).valueFrom(updatedValue));
-        assertEquals(0, SingleFieldPath.of("foo.int", FieldSyntaxVersion.V2).valueFrom(updatedValue));
-        assertEquals(0L, SingleFieldPath.of("foo.long", FieldSyntaxVersion.V2).valueFrom(updatedValue));
-        assertEquals(0f, SingleFieldPath.of("foo.float", FieldSyntaxVersion.V2).valueFrom(updatedValue));
-        assertEquals(0d, SingleFieldPath.of("foo.double", FieldSyntaxVersion.V2).valueFrom(updatedValue));
-        assertEquals("", SingleFieldPath.of("foo.string", FieldSyntaxVersion.V2).valueFrom(updatedValue));
-        assertEquals(new Date(0), SingleFieldPath.of("foo.date", FieldSyntaxVersion.V2).valueFrom(updatedValue));
-        assertEquals(new Date(0), SingleFieldPath.of("foo.time", FieldSyntaxVersion.V2).valueFrom(updatedValue));
-        assertEquals(new Date(0), SingleFieldPath.of("foo.timestamp", FieldSyntaxVersion.V2).valueFrom(updatedValue));
-        assertEquals(BigDecimal.ZERO, SingleFieldPath.of("foo.decimal", FieldSyntaxVersion.V2).valueFrom(updatedValue));
-        assertEquals(Collections.emptyList(), SingleFieldPath.of("foo.array", FieldSyntaxVersion.V2).valueFrom(updatedValue));
-        assertEquals(Collections.emptyMap(), SingleFieldPath.of("foo.map", FieldSyntaxVersion.V2).valueFrom(updatedValue));
+        assertEquals(42, new SingleFieldPath("foo.magic", FieldSyntaxVersion.V2).valueFrom(updatedValue));
+        assertEquals(false, new SingleFieldPath("foo.bool", FieldSyntaxVersion.V2).valueFrom(updatedValue));
+        assertEquals((byte) 0, new SingleFieldPath("foo.byte", FieldSyntaxVersion.V2).valueFrom(updatedValue));
+        assertEquals((short) 0, new SingleFieldPath("foo.short", FieldSyntaxVersion.V2).valueFrom(updatedValue));
+        assertEquals(0, new SingleFieldPath("foo.int", FieldSyntaxVersion.V2).valueFrom(updatedValue));
+        assertEquals(0L, new SingleFieldPath("foo.long", FieldSyntaxVersion.V2).valueFrom(updatedValue));
+        assertEquals(0f, new SingleFieldPath("foo.float", FieldSyntaxVersion.V2).valueFrom(updatedValue));
+        assertEquals(0d, new SingleFieldPath("foo.double", FieldSyntaxVersion.V2).valueFrom(updatedValue));
+        assertEquals("", new SingleFieldPath("foo.string", FieldSyntaxVersion.V2).valueFrom(updatedValue));
+        assertEquals(new Date(0), new SingleFieldPath("foo.date", FieldSyntaxVersion.V2).valueFrom(updatedValue));
+        assertEquals(new Date(0), new SingleFieldPath("foo.time", FieldSyntaxVersion.V2).valueFrom(updatedValue));
+        assertEquals(new Date(0), new SingleFieldPath("foo.timestamp", FieldSyntaxVersion.V2).valueFrom(updatedValue));
+        assertEquals(BigDecimal.ZERO, new SingleFieldPath("foo.decimal", FieldSyntaxVersion.V2).valueFrom(updatedValue));
+        assertEquals(Collections.emptyList(), new SingleFieldPath("foo.array", FieldSyntaxVersion.V2).valueFrom(updatedValue));
+        assertEquals(Collections.emptyMap(), new SingleFieldPath("foo.map", FieldSyntaxVersion.V2).valueFrom(updatedValue));
     }
 
     @Test
@@ -449,12 +449,12 @@ public class MaskFieldTest {
         final Struct updatedValue = (Struct) transform(maskFields, null, FieldSyntaxVersion.V2)
                 .apply(record(NESTED_SCHEMA, NESTED_VALUES_WITH_SCHEMA))
                 .value();
-        @SuppressWarnings("unchecked") List<Integer> actualList = (List<Integer>) SingleFieldPath.of("foo.array", FieldSyntaxVersion.V2).valueFrom(updatedValue);
+        @SuppressWarnings("unchecked") List<Integer> actualList = (List<Integer>) new SingleFieldPath("foo.array", FieldSyntaxVersion.V2).valueFrom(updatedValue);
         assertEquals(Collections.emptyList(), actualList);
         actualList.add(0);
         assertEquals(Collections.singletonList(0), actualList);
 
-        @SuppressWarnings("unchecked") Map<String, String> actualMap = (Map<String, String>) SingleFieldPath.of("foo.map", FieldSyntaxVersion.V2).valueFrom(updatedValue);
+        @SuppressWarnings("unchecked") Map<String, String> actualMap = (Map<String, String>) new SingleFieldPath("foo.map", FieldSyntaxVersion.V2).valueFrom(updatedValue);
         assertEquals(Collections.emptyMap(), actualMap);
         actualMap.put("k", "v");
         assertEquals(Collections.singletonMap("k", "v"), actualMap);

@@ -320,7 +320,7 @@ public abstract class TimestampConverter<R extends ConnectRecord<R>> implements 
                         + formatPattern, e);
             }
         }
-        config = new Config(SingleFieldPath.of(field, FieldSyntaxVersion.fromConfig(simpleConfig)), type,
+        config = new Config(new SingleFieldPath(field, FieldSyntaxVersion.fromConfig(simpleConfig)), type,
                 format, unixPrecision);
     }
 
