@@ -131,7 +131,7 @@ public class SingleFieldPath implements FieldPath {
                             || s.charAt(idx - 1) == BACKSLASH)) { // ... or escaped
                         idx++; // move index forward and keep searching
                     } else { // it's the closing pair
-                        steps.add(escapeBackticks(s.substring(0, idx)));
+                        steps.add(processEscapedBackticks(s.substring(0, idx)));
                         s.delete(0, idx + 2); // rm backtick and dot
                         break;
                     }
@@ -157,7 +157,7 @@ public class SingleFieldPath implements FieldPath {
      * @param field potentially containing backticks
      * @throws IllegalArgumentException when there are incomplete backtick pairs
      */
-    private static String escapeBackticks(String field) {
+    private static String processEscapedBackticks(String field) {
         final StringBuilder s = new StringBuilder(field);
         int idx = 0;
         while (idx >= 0) {
