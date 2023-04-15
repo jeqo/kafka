@@ -139,10 +139,10 @@ public class SingleFieldPath implements FieldPath {
             } else { // process dots in path
                 final int atDot = s.indexOf(String.valueOf(DOT));
                 if (atDot > 0) { // get path step and move forward
-                    steps.add(escapeBackticks(s.substring(0, atDot)));
+                    steps.add(s.substring(0, atDot));
                     s.delete(0, atDot + 1);
                 } else { // add all
-                    steps.add(escapeBackticks(s.toString()));
+                    steps.add(s.toString());
                     s.delete(0, s.length());
                 }
             }
