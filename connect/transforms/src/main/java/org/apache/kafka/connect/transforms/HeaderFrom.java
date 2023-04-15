@@ -58,7 +58,8 @@ public abstract class HeaderFrom<R extends ConnectRecord<R>> implements Transfor
                     "Use the concrete transformation type designed for the record " +
                     "key (<code>" + Key.class.getName() + "</code>) or value (<code>" + Value.class.getName() + "</code>).";
 
-    public static final ConfigDef CONFIG_DEF = FieldSyntaxVersion.baseConfigDef()
+    public static final ConfigDef CONFIG_DEF = new ConfigDef()
+        .addDefinition(FieldSyntaxVersion.configDef())
             .define(FIELDS_FIELD, ConfigDef.Type.LIST,
                     NO_DEFAULT_VALUE, new NonEmptyListValidator(),
                     ConfigDef.Importance.HIGH,

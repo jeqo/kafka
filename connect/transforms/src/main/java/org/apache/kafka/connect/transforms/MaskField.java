@@ -50,12 +50,13 @@ public abstract class MaskField<R extends ConnectRecord<R>> implements Transform
     private static final String FIELDS_CONFIG = "fields";
     private static final String REPLACEMENT_CONFIG = "replacement";
 
-    public static final ConfigDef CONFIG_DEF = FieldSyntaxVersion.baseConfigDef()
-            .define(FIELDS_CONFIG, ConfigDef.Type.LIST, ConfigDef.NO_DEFAULT_VALUE, new NonEmptyListValidator(),
-                    ConfigDef.Importance.HIGH, "Names of fields to mask.")
-            .define(REPLACEMENT_CONFIG, ConfigDef.Type.STRING, null, new ConfigDef.NonEmptyString(),
-                    ConfigDef.Importance.LOW, "Custom value replacement, that will be applied to all"
-                            + " 'fields' values (numeric or non-empty string values only).");
+    public static final ConfigDef CONFIG_DEF = new ConfigDef()
+        .addDefinition(FieldSyntaxVersion.configDef())
+        .define(FIELDS_CONFIG, ConfigDef.Type.LIST, ConfigDef.NO_DEFAULT_VALUE, new NonEmptyListValidator(),
+                ConfigDef.Importance.HIGH, "Names of fields to mask.")
+        .define(REPLACEMENT_CONFIG, ConfigDef.Type.STRING, null, new ConfigDef.NonEmptyString(),
+                ConfigDef.Importance.LOW, "Custom value replacement, that will be applied to all"
+                        + " 'fields' values (numeric or non-empty string values only).");
 
     private static final String PURPOSE = "mask fields";
 

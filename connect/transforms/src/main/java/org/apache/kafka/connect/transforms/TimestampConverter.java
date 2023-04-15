@@ -86,32 +86,33 @@ public abstract class TimestampConverter<R extends ConnectRecord<R>> implements 
     public static final Schema OPTIONAL_TIMESTAMP_SCHEMA = Timestamp.builder().optional().schema();
     public static final Schema OPTIONAL_TIME_SCHEMA = Time.builder().optional().schema();
 
-    public static final ConfigDef CONFIG_DEF = FieldSyntaxVersion.baseConfigDef()
-            .define(FIELD_CONFIG,
-                    ConfigDef.Type.STRING,
-                    FIELD_DEFAULT,
-                    ConfigDef.Importance.HIGH,
-                    "The field containing the timestamp, or empty if the entire value is a timestamp")
-            .define(TARGET_TYPE_CONFIG,
-                    ConfigDef.Type.STRING,
-                    ConfigDef.NO_DEFAULT_VALUE,
-                    ConfigDef.ValidString.in(TYPE_STRING, TYPE_UNIX, TYPE_DATE, TYPE_TIME, TYPE_TIMESTAMP),
-                    ConfigDef.Importance.HIGH,
-                    "The desired timestamp representation: string, unix, Date, Time, or Timestamp")
-            .define(FORMAT_CONFIG,
-                    ConfigDef.Type.STRING,
-                    FORMAT_DEFAULT,
-                    ConfigDef.Importance.MEDIUM,
-                    "A SimpleDateFormat-compatible format for the timestamp. Used to generate the output when type=string "
-                            + "or used to parse the input if the input is a string.")
-            .define(UNIX_PRECISION_CONFIG,
-                    ConfigDef.Type.STRING,
-                    UNIX_PRECISION_DEFAULT,
-                    ConfigDef.ValidString.in(UNIX_PRECISION_NANOS, UNIX_PRECISION_MICROS, UNIX_PRECISION_MILLIS, UNIX_PRECISION_SECONDS),
-                    ConfigDef.Importance.LOW,
-                    "The desired Unix precision for the timestamp: seconds, milliseconds, microseconds, or nanoseconds. " +
-                            "Used to generate the output when type=unix or used to parse the input if the input is a Long." +
-                            "Note: This SMT will cause precision loss during conversions from, and to, values with sub-millisecond components.");
+    public static final ConfigDef CONFIG_DEF = new ConfigDef()
+        .addDefinition(FieldSyntaxVersion.configDef())
+        .define(FIELD_CONFIG,
+                ConfigDef.Type.STRING,
+                FIELD_DEFAULT,
+                ConfigDef.Importance.HIGH,
+                "The field containing the timestamp, or empty if the entire value is a timestamp")
+        .define(TARGET_TYPE_CONFIG,
+                ConfigDef.Type.STRING,
+                ConfigDef.NO_DEFAULT_VALUE,
+                ConfigDef.ValidString.in(TYPE_STRING, TYPE_UNIX, TYPE_DATE, TYPE_TIME, TYPE_TIMESTAMP),
+                ConfigDef.Importance.HIGH,
+                "The desired timestamp representation: string, unix, Date, Time, or Timestamp")
+        .define(FORMAT_CONFIG,
+                ConfigDef.Type.STRING,
+                FORMAT_DEFAULT,
+                ConfigDef.Importance.MEDIUM,
+                "A SimpleDateFormat-compatible format for the timestamp. Used to generate the output when type=string "
+                        + "or used to parse the input if the input is a string.")
+        .define(UNIX_PRECISION_CONFIG,
+                ConfigDef.Type.STRING,
+                UNIX_PRECISION_DEFAULT,
+                ConfigDef.ValidString.in(UNIX_PRECISION_NANOS, UNIX_PRECISION_MICROS, UNIX_PRECISION_MILLIS, UNIX_PRECISION_SECONDS),
+                ConfigDef.Importance.LOW,
+                "The desired Unix precision for the timestamp: seconds, milliseconds, microseconds, or nanoseconds. " +
+                        "Used to generate the output when type=unix or used to parse the input if the input is a Long." +
+                        "Note: This SMT will cause precision loss during conversions from, and to, values with sub-millisecond components.");
 
     private interface TimestampTranslator {
         /**
