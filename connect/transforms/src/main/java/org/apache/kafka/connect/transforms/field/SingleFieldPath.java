@@ -83,41 +83,43 @@ public class SingleFieldPath implements FieldPath {
     private static String[] buildFieldPathV2(String pathText) {
         // prepare for tracking path steps
         final List<String> steps = new ArrayList<>();
-        // avoid creating new string on changes
-        final StringBuilder s = new StringBuilder(pathText);
-
-        while (s.length() > 0) { // until path is traversed
+        int idx = 0;
+        while (idx < pathText.length()) {
             // start processing backtick pair, if any
-            if (s.charAt(0) == BACKTICK) {
-                s.deleteCharAt(0);
-
+            if (pathText.charAt(idx) == BACKTICK) {
+                idx++;
+                final int start = idx; // this is where the "real" (i.e., not-wrapped-by-backticks) field name starts
                 // find backtick closing pair
-                int idx = 0;
-                while (idx >= 0) {
-                    idx = s.indexOf(String.valueOf(BACKTICK), idx);
+                while (true) {
+                    idx = pathText.indexOf(String.valueOf(BACKTICK), idx);
                     if (idx == -1) { // if not found, fail
-                        throw new IllegalArgumentException("Incomplete backtick pair at [...]`" + s);
+                        throw new IllegalArgumentException("Incomplete backtick pair in field path: " + pathText);
                     }
-                    boolean endOfPath = idx >= s.length() - 1;
-                    boolean notWrappingField = !endOfPath && s.charAt(idx + 1) != DOT;
-                    boolean escaped = s.charAt(idx - 1) == BACKSLASH;
+                    boolean endOfPath = idx >= pathText.length() - 1;
+                    boolean notWrappingField = !endOfPath && pathText.charAt(idx + 1) != DOT;
+                    boolean escaped = pathText.charAt(idx - 1) == BACKSLASH;
                     // check that it is not escaped or wrapped in another backticks pair
                     if (!endOfPath && (notWrappingField || escaped)) {
                         idx++; // move index forward and keep searching
                     } else { // it's the closing pair
-                        steps.add(processEscapedBackticks(s.substring(0, idx)));
-                        s.delete(0, idx + 2); // rm backtick and dot
+                        String field = pathText.substring(start, idx);
+                        steps.add(processEscapedBackticks(field));
+                        idx += 2; // increment by two (once for the backslash, and one for a potential dot following it)
                         break;
                     }
                 }
             } else { // process dots in path
-                final int atDot = s.indexOf(String.valueOf(DOT));
-                if (atDot > 0) { // get path step and move forward
-                    steps.add(s.substring(0, atDot));
-                    s.delete(0, atDot + 1);
-                } else { // add all
-                    steps.add(s.toString());
-                    s.delete(0, s.length());
+                final int start = idx; // this is where the field name starts
+                idx = pathText.indexOf(String.valueOf(DOT), idx);
+                if (idx == -1) {
+                    // we've reached the end of the path
+                    String field = pathText.substring(start);
+                    steps.add(field);
+                    break;
+                } else {
+                    String field = pathText.substring(start, idx);
+                    steps.add(field);
+                    idx++;
                 }
             }
         }
