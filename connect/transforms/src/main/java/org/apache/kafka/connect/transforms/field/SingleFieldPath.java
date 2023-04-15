@@ -107,7 +107,7 @@ public class SingleFieldPath implements FieldPath {
         }
     }
 
-    private String[] buildFieldPathV2(String pathText) {
+    private static String[] buildFieldPathV2(String pathText) {
         // prepare for tracking path steps
         final List<String> steps = new ArrayList<>();
         // avoid creating new string on changes
