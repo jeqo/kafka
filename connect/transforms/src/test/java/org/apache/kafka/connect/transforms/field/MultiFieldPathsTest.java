@@ -26,10 +26,10 @@ import org.junit.jupiter.api.Test;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class MultiFieldPathsTest {
     @Test void shouldBuildPathWithSinglePathV1() {
@@ -53,12 +53,14 @@ class MultiFieldPathsTest {
         assertEquals(path, ((Map<?, ?>) ((Map<?, ?>) paths.pathTree.get("foo")).get("bar")).get("baz"));
     }
 
-    @Test void shouldFailWhenPathsCollide() {
-        assertThrows(IllegalArgumentException.class,
-            () -> createMultiFieldPaths(
-                    SingleFieldPath.of("foo", FieldSyntaxVersion.V2),
-                    SingleFieldPath.of("foo.bar", FieldSyntaxVersion.V2)
-            ));
+    @Test void shouldConflatePathsWithSameParent() {
+        SingleFieldPath foobar = SingleFieldPath.of("foo.bar", FieldSyntaxVersion.V2);
+        MultiFieldPaths path = createMultiFieldPaths(
+            SingleFieldPath.of("foo", FieldSyntaxVersion.V2),
+            foobar
+        );
+        assertEquals(1, path.pathTree.size());
+        assertEquals(foobar, ((Map<?, ?>) path.pathTree.get("foo")).get("bar"));
     }
 
     @Test void shouldRenameSchemaV1Fields() {
@@ -183,6 +185,6 @@ class MultiFieldPathsTest {
     }
 
     static MultiFieldPaths createMultiFieldPaths(SingleFieldPath... fields) {
-        return new MultiFieldPaths(Arrays.asList(fields));
+        return new MultiFieldPaths(new HashSet<>(Arrays.asList(fields)));
     }
 }

@@ -24,12 +24,12 @@ import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.transforms.util.SchemaUtil;
 
 import java.util.AbstractMap;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -54,23 +54,23 @@ public class MultiFieldPaths implements FieldPath {
 
     final Map<String, Object> pathTree;
 
-    MultiFieldPaths(List<SingleFieldPath> paths) {
+    MultiFieldPaths(Set<SingleFieldPath> paths) {
         pathTree = buildPathTree(paths, 0, new HashMap<>());
     }
 
     public static MultiFieldPaths of(SingleFieldPath path) {
-        return new MultiFieldPaths(Collections.singletonList(path));
+        return new MultiFieldPaths(Collections.singleton(path));
     }
 
     public static MultiFieldPaths of(List<String> fields, FieldSyntaxVersion syntaxVersion) {
         return new MultiFieldPaths(fields.stream()
                 .map(f -> SingleFieldPath.of(f, syntaxVersion))
-                .collect(Collectors.toList()));
+                .collect(Collectors.toSet()));
     }
 
-    Map<String, Object> buildPathTree(List<SingleFieldPath> paths, int stepIdx, Map<String, Object> pathTree) {
+    Map<String, Object> buildPathTree(Set<SingleFieldPath> paths, int stepIdx, Map<String, Object> pathTree) {
         if (paths.size() == 1) { // optimize for paths with a single member
-            SingleFieldPath path = paths.get(0);
+            SingleFieldPath path = paths.iterator().next();
             if (path.stepAt(stepIdx + 1) == null) { // if last path step
                 pathTree.put(path.stepAt(stepIdx), path);
             } else {
@@ -78,39 +78,20 @@ public class MultiFieldPaths implements FieldPath {
                         buildPathTree(paths, stepIdx + 1, new HashMap<>()));
             }
         } else {
-            // group paths by prefix
-            final Map<String, List<SingleFieldPath>> groups = new HashMap<>();
-            for (SingleFieldPath path : paths) {
-                String step = path.stepAt(stepIdx);
-                if (step != null) {
-                    groups.computeIfPresent(step, (s, fieldPaths) -> {
-                        for (SingleFieldPath other : fieldPaths) {
-                            // avoid overlapping paths
-                            if (!path.equals(other)
-                                    && (other.stepAt(stepIdx + 1) == null
-                                    || path.stepAt(stepIdx + 1) == null)) {
-                                throw new IllegalArgumentException(
-                                        "Path " + other + " and " + path + " are overlapping. "
-                                                + "Paths need to point to leaf values");
-                            }
-                        }
-                        if (!fieldPaths.contains(path)) {
-                            fieldPaths.add(path);
-                        }
-                        return fieldPaths;
-                    });
-                    groups.computeIfAbsent(step, s -> {
-                        List<SingleFieldPath> fieldPaths = new ArrayList<>();
-                        fieldPaths.add(path);
-                        return fieldPaths;
-                    });
-                }
-            }
+            // group paths by prefix,
+            // if paths overlap (e.g. `foo` and `foo.bar` are added)
+            // only the children are kept (`foo.bar`)
+            final Map<String, Set<SingleFieldPath>> groups = paths.stream()
+                    .filter(p -> p.stepAt(stepIdx) != null)
+                    .collect(Collectors.groupingBy(
+                        path -> path.stepAt(stepIdx),
+                        Collectors.toSet()
+                    ));
 
             // create tree from grouped paths
-            for (Map.Entry<String, List<SingleFieldPath>> entry : groups.entrySet()) {
+            for (Map.Entry<String, Set<SingleFieldPath>> entry : groups.entrySet()) {
                 if (entry.getValue().size() == 1) {
-                    final SingleFieldPath path = entry.getValue().get(0);
+                    final SingleFieldPath path = entry.getValue().iterator().next();
                     if (path.stepAt(stepIdx + 1) == null) { // if it is the last path step
                         pathTree.put(entry.getKey(), path);
                     } else {
