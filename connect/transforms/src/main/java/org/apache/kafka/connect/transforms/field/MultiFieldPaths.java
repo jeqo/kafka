@@ -55,8 +55,7 @@ public class MultiFieldPaths implements FieldPath {
     final Map<String, Object> pathTree;
 
     MultiFieldPaths(List<SingleFieldPath> paths) {
-        List<SingleFieldPath> nonEmptyPaths = paths.stream().filter(Objects::nonNull).collect(Collectors.toList());
-        pathTree = buildPathTree(nonEmptyPaths, 0, new HashMap<>());
+        pathTree = buildPathTree(paths, 0, new HashMap<>());
     }
 
     public static MultiFieldPaths of(SingleFieldPath path) {
