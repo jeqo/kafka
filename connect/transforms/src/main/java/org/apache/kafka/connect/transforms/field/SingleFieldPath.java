@@ -98,10 +98,11 @@ public class SingleFieldPath implements FieldPath {
                     if (idx == -1) { // if not found, fail
                         throw new IllegalArgumentException("Incomplete backtick pair at [...]`" + s);
                     }
+                    boolean endOfPath = idx >= s.length() - 1;
+                    boolean notWrappingField = !endOfPath && s.charAt(idx + 1) != DOT;
+                    boolean escaped = s.charAt(idx - 1) == BACKSLASH;
                     // check that it is not escaped or wrapped in another backticks pair
-                    if (idx < s.length() - 1 // not wrapping the whole field path
-                            && (s.charAt(idx + 1) != DOT // not wrapping
-                            || s.charAt(idx - 1) == BACKSLASH)) { // ... or escaped
+                    if (!endOfPath && (notWrappingField || escaped)) {
                         idx++; // move index forward and keep searching
                     } else { // it's the closing pair
                         steps.add(processEscapedBackticks(s.substring(0, idx)));
