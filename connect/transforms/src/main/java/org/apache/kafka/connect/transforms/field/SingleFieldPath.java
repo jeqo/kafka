@@ -432,7 +432,7 @@ public class SingleFieldPath implements FieldPath {
     }
 
     public String stepAt(int i) {
-        return i < path.length ? path[i] : null;
+        return i < path.length ? path[i] : "";
     }
 
     // For testing

@@ -84,6 +84,7 @@ public class MultiFieldPaths implements FieldPath {
      *         <li>bar</li>
      *         <li>baz:
      *         <ul>
+     *             <li>"" (empty to represent path at root)</li>
      *             <li>other</li>
      *         </ul>
      *         </li>
@@ -103,7 +104,6 @@ public class MultiFieldPaths implements FieldPath {
         // if paths overlap (e.g. `foo` and `foo.bar` are added)
         // only the children are kept (`foo.bar`)
         final Map<String, Set<SingleFieldPath>> groups = paths.stream()
-            .filter(p -> p.stepAt(stepIdx) != null)
             .collect(Collectors.groupingBy(
                 path -> path.stepAt(stepIdx),
                 Collectors.toSet()
@@ -113,7 +113,7 @@ public class MultiFieldPaths implements FieldPath {
         for (Map.Entry<String, Set<SingleFieldPath>> entry : groups.entrySet()) {
             if (entry.getValue().size() == 1) {
                 final SingleFieldPath path = entry.getValue().iterator().next();
-                if (path.stepAt(stepIdx + 1) == null) { // if it is the last path step
+                if (path.stepAt(stepIdx + 1).isEmpty()) { // if it is the last path step
                     pathTree.put(entry.getKey(), path);
                 } else {
                     pathTree.put(entry.getKey(),

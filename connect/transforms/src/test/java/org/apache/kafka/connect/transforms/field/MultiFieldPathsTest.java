@@ -53,13 +53,16 @@ class MultiFieldPathsTest {
         assertEquals(path, ((Map<?, ?>) ((Map<?, ?>) paths.pathTree.get("foo")).get("bar")).get("baz"));
     }
 
-    @Test void shouldConflatePathsWithSameParent() {
+    @Test void shouldKeepOverlappingPaths() {
+        SingleFieldPath foo = new SingleFieldPath("foo", FieldSyntaxVersion.V2);
         SingleFieldPath foobar = new SingleFieldPath("foo.bar", FieldSyntaxVersion.V2);
         MultiFieldPaths path = createMultiFieldPaths(
-            new SingleFieldPath("foo", FieldSyntaxVersion.V2),
+            foo,
             foobar
         );
         assertEquals(1, path.pathTree.size());
+        assertEquals(2, ((Map<?, ?>) path.pathTree.get("foo")).size());
+        assertEquals(foo, ((Map<?, ?>) path.pathTree.get("foo")).get(""));
         assertEquals(foobar, ((Map<?, ?>) path.pathTree.get("foo")).get("bar"));
     }
 
