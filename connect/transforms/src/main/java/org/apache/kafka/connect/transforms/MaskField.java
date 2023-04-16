@@ -23,7 +23,7 @@ import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.data.Values;
 import org.apache.kafka.connect.errors.DataException;
-import org.apache.kafka.connect.transforms.field.MultiFieldPaths;
+import org.apache.kafka.connect.transforms.field.FieldPaths;
 import org.apache.kafka.connect.transforms.field.FieldSyntaxVersion;
 import org.apache.kafka.connect.transforms.util.NonEmptyListValidator;
 import org.apache.kafka.connect.transforms.util.SimpleConfig;
@@ -87,13 +87,14 @@ public abstract class MaskField<R extends ConnectRecord<R>> implements Transform
         REPLACEMENT_MAPPING_FUNC.put(BigInteger.class, BigInteger::new);
     }
 
-    private MultiFieldPaths maskedFields;
+    private FieldPaths maskedFields;
     private String replacement;
 
     @Override
     public void configure(Map<String, ?> props) {
         final SimpleConfig config = new SimpleConfig(CONFIG_DEF, props);
-        maskedFields = MultiFieldPaths.of(config.getList(FIELDS_CONFIG), FieldSyntaxVersion.fromConfig(config));
+        FieldSyntaxVersion syntaxVersion = FieldSyntaxVersion.fromConfig(config);
+        maskedFields = FieldPaths.newBuilder(syntaxVersion).addAll(config.getList(FIELDS_CONFIG)).build();
         replacement = config.getString(REPLACEMENT_CONFIG);
     }
 

@@ -23,8 +23,10 @@ import org.apache.kafka.connect.data.SchemaBuilder;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.transforms.util.SchemaUtil;
 
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -51,7 +53,7 @@ import java.util.Objects;
  * @see FieldSyntaxVersion
  * @see MultiFieldPaths
  */
-public class SingleFieldPath implements FieldPath {
+public class SingleFieldPath implements FieldPaths {
 
     private static final char BACKTICK = '`';
     private static final char DOT = '.';
@@ -174,13 +176,21 @@ public class SingleFieldPath implements FieldPath {
         return null;
     }
 
+    public Map<FieldPaths, Field> fieldsFrom(Schema schema) {
+        return Collections.singletonMap(this, fieldFrom(schema));
+    }
+
     /**
      * Access a value at the current path within a schema-based {@code Struct}
      * If object is not found, then {@code null} is returned.
      */
-    public Object valueFrom(Struct struct) {
+    @Override
+    public Map.Entry<Field, Object> fieldAndValueFrom(Schema schema, Struct struct) {
         if (path.length == 1) {
-            return struct.get(path[0]);
+            return new AbstractMap.SimpleImmutableEntry<>(
+                schema.field(path[0]),
+                struct == null ? null : struct.get(path[0])
+            );
         } else {
             Struct current = struct;
             for (int i = 0; i < path.length; i++) {
@@ -188,7 +198,7 @@ public class SingleFieldPath implements FieldPath {
                     return null;
                 }
                 if (i == path.length - 1) { // get value
-                    return current.get(path[i]);
+                    return new AbstractMap.SimpleImmutableEntry<>(current.schema().field(path[i]), current.get(path[i]));
                 } else { // iterate
                     current = current.getStruct(path[i]);
                 }
@@ -202,9 +212,9 @@ public class SingleFieldPath implements FieldPath {
      * If object is not found, then {@code null} is returned.
      */
     @SuppressWarnings("unchecked")
-    public Object valueFrom(Map<String, Object> map) {
+    public Map.Entry<String, Object> fieldAndValueFrom(Map<String, Object> map) {
         if (path.length == 1) {
-            return map.get(path[0]);
+            return new AbstractMap.SimpleImmutableEntry<>(path[0], map == null ? null : map.get(path[0]));
         } else {
             Map<String, Object> current = map;
             for (int i = 0; i < path.length; i++) {
@@ -212,13 +222,33 @@ public class SingleFieldPath implements FieldPath {
                     return null;
                 }
                 if (i == path.length - 1) {
-                    return current.get(path[i]);
+                    return new AbstractMap.SimpleImmutableEntry<>(path[i], current.get(path[i]));
                 } else {
                     current = (Map<String, Object>) current.get(path[i]);
                 }
             }
         }
         return null;
+    }
+
+    @Override
+    public Map<FieldPaths, Map.Entry<Field, Object>> fieldAndValuesFrom(Struct struct) {
+        return fieldAndValuesFrom(struct.schema(), struct);
+    }
+
+    @Override
+    public Map.Entry<Field, Object> fieldAndValueFrom(Struct struct) {
+        return fieldAndValueFrom(struct.schema(), struct);
+    }
+
+    @Override
+    public Map<FieldPaths, Map.Entry<Field, Object>> fieldAndValuesFrom(Schema schema, Struct struct) {
+        return Collections.singletonMap(this, fieldAndValueFrom(schema, struct));
+    }
+
+    @Override
+    public Map<FieldPaths, Map.Entry<String, Object>> fieldAndValuesFrom(Map<String, Object> map) {
+        return Collections.singletonMap(this, fieldAndValueFrom(map));
     }
 
     @Override
@@ -418,10 +448,6 @@ public class SingleFieldPath implements FieldPath {
 
     public String last() {
         return path[path.length - 1];
-    }
-
-    public boolean isEmpty() {
-        return path.length == 0;
     }
 
     public String stepAt(int i) {

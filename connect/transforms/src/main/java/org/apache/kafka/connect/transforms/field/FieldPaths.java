@@ -16,11 +16,15 @@
  */
 package org.apache.kafka.connect.transforms.field;
 
+import org.apache.kafka.connect.data.Field;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.SchemaBuilder;
 import org.apache.kafka.connect.data.Struct;
 
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Operations to update data values and schemas based on field paths.
@@ -30,7 +34,20 @@ import java.util.Map;
  * @see SingleFieldPath
  * @see MultiFieldPaths
  */
-public interface FieldPath {
+public interface FieldPaths {
+
+    Field fieldFrom(Schema schema);
+
+    Map<FieldPaths, Field> fieldsFrom(Schema schema);
+
+    Map<FieldPaths, Map.Entry<String, Object>> fieldAndValuesFrom(Map<String, Object> map);
+    Map.Entry<String, Object> fieldAndValueFrom(Map<String, Object> map);
+
+    Map<FieldPaths, Map.Entry<Field, Object>> fieldAndValuesFrom(Struct struct);
+    Map.Entry<Field, Object> fieldAndValueFrom(Struct struct);
+    Map<FieldPaths, Map.Entry<Field, Object>> fieldAndValuesFrom(Schema schema, Struct struct);
+    Map.Entry<Field, Object> fieldAndValueFrom(Schema schema, Struct struct);
+
     /**
      * Prepares a new schema based on an original one, and applies an update function
      * when the current path(s) is found.
@@ -101,4 +118,33 @@ public interface FieldPath {
             Map<String, Object> originalValue,
             MapValueUpdater whenFound
     );
+
+    static Builder newBuilder(FieldSyntaxVersion syntaxVersion) {
+        return new Builder(syntaxVersion);
+    }
+
+    class Builder {
+        final FieldSyntaxVersion version;
+        final Set<SingleFieldPath> paths = new HashSet<>();
+
+        public Builder(FieldSyntaxVersion version) {
+            this.version = version;
+        }
+
+        public Builder add(String path) {
+            if (!path.isEmpty()) this.paths.add(new SingleFieldPath(path, version));
+            return this;
+        }
+
+        public FieldPaths build() {
+            if (paths.isEmpty()) return null;
+            if (paths.size() == 1) return paths.iterator().next();
+            else return new MultiFieldPaths(paths);
+        }
+
+        public Builder addAll(List<String> fields) {
+            fields.forEach(this::add);
+            return this;
+        }
+    }
 }

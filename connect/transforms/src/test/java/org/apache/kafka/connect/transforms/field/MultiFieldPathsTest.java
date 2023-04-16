@@ -73,7 +73,7 @@ class MultiFieldPathsTest {
                 .field("baz", Schema.INT32_SCHEMA)
                 .build();
 
-        MultiFieldPaths fieldPath = MultiFieldPaths.of(Arrays.asList("foo", "bar"), FieldSyntaxVersion.V1);
+        FieldPaths fieldPath = FieldPaths.newBuilder(FieldSyntaxVersion.V1).addAll(Arrays.asList("foo", "bar")).build();
         SchemaBuilder updated = SchemaUtil.copySchemaBasics(schema, SchemaBuilder.struct());
         Schema result = fieldPath.updateSchemaFrom(
                 schema,
@@ -95,7 +95,7 @@ class MultiFieldPathsTest {
                 .field("foo", nested)
                 .build();
 
-        MultiFieldPaths fieldPath = MultiFieldPaths.of(Arrays.asList("foo.baz", "foo.bar"), FieldSyntaxVersion.V2);
+        FieldPaths fieldPath = FieldPaths.newBuilder(FieldSyntaxVersion.V2).addAll(Arrays.asList("foo.baz", "foo.bar")).build();
         Schema result = fieldPath.updateSchemaFrom(
                 schema,
                 (builder, field, path) -> builder.field(field.name() + "_other", field.schema())
@@ -120,7 +120,7 @@ class MultiFieldPathsTest {
                 (orig, map, f, k) -> map.put(k, ((Integer) orig.get(k)) * 2)
         );
 
-        Map<SingleFieldPath, Map.Entry<String, Object>> actual = fieldPaths.fieldAndValuesFrom(updated);
+        Map<FieldPaths, Map.Entry<String, Object>> actual = fieldPaths.fieldAndValuesFrom(updated);
         assertEquals(84, actual.get(fooPath).getValue());
         assertEquals(42, actual.get(barPath).getValue());
     }
@@ -139,7 +139,7 @@ class MultiFieldPathsTest {
                 (orig, map, f, k) -> map.put(k, ((Integer) orig.get(k)) * 2)
         );
 
-        Map<SingleFieldPath, Map.Entry<String, Object>> actual = fieldPaths.fieldAndValuesFrom(updated);
+        Map<FieldPaths, Map.Entry<String, Object>> actual = fieldPaths.fieldAndValuesFrom(updated);
         assertEquals(84, actual.get(bazPath).getValue());
         assertEquals(42, actual.get(barPath).getValue());
     }
@@ -159,7 +159,7 @@ class MultiFieldPathsTest {
         Struct updated = fieldPaths.updateValueFrom(schema, value, schema,
                 (orig, oldField, s, updatedField, f) -> s.put(updatedField, ((Integer) orig.get(oldField)) * 2));
 
-        Map<SingleFieldPath, Map.Entry<Field, Object>> actual = fieldPaths.fieldAndValuesFrom(updated);
+        Map<FieldPaths, Map.Entry<Field, Object>> actual = fieldPaths.fieldAndValuesFrom(updated.schema(), updated);
         assertEquals(84, actual.get(bazPath).getValue());
         assertEquals(42, actual.get(barPath).getValue());
     }
@@ -182,7 +182,7 @@ class MultiFieldPathsTest {
         Struct updated = fieldPaths.updateValueFrom(schema, value, schema,
                 (orig, oldField, s, updatedField, f) -> s.put(updatedField, ((Integer) orig.get(oldField)) * 2));
 
-        Map<SingleFieldPath, Map.Entry<Field, Object>> actual = fieldPaths.fieldAndValuesFrom(updated);
+        Map<FieldPaths, Map.Entry<Field, Object>> actual = fieldPaths.fieldAndValuesFrom(schema, updated);
         assertEquals(84, actual.get(bazPath).getValue());
         assertEquals(42, actual.get(barPath).getValue());
     }

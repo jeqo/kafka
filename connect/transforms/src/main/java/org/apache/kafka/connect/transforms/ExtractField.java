@@ -21,7 +21,7 @@ import org.apache.kafka.connect.connector.ConnectRecord;
 import org.apache.kafka.connect.data.Field;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
-import org.apache.kafka.connect.transforms.field.SingleFieldPath;
+import org.apache.kafka.connect.transforms.field.FieldPaths;
 import org.apache.kafka.connect.transforms.field.FieldSyntaxVersion;
 import org.apache.kafka.connect.transforms.util.SimpleConfig;
 
@@ -51,12 +51,14 @@ public abstract class ExtractField<R extends ConnectRecord<R>> implements Transf
 
     private static final String PURPOSE = "field extraction";
 
-    private SingleFieldPath fieldPath;
+    private FieldPaths fieldPath;
 
     @Override
     public void configure(Map<String, ?> props) {
         final SimpleConfig config = new SimpleConfig(CONFIG_DEF, props);
-        fieldPath = new SingleFieldPath(config.getString(FIELD_CONFIG), FieldSyntaxVersion.fromConfig(config));
+        fieldPath = FieldPaths.newBuilder(FieldSyntaxVersion.fromConfig(config))
+            .add(config.getString(FIELD_CONFIG))
+            .build();
     }
 
     @Override
@@ -64,16 +66,12 @@ public abstract class ExtractField<R extends ConnectRecord<R>> implements Transf
         final Schema schema = operatingSchema(record);
         if (schema == null) {
             final Map<String, Object> value = requireMapOrNull(operatingValue(record), PURPOSE);
-            return newRecord(record, null, value == null ? null : fieldPath.valueFrom(value));
+            Map.Entry<String, Object> fieldAndValue = fieldPath.fieldAndValueFrom(value);
+            return newRecord(record, null, value == null ? null : fieldAndValue.getValue());
         } else {
             final Struct value = requireStructOrNull(operatingValue(record), PURPOSE);
-            Field field = fieldPath.fieldFrom(schema);
-
-            if (field == null) {
-                throw new IllegalArgumentException("Unknown field: " + fieldPath);
-            }
-
-            return newRecord(record, field.schema(), value == null ? null : fieldPath.valueFrom(value));
+            final Map.Entry<Field, Object> fieldAndValue = fieldPath.fieldAndValueFrom(schema, value);
+            return newRecord(record, fieldAndValue.getKey().schema(), value == null ? null : fieldAndValue.getValue());
         }
     }
 

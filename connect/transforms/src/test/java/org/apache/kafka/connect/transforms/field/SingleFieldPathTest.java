@@ -151,34 +151,34 @@ class SingleFieldPathTest {
     @Test void shouldUpdateValueV1FromSchemaless() {
         Map<String, Object> value = Collections.singletonMap("foo", 42);
 
-        SingleFieldPath fieldPath = new SingleFieldPath("foo", FieldSyntaxVersion.V1);
+        FieldPaths fieldPath = FieldPaths.newBuilder(FieldSyntaxVersion.V1).add("foo").build();
         Map<String, Object> updated = fieldPath
             .updateValueFrom(value, (orig, map, f, k) -> map.put(k, ((Integer) orig.get(k)) * 2));
 
-        assertEquals(84, fieldPath.valueFrom(updated));
+        assertEquals(84, fieldPath.fieldAndValueFrom(updated).getValue());
     }
 
     @Test void shouldUpdateNestedValueV2FromSchemaless() {
         Map<String, Object> value = Collections.singletonMap("foo", Collections.singletonMap("bar", 42));
 
-        SingleFieldPath fieldPath = new SingleFieldPath("foo.bar", FieldSyntaxVersion.V2);
+        FieldPaths fieldPath = FieldPaths.newBuilder(FieldSyntaxVersion.V2).add("foo.bar").build();
         Map<String, Object> updated = fieldPath.updateValueFrom(
                 value,
                 (original, map, f, k) -> map.put(k, ((Integer) original.get(k)) * 2)
         );
 
-        assertEquals(84, fieldPath.valueFrom(updated));
+        assertEquals(84, fieldPath.fieldAndValueFrom(updated).getValue());
     }
 
     @Test void shouldUpdateValueV1WithSchema() {
         Schema schema = SchemaBuilder.struct().field("foo", Schema.INT32_SCHEMA).build();
         Struct value = new Struct(schema).put("foo", 42);
 
-        SingleFieldPath fieldPath = new SingleFieldPath("foo", FieldSyntaxVersion.V1);
+        FieldPaths fieldPath = FieldPaths.newBuilder(FieldSyntaxVersion.V1).add("foo").build();
         Struct updated = fieldPath.updateValueFrom(schema, value, schema,
                 (orig, oldField, s, updatedField, f) -> s.put(updatedField, ((Integer) orig.get(oldField)) * 2));
 
-        assertEquals(84, fieldPath.valueFrom(updated));
+        assertEquals(84, fieldPath.fieldAndValueFrom(updated).getValue());
     }
 
     @Test void shouldUpdateNestedValueV2WithSchema() {
@@ -186,10 +186,10 @@ class SingleFieldPathTest {
         Schema schema = SchemaBuilder.struct().field("foo", barSchema).build();
         Struct value = new Struct(schema).put("foo", new Struct(barSchema).put("bar", 42));
 
-        SingleFieldPath fieldPath = new SingleFieldPath("foo.bar", FieldSyntaxVersion.V2);
+        FieldPaths fieldPath = FieldPaths.newBuilder(FieldSyntaxVersion.V2).add("foo.bar").build();
         Struct updated = fieldPath.updateValueFrom(schema, value, schema,
                 (orig, oldField, s, updatedField, f) -> s.put(updatedField, ((Integer) orig.get(oldField)) * 2));
 
-        assertEquals(84, fieldPath.valueFrom(updated));
+        assertEquals(84, fieldPath.fieldAndValueFrom(updated).getValue());
     }
 }
