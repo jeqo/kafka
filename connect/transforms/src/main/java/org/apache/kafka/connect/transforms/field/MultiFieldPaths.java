@@ -68,40 +68,57 @@ public class MultiFieldPaths implements FieldPath {
                 .collect(Collectors.toSet()));
     }
 
-    Map<String, Object> buildPathTree(Set<SingleFieldPath> paths, int stepIdx, Map<String, Object> pathTree) {
-        if (paths.size() == 1) { // optimize for paths with a single member
-            SingleFieldPath path = paths.iterator().next();
-            if (path.stepAt(stepIdx + 1) == null) { // if last path step
-                pathTree.put(path.stepAt(stepIdx), path);
-            } else {
-                pathTree.put(path.stepAt(stepIdx),
-                        buildPathTree(paths, stepIdx + 1, new HashMap<>()));
-            }
-        } else {
-            // group paths by prefix,
-            // if paths overlap (e.g. `foo` and `foo.bar` are added)
-            // only the children are kept (`foo.bar`)
-            final Map<String, Set<SingleFieldPath>> groups = paths.stream()
-                    .filter(p -> p.stepAt(stepIdx) != null)
-                    .collect(Collectors.groupingBy(
-                        path -> path.stepAt(stepIdx),
-                        Collectors.toSet()
-                    ));
+    /**
+     * Build a nested map of paths to field paths to be used when traversing data structures.
+     * <p>
+     * With the following paths:
+     * <ul>
+     *     <li>foo.bar</li>
+     *     <li>foo.baz</li>
+     *     <li>foo.baz.other</li>
+     * </ul>
+     * a tree with the following structure will be created:
+     * <ul>
+     *     <li>foo:
+     *     <ul>
+     *         <li>bar</li>
+     *         <li>baz:
+     *         <ul>
+     *             <li>other</li>
+     *         </ul>
+     *         </li>
+     *     </ul>
+     *     </li>
+     * </ul>
+     *
+     * @param paths input paths
+     * @param stepIdx paths step index, starting at zero
+     * @param pathTree building tree, starting empty
+     */
+    static Map<String, Object> buildPathTree(Set<SingleFieldPath> paths, int stepIdx, Map<String, Object> pathTree) {
+        // group paths by prefix,
+        // if paths overlap (e.g. `foo` and `foo.bar` are added)
+        // only the children are kept (`foo.bar`)
+        final Map<String, Set<SingleFieldPath>> groups = paths.stream()
+            .filter(p -> p.stepAt(stepIdx) != null)
+            .collect(Collectors.groupingBy(
+                path -> path.stepAt(stepIdx),
+                Collectors.toSet()
+            ));
 
-            // create tree from grouped paths
-            for (Map.Entry<String, Set<SingleFieldPath>> entry : groups.entrySet()) {
-                if (entry.getValue().size() == 1) {
-                    final SingleFieldPath path = entry.getValue().iterator().next();
-                    if (path.stepAt(stepIdx + 1) == null) { // if it is the last path step
-                        pathTree.put(entry.getKey(), path);
-                    } else {
-                        pathTree.put(entry.getKey(),
-                                buildPathTree(entry.getValue(), stepIdx + 1, new HashMap<>()));
-                    }
+        // create tree from grouped paths
+        for (Map.Entry<String, Set<SingleFieldPath>> entry : groups.entrySet()) {
+            if (entry.getValue().size() == 1) {
+                final SingleFieldPath path = entry.getValue().iterator().next();
+                if (path.stepAt(stepIdx + 1) == null) { // if it is the last path step
+                    pathTree.put(entry.getKey(), path);
                 } else {
                     pathTree.put(entry.getKey(),
-                            buildPathTree(entry.getValue(), stepIdx + 1, new HashMap<>()));
+                        buildPathTree(entry.getValue(), stepIdx + 1, new HashMap<>()));
                 }
+            } else {
+                pathTree.put(entry.getKey(),
+                    buildPathTree(entry.getValue(), stepIdx + 1, new HashMap<>()));
             }
         }
         return pathTree;
