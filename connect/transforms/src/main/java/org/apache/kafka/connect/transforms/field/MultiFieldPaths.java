@@ -96,6 +96,9 @@ public class MultiFieldPaths implements FieldPath {
      * @param pathTree building tree, starting empty
      */
     static Map<String, Object> buildPathTree(Set<SingleFieldPath> paths, int stepIdx, Map<String, Object> pathTree) {
+        Objects.requireNonNull(pathTree, "Resulting path three may not be null");
+        if (stepIdx < 0) throw new IllegalArgumentException("stepAt index may be higher or equal than zero");
+
         // group paths by prefix,
         // if paths overlap (e.g. `foo` and `foo.bar` are added)
         // only the children are kept (`foo.bar`)
