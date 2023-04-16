@@ -22,7 +22,7 @@ import org.apache.kafka.connect.data.SchemaBuilder;
 /**
  * Function to update Struct schemas based on Field Paths.
  *
- * @see FieldPath
+ * @see FieldPaths
  * @see org.apache.kafka.connect.data.Schema
  */
 @FunctionalInterface

@@ -20,6 +20,7 @@ import java.util.HashMap;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.SchemaBuilder;
 import org.apache.kafka.connect.data.Struct;
+import org.apache.kafka.connect.errors.DataException;
 import org.apache.kafka.connect.sink.SinkRecord;
 import org.apache.kafka.connect.transforms.field.FieldSyntaxVersion;
 import org.junit.jupiter.api.AfterEach;
@@ -155,8 +156,8 @@ public class ExtractFieldTest {
         try {
             xform.apply(record);
             fail("Expected exception wasn't raised");
-        } catch (IllegalArgumentException iae) {
-            assertEquals("Unknown field: FieldPath(path = [nonexistent])", iae.getMessage());
+        } catch (DataException e) {
+            assertEquals("nonexistent is not a valid field name", e.getMessage());
         }
     }
 
@@ -172,8 +173,8 @@ public class ExtractFieldTest {
         try {
             xform.apply(record);
             fail("Expected exception wasn't raised");
-        } catch (IllegalArgumentException iae) {
-            assertEquals("Unknown field: FieldPath(path = [magic.nonexistent])", iae.getMessage());
+        } catch (DataException e) {
+            assertEquals("magic.nonexistent is not a valid field name", e.getMessage());
         }
     }
 }

@@ -24,9 +24,7 @@ import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.transforms.util.SchemaUtil;
 
 import java.util.AbstractMap;
-import java.util.Collections;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -50,22 +48,12 @@ import java.util.stream.Collectors;
  * @see SingleFieldPath
  * @see FieldSyntaxVersion
  */
-public class MultiFieldPaths implements FieldPath {
+public class MultiFieldPaths implements FieldPaths {
 
     final Map<String, Object> pathTree;
 
     MultiFieldPaths(Set<SingleFieldPath> paths) {
         pathTree = buildPathTree(paths, 0, new HashMap<>());
-    }
-
-    public static MultiFieldPaths of(SingleFieldPath path) {
-        return new MultiFieldPaths(Collections.singleton(path));
-    }
-
-    public static MultiFieldPaths of(List<String> fields, FieldSyntaxVersion syntaxVersion) {
-        return new MultiFieldPaths(fields.stream()
-                .map(f -> new SingleFieldPath(f, syntaxVersion))
-                .collect(Collectors.toSet()));
     }
 
     /**
@@ -132,18 +120,36 @@ public class MultiFieldPaths implements FieldPath {
      * @param struct data value
      * @return map of field paths and field/values
      */
-    public Map<SingleFieldPath, Map.Entry<Field, Object>> fieldAndValuesFrom(Struct struct) {
-        return findFieldAndValues(struct, pathTree, new HashMap<>());
+    @Override
+    public Map<FieldPaths, Map.Entry<Field, Object>> fieldAndValuesFrom(Schema schema, Struct struct) {
+        return findFieldAndValues(schema, struct, pathTree, new HashMap<>());
+    }
+    @Override
+    public Map<FieldPaths, Map.Entry<Field, Object>> fieldAndValuesFrom(Struct struct) {
+        return findFieldAndValues(struct.schema(), struct, pathTree, new HashMap<>());
+    }
+
+    @Override
+    public Map.Entry<Field, Object> fieldAndValueFrom(Struct struct) {
+        Map<FieldPaths, Map.Entry<Field, Object>> map = findFieldAndValues(struct.schema(), struct, pathTree, new HashMap<>());
+        return map.get(map.keySet().iterator().next());
+    }
+
+    @Override
+    public Map.Entry<Field, Object> fieldAndValueFrom(Schema schema, Struct struct) {
+        Map<FieldPaths, Map.Entry<Field, Object>> map = fieldAndValuesFrom(schema, struct);
+        return map.get(map.keySet().iterator().next());
     }
 
     @SuppressWarnings("unchecked")
-    private Map<SingleFieldPath, Map.Entry<Field, Object>> findFieldAndValues(
+    private Map<FieldPaths, Map.Entry<Field, Object>> findFieldAndValues(
+        Schema originalSchema,
             Struct originalValue,
             Map<String, Object> treeAt,
-            Map<SingleFieldPath, Map.Entry<Field, Object>> fieldAndValueMap
+            Map<FieldPaths, Map.Entry<Field, Object>> fieldAndValueMap
     ) {
         for (Map.Entry<String, Object> step : treeAt.entrySet()) {
-            Field field = originalValue.schema().field(step.getKey());
+            Field field = originalSchema.field(step.getKey());
             if (step.getValue() instanceof SingleFieldPath) {
                 Map.Entry<Field, Object> fieldAndValue =
                         field != null
@@ -153,6 +159,7 @@ public class MultiFieldPaths implements FieldPath {
             } else {
                 if (field.schema().type() == Type.STRUCT) {
                     findFieldAndValues(
+                            originalSchema.field(field.name()).schema(),
                             originalValue.getStruct(field.name()),
                             (Map<String, Object>) step.getValue(),
                             fieldAndValueMap
@@ -163,26 +170,70 @@ public class MultiFieldPaths implements FieldPath {
         return fieldAndValueMap;
     }
 
+    @Override
+    public Field fieldFrom(Schema schema) {
+        Map<FieldPaths, Field> map = fieldsFrom(schema);
+        return map.get(map.keySet().iterator().next());
+    }
+
+
+    @Override
+    public Map<FieldPaths, Field> fieldsFrom(Schema schema) {
+        return findFields(schema, pathTree, new HashMap<>());
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<FieldPaths, Field> findFields(
+        Schema originalSchema,
+        Map<String, Object> treeAt,
+        Map<FieldPaths, Field> result
+    ) {
+        for (Map.Entry<String, Object> step : treeAt.entrySet()) {
+            Field field = originalSchema.field(step.getKey());
+            if (step.getValue() instanceof SingleFieldPath) {
+                result.put((SingleFieldPath) step.getValue(), field);
+            } else {
+                if (field.schema().type() == Type.STRUCT) {
+                    findFields(
+                        field.schema(),
+                        (Map<String, Object>) step.getValue(),
+                        result
+                    );
+                }
+            }
+        }
+        return result;
+
+
+    }
+
     /**
      * Find values at the field paths on the tree.
      * @param value data value
      * @return map of field paths and field/values
      */
-    public Map<SingleFieldPath, Map.Entry<String, Object>> fieldAndValuesFrom(Map<String, Object> value) {
+    @Override
+    public Map<FieldPaths, Map.Entry<String, Object>> fieldAndValuesFrom(Map<String, Object> value) {
         return findFieldAndValues(value, pathTree, new HashMap<>());
     }
 
+    @Override
+    public Map.Entry<String, Object> fieldAndValueFrom(Map<String, Object> map) {
+        Map<FieldPaths, Map.Entry<String, Object>> result = fieldAndValuesFrom(map);
+        return result.get(result.keySet().iterator().next());
+    }
+
     @SuppressWarnings("unchecked")
-    private Map<SingleFieldPath, Map.Entry<String, Object>> findFieldAndValues(
+    private Map<FieldPaths, Map.Entry<String, Object>> findFieldAndValues(
             Map<String, Object> value,
             Map<String, Object> treeAt,
-            Map<SingleFieldPath, Map.Entry<String, Object>> fieldAndValueMap
+            Map<FieldPaths, Map.Entry<String, Object>> fieldAndValueMap
     ) {
         for (Map.Entry<String, Object> step : treeAt.entrySet()) {
             Object fieldValue = value.get(step.getKey());
             if (step.getValue() instanceof SingleFieldPath) {
-                fieldAndValueMap.put((
-                                SingleFieldPath) step.getValue(),
+                fieldAndValueMap.put(
+                        (SingleFieldPath) step.getValue(),
                         new AbstractMap.SimpleImmutableEntry<>(step.getKey(), fieldValue)
                 );
             } else {

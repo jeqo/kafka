@@ -31,7 +31,7 @@ import org.apache.kafka.connect.data.Time;
 import org.apache.kafka.connect.data.Timestamp;
 import org.apache.kafka.connect.errors.ConnectException;
 import org.apache.kafka.connect.errors.DataException;
-import org.apache.kafka.connect.transforms.field.SingleFieldPath;
+import org.apache.kafka.connect.transforms.field.FieldPaths;
 import org.apache.kafka.connect.transforms.field.FieldSyntaxVersion;
 import org.apache.kafka.connect.transforms.util.SchemaUtil;
 import org.apache.kafka.connect.transforms.util.SimpleConfig;
@@ -283,13 +283,13 @@ public abstract class TimestampConverter<R extends ConnectRecord<R>> implements 
     // This is a bit unusual, but allows the transformation config to be passed to static anonymous classes to customize
     // their behavior
     private static class Config {
-        Config(SingleFieldPath field, String type, SimpleDateFormat format, String unixPrecision) {
-            this.field = field;
+        Config(FieldPaths fieldPath, String type, SimpleDateFormat format, String unixPrecision) {
+            this.fieldPath = fieldPath;
             this.type = type;
             this.format = format;
             this.unixPrecision = unixPrecision;
         }
-        final SingleFieldPath field;
+        final FieldPaths fieldPath;
         final String type;
         final SimpleDateFormat format;
         final String unixPrecision;
@@ -320,8 +320,13 @@ public abstract class TimestampConverter<R extends ConnectRecord<R>> implements 
                         + formatPattern, e);
             }
         }
-        config = new Config(new SingleFieldPath(field, FieldSyntaxVersion.fromConfig(simpleConfig)), type,
-                format, unixPrecision);
+        config = new Config(
+            FieldPaths.newBuilder(FieldSyntaxVersion.fromConfig(simpleConfig))
+                .add(field)
+                .build(),
+            type,
+            format,
+            unixPrecision);
     }
 
     @Override
@@ -384,7 +389,7 @@ public abstract class TimestampConverter<R extends ConnectRecord<R>> implements 
 
     private R applyWithSchema(R record) {
         final Schema schema = operatingSchema(record);
-        if (config.field.isEmpty()) {
+        if (config.fieldPath == null) {
             Object value = operatingValue(record);
             // New schema is determined by the requested target timestamp type
             Schema updatedSchema = TRANSLATORS.get(config.type).typeSchema(schema.isOptional(), schema.defaultValue());
@@ -400,7 +405,7 @@ public abstract class TimestampConverter<R extends ConnectRecord<R>> implements 
                     updated.defaultValue(updatedDefaultValue);
                 }
 
-                updatedSchema = config.field.updateSchemaFrom(
+                updatedSchema = config.fieldPath.updateSchemaFrom(
                     schema,
                     updated,
                     (builder, field, fieldPath) -> {
@@ -426,7 +431,7 @@ public abstract class TimestampConverter<R extends ConnectRecord<R>> implements 
         if (value == null) {
             return null;
         }
-        return config.field.updateValueFrom(
+        return config.fieldPath.updateValueFrom(
             value.schema(),
             value,
             updatedSchema,
@@ -441,11 +446,11 @@ public abstract class TimestampConverter<R extends ConnectRecord<R>> implements 
 
     private R applySchemaless(R record) {
         Object rawValue = operatingValue(record);
-        if (rawValue == null || config.field.isEmpty()) {
+        if (rawValue == null || config.fieldPath == null) {
             return newRecord(record, null, convertTimestamp(rawValue));
         } else {
             final Map<String, Object> value = requireMap(rawValue, PURPOSE);
-            final Map<String, Object> updatedValue = config.field.updateValueFrom(
+            final Map<String, Object> updatedValue = config.fieldPath.updateValueFrom(
                 value,
                 (orig, map, fieldPath, k) -> map.put(k, convertTimestamp(orig.get(k))));
             return newRecord(record, null, updatedValue);
