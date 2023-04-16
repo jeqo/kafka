@@ -39,11 +39,6 @@ import java.util.stream.Collectors;
  * If the SMT requires accessing a single field on the same data object,
  * use {@code FieldPath} instead.
  * <p>
- * Invariants:
- * <li>
- *     <ul>Tree values contain either a nested tree or a field path</ul>
- *     <ul>A tree cannot contain paths that are a subset of other paths (e.g. foo and foo.bar in V2 should collide and fail)</ul>
- * </li>
  *
  * See KIP-821.
  *
@@ -51,7 +46,10 @@ import java.util.stream.Collectors;
  * @see FieldSyntaxVersion
  */
 public class MultiFieldPaths implements FieldPath {
-
+    // Invariants:
+    // - Tree values contain either a nested tree or a field path
+    // - A tree can contain paths that are a subset of other paths
+    //   (e.g. foo and foo.bar in V2 would be kept)
     final Map<String, Object> pathTree;
 
     MultiFieldPaths(Set<SingleFieldPath> paths) {
