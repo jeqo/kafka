@@ -320,8 +320,11 @@ public abstract class TimestampConverter<R extends ConnectRecord<R>> implements 
                         + formatPattern, e);
             }
         }
-        config = new Config(new SingleFieldPath(field, FieldSyntaxVersion.fromConfig(simpleConfig)), type,
-                format, unixPrecision);
+        FieldSyntaxVersion syntaxVersion = FieldSyntaxVersion.fromConfig(simpleConfig);
+        SingleFieldPath fieldPath = field.isEmpty()
+            ? null
+            : new SingleFieldPath(field, syntaxVersion);
+        config = new Config(fieldPath, type, format, unixPrecision);
     }
 
     @Override
@@ -384,7 +387,7 @@ public abstract class TimestampConverter<R extends ConnectRecord<R>> implements 
 
     private R applyWithSchema(R record) {
         final Schema schema = operatingSchema(record);
-        if (config.field.isEmpty()) {
+        if (config.field == null) {
             Object value = operatingValue(record);
             // New schema is determined by the requested target timestamp type
             Schema updatedSchema = TRANSLATORS.get(config.type).typeSchema(schema.isOptional(), schema.defaultValue());
@@ -441,7 +444,7 @@ public abstract class TimestampConverter<R extends ConnectRecord<R>> implements 
 
     private R applySchemaless(R record) {
         Object rawValue = operatingValue(record);
-        if (rawValue == null || config.field.isEmpty()) {
+        if (rawValue == null || config.field == null) {
             return newRecord(record, null, convertTimestamp(rawValue));
         } else {
             final Map<String, Object> value = requireMap(rawValue, PURPOSE);

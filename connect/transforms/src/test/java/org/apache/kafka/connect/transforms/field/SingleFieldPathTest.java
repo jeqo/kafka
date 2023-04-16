@@ -43,10 +43,6 @@ class SingleFieldPathTest {
         assertArrayEquals(EMPTY_PATH, new SingleFieldPath("", FieldSyntaxVersion.V2).path());
     }
 
-    @Test void shouldBuildV2WithNullPath() {
-        assertArrayEquals(EMPTY_PATH, new SingleFieldPath(null, FieldSyntaxVersion.V2).path());
-    }
-
     @Test void shouldBuildV2WithoutDots() {
         assertArrayEquals(new String[] {"foobarbaz"}, new SingleFieldPath("foobarbaz", FieldSyntaxVersion.V2).path());
     }

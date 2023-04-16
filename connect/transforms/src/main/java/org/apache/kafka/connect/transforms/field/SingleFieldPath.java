@@ -28,6 +28,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * A FieldPath is composed by one or many field names, known as steps,
@@ -59,24 +60,16 @@ public class SingleFieldPath implements FieldPath {
     private final String[] path;
 
     public SingleFieldPath(String pathText, FieldSyntaxVersion version) {
-        if (pathText == null || pathText.isEmpty()) { // empty path
-            this.path = new String[] {};
-        } else {
-            switch (version) {
-                case V1: // backward compatibility
-                    this.path = new String[] {pathText};
-                    break;
-                case V2:
-                    // if no dots or wrapping backticks are used, then return path with single step
-                    if (!pathText.contains(String.valueOf(DOT))) {
-                        path = new String[] {pathText};
-                    } else {
-                        path = buildFieldPathV2(pathText);
-                    }
-                    break;
-                default:
-                    throw new IllegalArgumentException("Unknown syntax version: " + version);
-            }
+        Objects.requireNonNull(pathText, "Field path cannot be null");
+        switch (version) {
+            case V1: // backward compatibility
+                this.path = new String[] {pathText};
+                break;
+            case V2:
+                this.path = buildFieldPathV2(pathText);
+                break;
+            default:
+                throw new IllegalArgumentException("Unknown syntax version: " + version);
         }
     }
 
