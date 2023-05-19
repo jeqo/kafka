@@ -39,7 +39,7 @@ import org.apache.kafka.common.message.{AlterUserScramCredentialsRequestData, Al
 import org.apache.kafka.common.message.DescribeUserScramCredentialsResponseData.CredentialInfo
 import org.apache.kafka.common.metrics.Metrics
 import org.apache.kafka.common.security.scram.internals.{ScramMechanism => InternalScramMechanism}
-import org.apache.kafka.server.policy.{AlterConfigPolicy, CreateTopicPolicy}
+import org.apache.kafka.server.policy.{AlterConfigPolicy, CreateTopicPolicy, DeleteTopicPolicy}
 import org.apache.kafka.server.policy.CreateTopicPolicy.RequestMetadata
 import org.apache.kafka.common.protocol.Errors
 import org.apache.kafka.common.quota.{ClientQuotaAlteration, ClientQuotaEntity, ClientQuotaFilter, ClientQuotaFilterComponent}
@@ -78,6 +78,9 @@ class ZkAdminManager(val config: KafkaConfig,
 
   private val createTopicPolicy =
     Option(config.getConfiguredInstance(KafkaConfig.CreateTopicPolicyClassNameProp, classOf[CreateTopicPolicy]))
+
+  private val deleteTopicPolicy =
+    Option(config.getConfiguredInstance(KafkaConfig.DeleteTopicPolicyClassNameProp, classOf[DeleteTopicPolicy]))
 
   private val alterConfigPolicy =
     Option(config.getConfiguredInstance(KafkaConfig.AlterConfigPolicyClassNameProp, classOf[AlterConfigPolicy]))
@@ -545,6 +548,7 @@ class ZkAdminManager(val config: KafkaConfig,
   def shutdown(): Unit = {
     topicPurgatory.shutdown()
     CoreUtils.swallow(createTopicPolicy.foreach(_.close()), this)
+    CoreUtils.swallow(deleteTopicPolicy.foreach(_.close()), this)
     CoreUtils.swallow(alterConfigPolicy.foreach(_.close()), this)
   }
 

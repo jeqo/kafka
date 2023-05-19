@@ -26,6 +26,8 @@
   // in the response if the topics deletion is throttled (KIP-599).
   //
   // Version 6 reorganizes topics, adds topic IDs and allows topic names to be null.
+  //
+  // Version 7 adds validateOnly.
   "validVersions": "0-6",
   "flexibleVersions": "4+",
   "fields": [
@@ -37,6 +39,8 @@
     { "name": "TopicNames", "type": "[]string", "versions": "0-5", "entityType": "topicName", "ignorable": true,
       "about": "The names of the topics to delete" },
     { "name": "TimeoutMs", "type": "int32", "versions": "0+",
-      "about": "The length of time in milliseconds to wait for the deletions to complete." }
+      "about": "The length of time in milliseconds to wait for the deletions to complete." },
+    { "name": "validateOnly", "type": "bool", "versions": "1+", "default": "false", "ignorable": false,
+      "about": "If true, check that the topics can be deleted as specified, but don't delete anything." }
   ]
 }

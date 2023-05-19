@@ -30,6 +30,7 @@ import java.util.Collection;
 public class DeleteTopicsOptions extends AbstractOptions<DeleteTopicsOptions> {
 
     private boolean retryOnQuotaViolation = true;
+    private boolean validateOnly = false;
 
     /**
      * Set the timeout in milliseconds for this operation or {@code null} if the default api timeout for the
@@ -50,10 +51,19 @@ public class DeleteTopicsOptions extends AbstractOptions<DeleteTopicsOptions> {
         return this;
     }
 
+    public DeleteTopicsOptions validateOnly(boolean validateOnly) {
+        this.validateOnly = validateOnly;
+        return this;
+    }
+
     /**
      * Returns true if quota violation should be automatically retried.
      */
     public boolean shouldRetryOnQuotaViolation() {
         return retryOnQuotaViolation;
+    }
+
+    public boolean shouldValidateOnly() {
+        return validateOnly;
     }
 }

@@ -44,6 +44,7 @@ import org.apache.kafka.common.message.CreatePartitionsRequestData.CreatePartiti
 import org.apache.kafka.common.message.CreatePartitionsResponseData.CreatePartitionsTopicResult;
 import org.apache.kafka.common.message.CreateTopicsRequestData;
 import org.apache.kafka.common.message.CreateTopicsResponseData;
+import org.apache.kafka.common.message.DeleteTopicsRequestData;
 import org.apache.kafka.common.message.ElectLeadersRequestData;
 import org.apache.kafka.common.message.ElectLeadersResponseData;
 import org.apache.kafka.common.message.ListPartitionReassignmentsRequestData;
@@ -74,6 +75,7 @@ import org.apache.kafka.common.protocol.ApiMessage;
 import org.apache.kafka.common.quota.ClientQuotaAlteration;
 import org.apache.kafka.common.quota.ClientQuotaEntity;
 import org.apache.kafka.common.requests.ApiError;
+import org.apache.kafka.common.requests.DeleteTopicsRequest;
 import org.apache.kafka.common.utils.LogContext;
 import org.apache.kafka.common.utils.Time;
 import org.apache.kafka.common.utils.Utils;
@@ -106,6 +108,7 @@ import org.apache.kafka.server.common.MetadataVersion;
 import org.apache.kafka.server.fault.FaultHandler;
 import org.apache.kafka.server.policy.AlterConfigPolicy;
 import org.apache.kafka.server.policy.CreateTopicPolicy;
+import org.apache.kafka.server.policy.DeleteTopicPolicy;
 import org.apache.kafka.snapshot.SnapshotReader;
 import org.apache.kafka.snapshot.Snapshots;
 import org.apache.kafka.timeline.SnapshotRegistry;
@@ -183,6 +186,7 @@ public final class QuorumController implements Controller {
         private long sessionTimeoutNs = ClusterControlManager.DEFAULT_SESSION_TIMEOUT_NS;
         private QuorumControllerMetrics controllerMetrics = null;
         private Optional<CreateTopicPolicy> createTopicPolicy = Optional.empty();
+        private Optional<DeleteTopicPolicy> deleteTopicPolicy = Optional.empty();
         private Optional<AlterConfigPolicy> alterConfigPolicy = Optional.empty();
         private ConfigurationValidator configurationValidator = ConfigurationValidator.NO_OP;
         private Optional<ClusterMetadataAuthorizer> authorizer = Optional.empty();
@@ -285,6 +289,11 @@ public final class QuorumController implements Controller {
             return this;
         }
 
+        public Builder setDeleteTopicPolicy(Optional<DeleteTopicPolicy> deleteTopicPolicy) {
+            this.deleteTopicPolicy = deleteTopicPolicy;
+            return this;
+        }
+
         public Builder setAlterConfigPolicy(Optional<AlterConfigPolicy> alterConfigPolicy) {
             this.alterConfigPolicy = alterConfigPolicy;
             return this;
@@ -353,6 +362,7 @@ public final class QuorumController implements Controller {
                     sessionTimeoutNs,
                     controllerMetrics,
                     createTopicPolicy,
+                    deleteTopicPolicy,
                     alterConfigPolicy,
                     configurationValidator,
                     authorizer,
@@ -1801,6 +1811,7 @@ public final class QuorumController implements Controller {
         long sessionTimeoutNs,
         QuorumControllerMetrics controllerMetrics,
         Optional<CreateTopicPolicy> createTopicPolicy,
+        Optional<DeleteTopicPolicy> deleteTopicPolicy,
         Optional<AlterConfigPolicy> alterConfigPolicy,
         ConfigurationValidator configurationValidator,
         Optional<ClusterMetadataAuthorizer> authorizer,
@@ -1972,12 +1983,13 @@ public final class QuorumController implements Controller {
     @Override
     public CompletableFuture<Map<Uuid, ApiError>> deleteTopics(
         ControllerRequestContext context,
+        DeleteTopicsRequestData request,
         Collection<Uuid> ids
     ) {
         if (ids.isEmpty())
             return CompletableFuture.completedFuture(Collections.emptyMap());
         return appendWriteEvent("deleteTopics", context.deadlineNs(),
-            () -> replicationControl.deleteTopics(context, ids));
+            () -> replicationControl.deleteTopics(context, request, ids));
     }
 
     @Override

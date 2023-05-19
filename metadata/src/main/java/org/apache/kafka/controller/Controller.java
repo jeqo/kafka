@@ -34,6 +34,7 @@ import org.apache.kafka.common.message.CreatePartitionsRequestData.CreatePartiti
 import org.apache.kafka.common.message.CreatePartitionsResponseData.CreatePartitionsTopicResult;
 import org.apache.kafka.common.message.CreateTopicsRequestData;
 import org.apache.kafka.common.message.CreateTopicsResponseData;
+import org.apache.kafka.common.message.DeleteTopicsRequestData;
 import org.apache.kafka.common.message.ElectLeadersRequestData;
 import org.apache.kafka.common.message.ElectLeadersResponseData;
 import org.apache.kafka.common.message.ListPartitionReassignmentsRequestData;
@@ -156,6 +157,7 @@ public interface Controller extends AclMutator, AutoCloseable {
      */
     CompletableFuture<Map<Uuid, ApiError>> deleteTopics(
         ControllerRequestContext context,
+        DeleteTopicsRequestData request,
         Collection<Uuid> topicIds
     );
 

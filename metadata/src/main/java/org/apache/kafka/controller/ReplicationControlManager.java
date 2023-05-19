@@ -56,6 +56,7 @@ import org.apache.kafka.common.message.CreateTopicsRequestData.CreatableTopicCol
 import org.apache.kafka.common.message.CreateTopicsRequestData.CreateableTopicConfigCollection;
 import org.apache.kafka.common.message.CreateTopicsResponseData;
 import org.apache.kafka.common.message.CreateTopicsResponseData.CreatableTopicResult;
+import org.apache.kafka.common.message.DeleteTopicsRequestData;
 import org.apache.kafka.common.message.ElectLeadersRequestData;
 import org.apache.kafka.common.message.ElectLeadersRequestData.TopicPartitions;
 import org.apache.kafka.common.message.ElectLeadersResponseData;
@@ -92,6 +93,7 @@ import org.apache.kafka.metadata.placement.TopicAssignment;
 import org.apache.kafka.metadata.placement.UsableBroker;
 import org.apache.kafka.server.common.ApiMessageAndVersion;
 import org.apache.kafka.server.policy.CreateTopicPolicy;
+import org.apache.kafka.server.policy.DeleteTopicPolicy;
 import org.apache.kafka.timeline.SnapshotRegistry;
 import org.apache.kafka.timeline.TimelineHashMap;
 import org.apache.kafka.timeline.TimelineHashSet;
@@ -151,6 +153,7 @@ public class ReplicationControlManager {
         private ConfigurationControlManager configurationControl = null;
         private ClusterControlManager clusterControl = null;
         private Optional<CreateTopicPolicy> createTopicPolicy = Optional.empty();
+        private Optional<DeleteTopicPolicy> deleteTopicPolicy = Optional.empty();
         private FeatureControlManager featureControl = null;
 
         Builder setSnapshotRegistry(SnapshotRegistry snapshotRegistry) {
@@ -217,6 +220,7 @@ public class ReplicationControlManager {
                 configurationControl,
                 clusterControl,
                 createTopicPolicy,
+                deleteTopicPolicy,
                 featureControl);
         }
     }
@@ -296,6 +300,8 @@ public class ReplicationControlManager {
      */
     private final Optional<CreateTopicPolicy> createTopicPolicy;
 
+    private final Optional<DeleteTopicPolicy> deleteTopicPolicy;
+
     /**
      * The feature control manager.
      */
@@ -357,6 +363,7 @@ public class ReplicationControlManager {
         ConfigurationControlManager configurationControl,
         ClusterControlManager clusterControl,
         Optional<CreateTopicPolicy> createTopicPolicy,
+        Optional<DeleteTopicPolicy> deleteTopicPolicy,
         FeatureControlManager featureControl
     ) {
         this.snapshotRegistry = snapshotRegistry;
@@ -366,6 +373,7 @@ public class ReplicationControlManager {
         this.maxElectionsPerImbalance = maxElectionsPerImbalance;
         this.configurationControl = configurationControl;
         this.createTopicPolicy = createTopicPolicy;
+        this.deleteTopicPolicy = deleteTopicPolicy;
         this.featureControl = featureControl;
         this.clusterControl = clusterControl;
         this.topicsByName = new TimelineHashMap<>(snapshotRegistry, 0);
@@ -764,6 +772,17 @@ public class ReplicationControlManager {
         return ApiError.NONE;
     }
 
+    private ApiError maybeCheckDeleteTopicPolicy(Supplier<DeleteTopicPolicy.RequestMetadata> supplier) {
+        if (deleteTopicPolicy.isPresent()) {
+            try {
+                deleteTopicPolicy.get().validate(supplier.get());
+            } catch (PolicyViolationException e) {
+                return new ApiError(Errors.POLICY_VIOLATION, e.getMessage());
+            }
+        }
+        return ApiError.NONE;
+    }
+
     static void validateNewTopicNames(Map<String, ApiError> topicErrors,
                                       CreatableTopicCollection topics,
                                       Map<String, ? extends Set<String>> topicsWithCollisionChars) {
@@ -856,13 +875,15 @@ public class ReplicationControlManager {
         return results;
     }
 
-    ControllerResult<Map<Uuid, ApiError>> deleteTopics(ControllerRequestContext context, Collection<Uuid> ids) {
+    ControllerResult<Map<Uuid, ApiError>> deleteTopics(ControllerRequestContext context,
+                                                       DeleteTopicsRequestData request,
+                                                       Collection<Uuid> ids) {
         Map<Uuid, ApiError> results = new HashMap<>(ids.size());
         List<ApiMessageAndVersion> records = new ArrayList<>(ids.size());
         for (Uuid id : ids) {
             try {
-                deleteTopic(context, id, records);
-                results.put(id, ApiError.NONE);
+                ApiError error = deleteTopic(context, id, records);
+                results.put(id, error);
             } catch (ApiException e) {
                 results.put(id, ApiError.fromThrowable(e));
             } catch (Exception e) {
@@ -870,15 +891,25 @@ public class ReplicationControlManager {
                 results.put(id, ApiError.fromThrowable(e));
             }
         }
-        return ControllerResult.atomicOf(records, results);
+
+        if (request.validateOnly()) {
+            log.info("Validate-only DeleteTopics result(s): {}", results);
+            return ControllerResult.atomicOf(Collections.emptyList(), results);
+        } else {
+            log.info("DeleteTopics result(s): {}", results);
+            return ControllerResult.atomicOf(records, results);
+        }
     }
 
-    void deleteTopic(ControllerRequestContext context, Uuid id, List<ApiMessageAndVersion> records) {
+    private ApiError deleteTopic(ControllerRequestContext context, Uuid id, List<ApiMessageAndVersion> records) {
         TopicControlInfo topic = topics.get(id);
         if (topic == null) {
             throw new UnknownTopicIdException(UNKNOWN_TOPIC_ID.message());
         }
         int numPartitions = topic.parts.size();
+        ApiError error = maybeCheckDeleteTopicPolicy(() ->
+            new DeleteTopicPolicy.RequestMetadata(topic.name()));
+        if (error.isFailure()) return error;
         try {
             context.applyPartitionChangeQuota(numPartitions); // check controller mutation quota
         } catch (ThrottlingQuotaExceededException e) {
@@ -889,6 +920,7 @@ public class ReplicationControlManager {
         }
         records.add(new ApiMessageAndVersion(new RemoveTopicRecord().
             setTopicId(id), (short) 0));
+        return ApiError.NONE;
     }
 
     // VisibleForTesting

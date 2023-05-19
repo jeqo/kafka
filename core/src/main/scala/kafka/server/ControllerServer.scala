@@ -47,7 +47,7 @@ import org.apache.kafka.raft.RaftConfig
 import org.apache.kafka.server.authorizer.Authorizer
 import org.apache.kafka.server.common.ApiMessageAndVersion
 import org.apache.kafka.server.metrics.{KafkaMetricsGroup, KafkaYammerMetrics}
-import org.apache.kafka.server.policy.{AlterConfigPolicy, CreateTopicPolicy}
+import org.apache.kafka.server.policy.{AlterConfigPolicy, CreateTopicPolicy, DeleteTopicPolicy}
 import org.apache.kafka.server.util.{Deadline, FutureUtils}
 
 import java.util
@@ -105,6 +105,7 @@ class ControllerServer(
   var socketServer: SocketServer = _
   val socketServerFirstBoundPortFuture = new CompletableFuture[Integer]()
   var createTopicPolicy: Option[CreateTopicPolicy] = None
+  var deleteTopicPolicy: Option[DeleteTopicPolicy] = None
   var alterConfigPolicy: Option[AlterConfigPolicy] = None
   @volatile var quorumControllerMetrics: QuorumControllerMetrics = _
   var controller: Controller = _
@@ -236,6 +237,7 @@ class ControllerServer(
           setMaxIdleIntervalNs(maxIdleIntervalNs).
           setMetrics(quorumControllerMetrics).
           setCreateTopicPolicy(createTopicPolicy.asJava).
+          setDeleteTopicPolicy(deleteTopicPolicy.asJava).
           setAlterConfigPolicy(alterConfigPolicy.asJava).
           setConfigurationValidator(new ControllerConfigurationValidator()).
           setStaticConfig(config.originals).

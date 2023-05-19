@@ -17,6 +17,7 @@
 package org.apache.kafka.common.requests;
 
 import org.apache.kafka.common.Uuid;
+import org.apache.kafka.common.errors.UnsupportedVersionException;
 import org.apache.kafka.common.message.DeleteTopicsRequestData;
 import org.apache.kafka.common.message.DeleteTopicsResponseData;
 import org.apache.kafka.common.message.DeleteTopicsResponseData.DeletableTopicResult;
@@ -45,6 +46,9 @@ public class DeleteTopicsRequest extends AbstractRequest {
             if (version >= 6 && !data.topicNames().isEmpty()) {
                 data.setTopics(groupByTopic(data.topicNames()));
             }
+            if (data.validateOnly() && version < 7)
+                throw new UnsupportedVersionException("validateOnly is not supported in version 7 of " +
+                    "DeleteTopicsRequest");
             return new DeleteTopicsRequest(data, version);
         }
         
@@ -112,6 +116,10 @@ public class DeleteTopicsRequest extends AbstractRequest {
         if (version() >= 6)
             return data.topics();
         return data.topicNames().stream().map(name -> new DeleteTopicState().setName(name)).collect(Collectors.toList()); 
+    }
+
+    public boolean validateOnly() {
+        return data.validateOnly();
     }
 
     public static DeleteTopicsRequest parse(ByteBuffer buffer, short version) {

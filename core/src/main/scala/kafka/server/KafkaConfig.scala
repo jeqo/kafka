@@ -469,6 +469,7 @@ object KafkaConfig {
   val AutoCreateTopicsEnableProp = "auto.create.topics.enable"
   val MinInSyncReplicasProp = ServerTopicConfigSynonyms.serverSynonym(TopicConfig.MIN_IN_SYNC_REPLICAS_CONFIG)
   val CreateTopicPolicyClassNameProp = "create.topic.policy.class.name"
+  val DeleteTopicPolicyClassNameProp = "delete.topic.policy.class.name"
   val AlterConfigPolicyClassNameProp = "alter.config.policy.class.name"
   val LogMessageDownConversionEnableProp = ServerTopicConfigSynonyms.serverSynonym(TopicConfig.MESSAGE_DOWNCONVERSION_ENABLE_CONFIG)
   /** ********* Replication configuration ***********/
@@ -916,6 +917,8 @@ object KafkaConfig {
 
   val CreateTopicPolicyClassNameDoc = "The create topic policy class that should be used for validation. The class should " +
     "implement the <code>org.apache.kafka.server.policy.CreateTopicPolicy</code> interface."
+  val DeleteTopicPolicyClassNameDoc = "The delete topic policy class that should be used for validation. The class should " +
+    "implement the <code>org.apache.kafka.server.policy.DeleteTopicPolicy</code> interface."
   val AlterConfigPolicyClassNameDoc = "The alter configs policy class that should be used for validation. The class should " +
     "implement the <code>org.apache.kafka.server.policy.AlterConfigPolicy</code> interface."
   val LogMessageDownConversionEnableDoc = TopicConfig.MESSAGE_DOWNCONVERSION_ENABLE_DOC;
@@ -1284,6 +1287,7 @@ object KafkaConfig {
       .define(LogMessageTimestampTypeProp, STRING, LogConfig.DEFAULT_MESSAGE_TIMESTAMP_TYPE, in("CreateTime", "LogAppendTime"), MEDIUM, LogMessageTimestampTypeDoc)
       .define(LogMessageTimestampDifferenceMaxMsProp, LONG, LogConfig.DEFAULT_MESSAGE_TIMESTAMP_DIFFERENCE_MAX_MS, atLeast(0), MEDIUM, LogMessageTimestampDifferenceMaxMsDoc)
       .define(CreateTopicPolicyClassNameProp, CLASS, null, LOW, CreateTopicPolicyClassNameDoc)
+      .define(DeleteTopicPolicyClassNameProp, CLASS, null, LOW, DeleteTopicPolicyClassNameDoc)
       .define(AlterConfigPolicyClassNameProp, CLASS, null, LOW, AlterConfigPolicyClassNameDoc)
       .define(LogMessageDownConversionEnableProp, BOOLEAN, LogConfig.DEFAULT_MESSAGE_DOWNCONVERSION_ENABLE, LOW, LogMessageDownConversionEnableDoc)
 

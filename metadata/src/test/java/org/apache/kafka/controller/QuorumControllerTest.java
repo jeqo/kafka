@@ -45,6 +45,7 @@ import java.util.stream.IntStream;
 import org.apache.kafka.common.Uuid;
 import org.apache.kafka.common.errors.BrokerIdNotRegisteredException;
 import org.apache.kafka.common.errors.UnknownTopicOrPartitionException;
+import org.apache.kafka.common.message.DeleteTopicsRequestData;
 import org.apache.kafka.common.message.RequestHeaderData;
 import org.apache.kafka.common.metadata.BrokerRegistrationChangeRecord;
 import org.apache.kafka.common.metadata.ConfigRecord;
@@ -786,7 +787,7 @@ public class QuorumControllerTest {
                         new CreatableTopic().setName("foo")).iterator())),
                     Collections.emptySet());
             CompletableFuture<Map<Uuid, ApiError>> deleteFuture =
-                controller.deleteTopics(context0, Collections.singletonList(Uuid.ZERO_UUID));
+                controller.deleteTopics(context0, new DeleteTopicsRequestData(), Collections.singletonList(Uuid.ZERO_UUID));
             CompletableFuture<Map<String, ResultOrError<Uuid>>> findTopicIdsFuture =
                 controller.findTopicIds(context0, Collections.singletonList("foo"));
             CompletableFuture<Map<Uuid, ResultOrError<String>>> findTopicNamesFuture =
@@ -845,7 +846,7 @@ public class QuorumControllerTest {
                 controller.createTopics(ANONYMOUS_CONTEXT, new CreateTopicsRequestData().
                     setTimeoutMs(120000), Collections.emptySet());
             CompletableFuture<Map<Uuid, ApiError>> deleteFuture =
-                controller.deleteTopics(ANONYMOUS_CONTEXT, Collections.emptyList());
+                controller.deleteTopics(ANONYMOUS_CONTEXT, new DeleteTopicsRequestData(), Collections.emptyList());
             CompletableFuture<Map<String, ResultOrError<Uuid>>> findTopicIdsFuture =
                 controller.findTopicIds(ANONYMOUS_CONTEXT, Collections.emptyList());
             CompletableFuture<Map<Uuid, ResultOrError<String>>> findTopicNamesFuture =

@@ -1753,6 +1753,7 @@ public class KafkaAdminClient extends AdminClient {
                 return new DeleteTopicsRequest.Builder(
                     new DeleteTopicsRequestData()
                         .setTopicNames(topics)
+                        .setValidateOnly(options.shouldValidateOnly())
                         .setTimeoutMs(timeoutMs));
             }
 

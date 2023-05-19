@@ -37,6 +37,7 @@ public class DeleteTopicsResponse extends AbstractResponse {
      * NOT_CONTROLLER(41)
      * INVALID_REQUEST(42)
      * TOPIC_DELETION_DISABLED(73)
+     * POLICY_VIOLATION(44)
      */
     private final DeleteTopicsResponseData data;
 
