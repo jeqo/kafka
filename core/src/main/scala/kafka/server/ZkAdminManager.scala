@@ -446,7 +446,7 @@ class ZkAdminManager(val config: KafkaConfig,
       throw new UnknownTopicOrPartitionException(s"The topic '$topic' does not exist.")
 
     adminZkClient.validateTopicConfig(topic, configProps)
-    validateConfigPolicy(resource, configEntriesMap)
+    validateConfigPolicy(resource, configProps, configEntriesMap)
     if (!validateOnly) {
       info(s"Updating topic $topic with new configuration : ${toLoggableProps(resource, configProps).mkString(",")}")
       adminZkClient.changeTopicConfig(topic, configProps)
@@ -460,7 +460,7 @@ class ZkAdminManager(val config: KafkaConfig,
     val brokerId = getBrokerId(resource)
     val perBrokerConfig = brokerId.nonEmpty
     this.config.dynamicConfig.validate(configProps, perBrokerConfig)
-    validateConfigPolicy(resource, configEntriesMap)
+    validateConfigPolicy(resource, configProps, configEntriesMap)
     if (!validateOnly) {
       if (perBrokerConfig)
         this.config.dynamicConfig.reloadUpdatedFilesWithoutConfigChange(configProps)
@@ -488,10 +488,13 @@ class ZkAdminManager(val config: KafkaConfig,
     }
   }
 
-  private def validateConfigPolicy(resource: ConfigResource, configEntriesMap: Map[String, String]): Unit = {
+  private def validateConfigPolicy(resource: ConfigResource, configProps: Properties, configEntriesMap: Map[String, String]): Unit = {
+    val existing = new mutable.HashMap[String, String]
+    configProps.forEach((k, v) => existing.put(k.toString, v.toString))
+
     alterConfigPolicy match {
       case Some(policy) =>
-        policy.validate(new AlterConfigPolicy.RequestMetadata(new ConfigResource(resource.`type`(), resource.name), configEntriesMap.asJava, existingConfigs))
+        policy.validate(new AlterConfigPolicy.RequestMetadata(new ConfigResource(resource.`type`(), resource.name), configEntriesMap.asJava, existing.asJava))
       case None =>
     }
   }
