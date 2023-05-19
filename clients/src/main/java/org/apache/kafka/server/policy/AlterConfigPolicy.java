@@ -20,6 +20,8 @@ import org.apache.kafka.common.Configurable;
 import org.apache.kafka.common.config.ConfigResource;
 import org.apache.kafka.common.errors.PolicyViolationException;
 
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 
@@ -42,15 +44,23 @@ public interface AlterConfigPolicy extends Configurable, AutoCloseable {
 
         private final ConfigResource resource;
         private final Map<String, String> configs;
+        private final Map<String, String> existingConfigs;
 
         /**
          * Create an instance of this class with the provided parameters.
-         *
+         * <p>
          * This constructor is public to make testing of <code>AlterConfigPolicy</code> implementations easier.
          */
         public RequestMetadata(ConfigResource resource, Map<String, String> configs) {
             this.resource = resource;
             this.configs = configs;
+            this.existingConfigs = Collections.emptyMap();
+        }
+
+        public RequestMetadata(ConfigResource resource, Map<String, String> configs, Map<String, String> existingConfigs) {
+            this.resource = resource;
+            this.configs = configs;
+            this.existingConfigs = existingConfigs;
         }
 
         /**
@@ -58,6 +68,10 @@ public interface AlterConfigPolicy extends Configurable, AutoCloseable {
          */
         public Map<String, String> configs() {
             return configs;
+        }
+
+        public Map<String, String> existingConfigs() {
+            return existingConfigs;
         }
 
         public ConfigResource resource() {
@@ -80,7 +94,8 @@ public interface AlterConfigPolicy extends Configurable, AutoCloseable {
         @Override
         public String toString() {
             return "AlterConfigPolicy.RequestMetadata(resource=" + resource +
-                    ", configs=" + configs + ")";
+                    ", configs=" + configs +
+                    ", existingConfigs=" + existingConfigs + ")";
         }
     }
 

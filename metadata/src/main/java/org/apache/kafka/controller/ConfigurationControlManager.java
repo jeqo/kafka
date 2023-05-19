@@ -288,7 +288,12 @@ public class ConfigurationControlManager {
                 existenceChecker.accept(configResource);
             }
             if (alterConfigPolicy.isPresent()) {
-                alterConfigPolicy.get().validate(new RequestMetadata(configResource, alteredConfigsForAlterConfigPolicyCheck));
+                final RequestMetadata requestMetadata = new RequestMetadata(
+                    configResource,
+                    alteredConfigsForAlterConfigPolicyCheck,
+                    existingConfigs
+                );
+                alterConfigPolicy.get().validate(requestMetadata);
             }
         } catch (ConfigException e) {
             return new ApiError(INVALID_CONFIG, e.getMessage());

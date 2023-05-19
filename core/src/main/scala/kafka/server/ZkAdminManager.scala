@@ -491,8 +491,7 @@ class ZkAdminManager(val config: KafkaConfig,
   private def validateConfigPolicy(resource: ConfigResource, configEntriesMap: Map[String, String]): Unit = {
     alterConfigPolicy match {
       case Some(policy) =>
-        policy.validate(new AlterConfigPolicy.RequestMetadata(
-          new ConfigResource(resource.`type`(), resource.name), configEntriesMap.asJava))
+        policy.validate(new AlterConfigPolicy.RequestMetadata(new ConfigResource(resource.`type`(), resource.name), configEntriesMap.asJava, existingConfigs))
       case None =>
     }
   }
