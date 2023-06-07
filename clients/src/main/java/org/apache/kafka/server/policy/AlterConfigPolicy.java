@@ -61,6 +61,15 @@ public interface AlterConfigPolicy extends Configurable, AutoCloseable {
 
         public RequestMetadata(ConfigResource resource,
                                Map<String, String> proposedConfigs,
+                               Map<String, String> existingConfigs) {
+            this.resource = resource;
+            this.proposedConfigs = proposedConfigs;
+            this.proposedConfigsToDelete = Collections.emptyList();
+            this.existingConfigs = existingConfigs;
+        }
+
+        public RequestMetadata(ConfigResource resource,
+                               Map<String, String> proposedConfigs,
                                List<String> proposedConfigsToDelete,
                                Map<String, String> existingConfigs) {
             this.resource = resource;

@@ -128,7 +128,7 @@ class AdminClientWithPoliciesIntegrationTest extends KafkaServerTestHarness with
     val brokerConfigs = Seq(new ConfigEntry(KafkaConfig.MessageMaxBytesProp, "50000")).asJava
     val alterResult1 = client.alterConfigs(Map(brokerResource -> new Config(brokerConfigs)).asJava)
     alterResult1.all.get
-    assertEquals(Set(KafkaConfig.MessageMaxBytesProp), validationsForResource(brokerResource).head.configs().keySet().asScala)
+    assertEquals(Set(KafkaConfig.MessageMaxBytesProp), validationsForResource(brokerResource).head.proposedConfigs().keySet().asScala)
     validations.clear()
 
     val topicConfigEntries1 = Seq(
@@ -212,7 +212,7 @@ class AdminClientWithPoliciesIntegrationTest extends KafkaServerTestHarness with
         ).asJavaCollection
     ).asJava)
     alterResult.all.get
-    assertEquals(Set(KafkaConfig.MaxConnectionsProp), validationsForResource(brokerResource).head.configs().keySet().asScala)
+    assertEquals(Set(KafkaConfig.MaxConnectionsProp), validationsForResource(brokerResource).head.proposedConfigs().keySet().asScala)
   }
 
 }
@@ -239,9 +239,9 @@ object AdminClientWithPoliciesIntegrationTest {
       validations.append(requestMetadata)
       require(!closed, "Policy should not be closed")
       require(configs.nonEmpty, "configure should have been called with non empty configs")
-      require(!requestMetadata.configs.isEmpty, "request configs should not be empty")
+      require(!requestMetadata.proposedConfigs().isEmpty, "request configs should not be empty")
       require(requestMetadata.resource.name.nonEmpty, "resource name should not be empty")
-      if (requestMetadata.configs.containsKey(TopicConfig.MIN_IN_SYNC_REPLICAS_CONFIG))
+      if (requestMetadata.proposedConfigs().containsKey(TopicConfig.MIN_IN_SYNC_REPLICAS_CONFIG))
         throw new PolicyViolationException("Min in sync replicas cannot be updated")
     }
 

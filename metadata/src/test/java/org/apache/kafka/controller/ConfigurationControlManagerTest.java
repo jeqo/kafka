@@ -340,7 +340,7 @@ public class ConfigurationControlManagerTest {
     private static class CheckForNullValuesPolicy implements AlterConfigPolicy {
         @Override
         public void validate(RequestMetadata actual) throws PolicyViolationException {
-            actual.configs().forEach((key, value) -> {
+            actual.proposedConfigs().forEach((key, value) -> {
                 if (value == null) {
                     throw new PolicyViolationException("Legacy Alter Configs should not see null values");
                 }
