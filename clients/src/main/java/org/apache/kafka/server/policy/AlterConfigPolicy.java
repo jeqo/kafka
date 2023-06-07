@@ -21,6 +21,7 @@ import org.apache.kafka.common.config.ConfigResource;
 import org.apache.kafka.common.errors.PolicyViolationException;
 
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
@@ -43,6 +44,7 @@ public interface AlterConfigPolicy extends Configurable, AutoCloseable {
 
         private final ConfigResource resource;
         private final Map<String, String> proposedConfigs;
+        private final List<String> proposedConfigsToDelete;
         private final Map<String, String> existingConfigs;
 
         /**
@@ -53,12 +55,17 @@ public interface AlterConfigPolicy extends Configurable, AutoCloseable {
         public RequestMetadata(ConfigResource resource, Map<String, String> proposedConfigs) {
             this.resource = resource;
             this.proposedConfigs = proposedConfigs;
+            this.proposedConfigsToDelete = Collections.emptyList();
             this.existingConfigs = Collections.emptyMap();
         }
 
-        public RequestMetadata(ConfigResource resource, Map<String, String> proposedConfigs, Map<String, String> existingConfigs) {
+        public RequestMetadata(ConfigResource resource,
+                               Map<String, String> proposedConfigs,
+                               List<String> proposedConfigsToDelete,
+                               Map<String, String> existingConfigs) {
             this.resource = resource;
             this.proposedConfigs = proposedConfigs;
+            this.proposedConfigsToDelete = proposedConfigsToDelete;
             this.existingConfigs = existingConfigs;
         }
 
@@ -71,6 +78,10 @@ public interface AlterConfigPolicy extends Configurable, AutoCloseable {
 
         public Map<String, String> existingConfigs() {
             return existingConfigs;
+        }
+
+        public List<String> proposedConfigsToDelete() {
+            return proposedConfigsToDelete;
         }
 
         public ConfigResource resource() {

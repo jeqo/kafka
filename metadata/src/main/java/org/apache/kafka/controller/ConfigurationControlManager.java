@@ -265,12 +265,14 @@ public class ConfigurationControlManager {
                                          boolean newlyCreatedResource) {
         Map<String, String> allConfigs = new HashMap<>();
         Map<String, String> alteredConfigsForAlterConfigPolicyCheck = new HashMap<>();
+        List<String> configsToDelete = new ArrayList<>();
         TimelineHashMap<String, String> existingConfigs = configData.get(configResource);
         if (existingConfigs != null) allConfigs.putAll(existingConfigs);
         for (ApiMessageAndVersion newRecord : recordsExplicitlyAltered) {
             ConfigRecord configRecord = (ConfigRecord) newRecord.message();
             if (configRecord.value() == null) {
                 allConfigs.remove(configRecord.name());
+                configsToDelete.add(configResource.name());
             } else {
                 allConfigs.put(configRecord.name(), configRecord.value());
             }
@@ -279,6 +281,7 @@ public class ConfigurationControlManager {
         for (ApiMessageAndVersion recordImplicitlyDeleted : recordsImplicitlyDeleted) {
             ConfigRecord configRecord = (ConfigRecord) recordImplicitlyDeleted.message();
             allConfigs.remove(configRecord.name());
+            configsToDelete.add(configRecord.name());
             // As per KAFKA-14195, do not include implicit deletions caused by using the legacy AlterConfigs API
             // in the list passed to the policy in order to maintain backwards compatibility
         }
@@ -291,6 +294,7 @@ public class ConfigurationControlManager {
                 final RequestMetadata requestMetadata = new RequestMetadata(
                     configResource,
                     alteredConfigsForAlterConfigPolicyCheck,
+                    configsToDelete,
                     existingConfigs
                 );
                 alterConfigPolicy.get().validate(requestMetadata);
