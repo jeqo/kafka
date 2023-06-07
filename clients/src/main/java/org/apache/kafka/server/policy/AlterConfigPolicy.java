@@ -21,7 +21,6 @@ import org.apache.kafka.common.config.ConfigResource;
 import org.apache.kafka.common.errors.PolicyViolationException;
 
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 
@@ -43,7 +42,7 @@ public interface AlterConfigPolicy extends Configurable, AutoCloseable {
     class RequestMetadata {
 
         private final ConfigResource resource;
-        private final Map<String, String> configs;
+        private final Map<String, String> proposedConfigs;
         private final Map<String, String> existingConfigs;
 
         /**
@@ -51,23 +50,23 @@ public interface AlterConfigPolicy extends Configurable, AutoCloseable {
          * <p>
          * This constructor is public to make testing of <code>AlterConfigPolicy</code> implementations easier.
          */
-        public RequestMetadata(ConfigResource resource, Map<String, String> configs) {
+        public RequestMetadata(ConfigResource resource, Map<String, String> proposedConfigs) {
             this.resource = resource;
-            this.configs = configs;
+            this.proposedConfigs = proposedConfigs;
             this.existingConfigs = Collections.emptyMap();
         }
 
-        public RequestMetadata(ConfigResource resource, Map<String, String> configs, Map<String, String> existingConfigs) {
+        public RequestMetadata(ConfigResource resource, Map<String, String> proposedConfigs, Map<String, String> existingConfigs) {
             this.resource = resource;
-            this.configs = configs;
+            this.proposedConfigs = proposedConfigs;
             this.existingConfigs = existingConfigs;
         }
 
         /**
          * Return the configs in the request.
          */
-        public Map<String, String> configs() {
-            return configs;
+        public Map<String, String> proposedConfigs() {
+            return proposedConfigs;
         }
 
         public Map<String, String> existingConfigs() {
@@ -80,7 +79,7 @@ public interface AlterConfigPolicy extends Configurable, AutoCloseable {
 
         @Override
         public int hashCode() {
-            return Objects.hash(resource, configs);
+            return Objects.hash(resource, proposedConfigs);
         }
 
         @Override
@@ -88,13 +87,13 @@ public interface AlterConfigPolicy extends Configurable, AutoCloseable {
             if ((o == null) || (!o.getClass().equals(getClass()))) return false;
             RequestMetadata other = (RequestMetadata) o;
             return resource.equals(other.resource) &&
-                configs.equals(other.configs);
+                proposedConfigs.equals(other.proposedConfigs);
         }
 
         @Override
         public String toString() {
             return "AlterConfigPolicy.RequestMetadata(resource=" + resource +
-                    ", configs=" + configs +
+                    ", configs=" + proposedConfigs +
                     ", existingConfigs=" + existingConfigs + ")";
         }
     }
