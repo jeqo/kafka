@@ -142,7 +142,7 @@ public class RemoteLogManager implements Closeable {
 
     private final long delayInMs;
 
-    private final ConcurrentHashMap<TopicIdPartition, RLMTaskWithFuture> leaderOrFollowerTasks = new ConcurrentHashMap<>();
+    final ConcurrentHashMap<TopicIdPartition, RLMTaskWithFuture> leaderOrFollowerTasks = new ConcurrentHashMap<>();
 
     // topic ids that are received on leadership changes, this map is cleared on stop partitions
     private final ConcurrentMap<TopicPartition, Uuid> topicPartitionIds = new ConcurrentHashMap<>();
@@ -426,9 +426,18 @@ public class RemoteLogManager implements Closeable {
 
     private static abstract class CancellableRunnable implements Runnable {
         private volatile boolean cancelled = false;
+        private volatile boolean paused = false;
 
         public void cancel() {
             cancelled = true;
+        }
+
+        public void setPause(boolean paused) {
+            this.paused = paused;
+        }
+
+        public boolean isCancelledOrPaused() {
+            return cancelled || paused;
         }
 
         public boolean isCancelled() {
@@ -507,7 +516,7 @@ public class RemoteLogManager implements Closeable {
         }
 
         public void copyLogSegmentsToRemote(UnifiedLog log) throws InterruptedException {
-            if (isCancelled())
+            if (isCancelledOrPaused())
                 return;
 
             try {
@@ -1127,6 +1136,13 @@ public class RemoteLogManager implements Closeable {
             }
         }
 
+        public void pause() {
+            rlmTask.setPause(true);
+        }
+
+        public void resume() {
+            rlmTask.setPause(false);
+        }
     }
 
     /**

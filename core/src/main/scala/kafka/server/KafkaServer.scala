@@ -23,7 +23,7 @@ import kafka.controller.KafkaController
 import kafka.coordinator.group.GroupCoordinatorAdapter
 import kafka.coordinator.transaction.{ProducerIdManager, TransactionCoordinator}
 import kafka.log.LogManager
-import kafka.log.remote.RemoteLogManager
+import kafka.log.remote.{RemoteLogManager, RemoteLogManagerMBean}
 import kafka.metrics.KafkaMetricsReporter
 import kafka.network.{ControlPlaneAcceptor, DataPlaneAcceptor, RequestChannel, SocketServer}
 import kafka.raft.KafkaRaftManager
@@ -60,9 +60,11 @@ import org.apache.kafka.storage.internals.log.LogDirFailureChannel
 import org.apache.zookeeper.client.ZKClientConfig
 
 import java.io.{File, IOException}
+import java.lang.management.ManagementFactory
 import java.net.{InetAddress, SocketTimeoutException}
 import java.util.concurrent._
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
+import javax.management.ObjectName
 import scala.collection.{Map, Seq}
 import scala.compat.java8.OptionConverters.RichOptionForJava8
 import scala.jdk.CollectionConverters._
@@ -516,6 +518,13 @@ class KafkaServer(
               .foreach(e => rlm.onEndPointCreated(e))
           }
           rlm.startup()
+        })
+
+        remoteLogManagerOpt.foreach(rlm => {
+          if (true) { // if RLMMBean enabled
+            val mBeanServer = ManagementFactory.getPlatformMBeanServer
+            mBeanServer.registerMBean(new RemoteLogManagerMBean(rlm), new ObjectName("kafka.storage.remote:type=RemoteLogManagerMBean"))
+          }
         })
 
         /* start processing requests */
