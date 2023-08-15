@@ -22,7 +22,7 @@ jobs:
           distribution: temurin
       - name: Set branch name as environment variable
         run: |
-          echo "BRANCH=${GITHUB_REF#refs/heads/}" >> $GITHUB_ENV
+          echo "BRANCH=${GITHUB_HEAD_REF}" >> $GITHUB_ENV
 
       - name: Print branch name
         run: |
