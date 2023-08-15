@@ -20,11 +20,13 @@ jobs:
         with:
           java-version: ${{ matrix.java-version }}
           distribution: temurin
-      - name: Set up environment variable
+      - name: Set branch name as environment variable
         run: |
-          echo "BRANCH=$(echo ${GITHUB_REF} | sed -n 's/^refs\/heads\///p')" >> $GITHUB_ENV
-      - name: Print environment variables
+          echo "BRANCH=${GITHUB_REF#refs/heads/}" >> $GITHUB_ENV
+
+      - name: Print branch name
         run: |
-          echo "BRANCH: $BRANCH"
+          echo "Branch name: $BRANCH"
+
       - name: Build Docker image
-        run: make docker_image
+        run: make BRANCH=${BRANCH} docker_image
