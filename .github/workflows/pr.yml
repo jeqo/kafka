@@ -23,8 +23,8 @@ jobs:
       - name: Set up environment variable
         run: |
           echo "BRANCH=$(echo ${GITHUB_REF} | sed -n 's/^refs\/heads\///p')" >> $GITHUB_ENV
-
-      - name: Build Docker image
+      - name: Print environment variables
         run: |
-          echo $BRANCH
-          make docker_image
+          echo "BRANCH: $BRANCH"
+      - name: Build Docker image
+        run: make docker_image
