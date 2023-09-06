@@ -43,7 +43,7 @@ public abstract class ShutdownableThread extends Thread {
     }
 
     public ShutdownableThread(String name, boolean isInterruptible) {
-        this(name, isInterruptible, "[" + name + "]: ");
+        this(name, isInterruptible, "[" + name + "] ");
     }
 
     public ShutdownableThread(String name, boolean isInterruptible, String logPrefix) {
