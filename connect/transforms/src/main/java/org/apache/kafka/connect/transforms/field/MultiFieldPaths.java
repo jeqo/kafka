@@ -26,11 +26,11 @@ import org.apache.kafka.connect.transforms.util.SchemaUtil;
 import java.util.AbstractMap;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -47,14 +47,14 @@ import java.util.stream.Collectors;
 public class MultiFieldPaths {
     final Trie trie = new Trie();
 
-    MultiFieldPaths(Set<SingleFieldPath> paths) {
+    public MultiFieldPaths(List<SingleFieldPath> paths) {
         paths.forEach(trie::insert);
     }
 
-    public static MultiFieldPaths of(List<String> fields, FieldSyntaxVersion syntaxVersion) {
-        return new MultiFieldPaths(fields.stream()
+    public MultiFieldPaths(List<String> fields, FieldSyntaxVersion syntaxVersion) {
+        this(fields.stream()
             .map(f -> new SingleFieldPath(f, syntaxVersion))
-            .collect(Collectors.toSet()));
+            .collect(Collectors.toList()));
     }
 
     /**
@@ -65,7 +65,7 @@ public class MultiFieldPaths {
      */
     public Map<SingleFieldPath, Map.Entry<Field, Object>> fieldAndValuesFrom(Struct struct) {
         if (trie.isEmpty()) return Collections.emptyMap();
-        return findFieldAndValues(struct, trie.root, new HashMap<>());
+        return findFieldAndValues(struct, trie.root, new LinkedHashMap<>());
     }
 
     private Map<SingleFieldPath, Map.Entry<Field, Object>> findFieldAndValues(
@@ -102,7 +102,7 @@ public class MultiFieldPaths {
      */
     public Map<SingleFieldPath, Map.Entry<String, Object>> fieldAndValuesFrom(Map<String, Object> value) {
         if (trie.isEmpty()) return Collections.emptyMap();
-        return findFieldAndValues(value, trie.root, new HashMap<>());
+        return findFieldAndValues(value, trie.root, new LinkedHashMap<>());
     }
 
     @SuppressWarnings("unchecked")
@@ -164,8 +164,8 @@ public class MultiFieldPaths {
         MapValueUpdater others
     ) {
         if (originalValue == null) return null;
-        Map<String, Object> updatedValue = new HashMap<>(originalValue.size());
-        Map<String, TrieNode> notFoundFields = new HashMap<>(trieAt.steps);
+        Map<String, Object> updatedValue = new LinkedHashMap<>(originalValue.size());
+        Map<String, TrieNode> notFoundFields = new LinkedHashMap<>(trieAt.steps);
         for (Map.Entry<String, Object> entry : originalValue.entrySet()) {
             String fieldName = entry.getKey();
             Object fieldValue = entry.getValue();
@@ -203,7 +203,7 @@ public class MultiFieldPaths {
                 notFound.apply(originalValue, updatedValue, trieValue.path, fieldName);
             } else {
                 Map<String, Object> updatedField = updateValues(
-                    new HashMap<>(),
+                    new LinkedHashMap<>(),
                     trieValue,
                     matching, notFound, others);
                 updatedValue.put(fieldName, updatedField);
@@ -417,6 +417,10 @@ public class MultiFieldPaths {
             }
         }
         return baseSchemaBuilder.build();
+    }
+
+    public int size() {
+        return trie.size();
     }
 
     @Override
