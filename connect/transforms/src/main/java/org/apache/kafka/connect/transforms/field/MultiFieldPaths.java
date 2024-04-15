@@ -456,7 +456,7 @@ public class MultiFieldPaths {
         }
 
 
-        public void insert(SingleFieldPath path) {
+        void insert(SingleFieldPath path) {
             TrieNode current = root;
 
             for (String step : path.stepsWithoutLast()) {
@@ -473,15 +473,15 @@ public class MultiFieldPaths {
             }
         }
 
-        public boolean isEmpty() {
+        boolean isEmpty() {
             return root.isEmpty();
         }
 
-        public Optional<TrieNode> find(String step) {
+        Optional<TrieNode> find(String step) {
             return root.find(step);
         }
 
-        public int size() {
+        int size() {
             if (root.isEmpty()) return 0;
             return root.size();
         }
@@ -511,14 +511,14 @@ public class MultiFieldPaths {
         Map<String, TrieNode> steps = new HashMap<>();
         SingleFieldPath path;
 
-        TrieNode() {
+        private TrieNode() {
         }
 
         private TrieNode(SingleFieldPath path) {
             this.path = path;
         }
 
-        public boolean contains(String step) {
+        boolean contains(String step) {
             return steps.containsKey(step);
         }
 
@@ -532,16 +532,33 @@ public class MultiFieldPaths {
             steps.put(step, new TrieNode(path));
         }
 
-        public TrieNode get(String step) {
+        TrieNode get(String step) {
             return steps.get(step);
         }
 
-        public Optional<TrieNode> find(String step) {
+        Optional<TrieNode> find(String step) {
             return Optional.ofNullable(steps.get(step));
         }
 
-        public boolean isEmpty() {
+        boolean isEmpty() {
             return steps.isEmpty() && path == null;
+        }
+
+        public boolean isLeaf() {
+            return path != null;
+        }
+
+        Map<String, TrieNode> steps() {
+            return new HashMap<>(steps);
+        }
+
+        int size() {
+            if (isLeaf()) return 1;
+            int size = 0;
+            for (TrieNode child : steps.values()) {
+                size = size + child.size();
+            }
+            return size;
         }
 
         @Override
@@ -563,23 +580,6 @@ public class MultiFieldPaths {
                 "steps = " + steps +
                 (path != null ? (", path = " + path) : "") +
                 ')';
-        }
-
-        public boolean isLeaf() {
-            return path != null;
-        }
-
-        public Map<String, TrieNode> steps() {
-            return new HashMap<>(steps);
-        }
-
-        public int size() {
-            if (isLeaf()) return 1;
-            int size = 0;
-            for (TrieNode child : steps.values()) {
-                size = size + child.size();
-            }
-            return size;
         }
     }
 }
