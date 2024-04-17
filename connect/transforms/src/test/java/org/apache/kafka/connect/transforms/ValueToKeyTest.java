@@ -22,11 +22,13 @@ import org.apache.kafka.connect.data.SchemaBuilder;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.errors.DataException;
 import org.apache.kafka.connect.sink.SinkRecord;
+import org.apache.kafka.connect.transforms.field.FieldSyntaxVersion;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -55,6 +57,30 @@ public class ValueToKeyTest {
         final HashMap<String, Integer> expectedKey = new HashMap<>();
         expectedKey.put("a", 1);
         expectedKey.put("b", 2);
+
+        assertNull(transformedRecord.keySchema());
+        assertEquals(expectedKey, transformedRecord.key());
+    }
+
+    @Test
+    public void schemalessAndNestedFields() {
+        Map<String, Object> configs = new HashMap<>();
+        configs.put("fields", "a,b.c");
+        configs.put(FieldSyntaxVersion.FIELD_SYNTAX_VERSION_CONFIG, FieldSyntaxVersion.V2.name());
+        xform.configure(configs);
+
+        final HashMap<String, Object> value = new HashMap<>();
+        value.put("a", 1);
+        final HashMap<String, Integer> nested = new HashMap<>();
+        nested.put("c", 3);
+        value.put("b", nested);
+
+        final SinkRecord record = new SinkRecord("", 0, null, null, null, value, 0);
+        final SinkRecord transformedRecord = xform.apply(record);
+
+        final HashMap<String, Integer> expectedKey = new HashMap<>();
+        expectedKey.put("a", 1);
+        expectedKey.put("b.c", 3);
 
         assertNull(transformedRecord.keySchema());
         assertEquals(expectedKey, transformedRecord.key());
@@ -92,6 +118,43 @@ public class ValueToKeyTest {
     }
 
     @Test
+    public void withSchemaAndNestedFields() {
+        Map<String, Object> configs = new HashMap<>();
+        configs.put("fields", "a,b.c");
+        configs.put(FieldSyntaxVersion.FIELD_SYNTAX_VERSION_CONFIG, FieldSyntaxVersion.V2.name());
+        xform.configure(configs);
+
+        final Schema nestedSchema = SchemaBuilder.struct()
+            .field("c", Schema.INT32_SCHEMA)
+            .build();
+        final Schema valueSchema = SchemaBuilder.struct()
+            .field("a", Schema.INT32_SCHEMA)
+            .field("b", nestedSchema)
+            .build();
+
+        final Struct nested = new Struct(nestedSchema)
+            .put("c", 3);
+        final Struct value = new Struct(valueSchema);
+        value.put("a", 1);
+        value.put("b", nested);
+
+        final SinkRecord record = new SinkRecord("", 0, null, null, valueSchema, value, 0);
+        final SinkRecord transformedRecord = xform.apply(record);
+
+        final Schema expectedKeySchema = SchemaBuilder.struct()
+            .field("a", Schema.INT32_SCHEMA)
+            .field("b.c", Schema.INT32_SCHEMA)
+            .build();
+
+        final Struct expectedKey = new Struct(expectedKeySchema)
+            .put("a", 1)
+            .put("b.c", 3);
+
+        assertEquals(expectedKeySchema, transformedRecord.keySchema());
+        assertEquals(expectedKey, transformedRecord.key());
+    }
+
+    @Test
     public void nonExistingField() {
         xform.configure(Collections.singletonMap("fields", "not_exist"));
 
@@ -105,7 +168,7 @@ public class ValueToKeyTest {
         final SinkRecord record = new SinkRecord("", 0, null, null, valueSchema, value, 0);
 
         DataException actual = assertThrows(DataException.class, () -> xform.apply(record));
-        assertEquals("Field does not exist: not_exist", actual.getMessage());
+        assertEquals("Field does not exist: FieldPath(path = not_exist)", actual.getMessage());
     }
 
     @Test
