@@ -45,18 +45,20 @@ else
     export TEMP_KAFKA_JVM_PERFORMANCE_OPTS="$KAFKA_JVM_PERFORMANCE_OPTS"
 fi
 
-# We will first use CDS for storage to format storage
-export KAFKA_JVM_PERFORMANCE_OPTS="${KAFKA_JVM_PERFORMANCE_OPTS-} -XX:SharedArchiveFile=/opt/kafka/storage.jsa"
+if [ $KRAFT_MODE -eq 1 ]; then
+    # We will first use CDS for storage to format storage
+    export KAFKA_JVM_PERFORMANCE_OPTS="${KAFKA_JVM_PERFORMANCE_OPTS-} -XX:SharedArchiveFile=/opt/kafka/storage.jsa"
 
-echo "===> Using provided cluster id $CLUSTER_ID ..."
+    echo "===> Using provided cluster id $CLUSTER_ID ..."
 
-# Invoke the docker wrapper to setup property files and format storage
-result=$(/opt/kafka/bin/kafka-run-class.sh kafka.docker.KafkaDockerWrapper setup \
-      --default-configs-dir /etc/kafka/docker \
-      --mounted-configs-dir /mnt/shared/config \
-      --final-configs-dir /opt/kafka/config 2>&1) || \
-      echo $result | grep -i "already formatted" || \
-      { echo $result && (exit 1) }
+    # Invoke the docker wrapper to setup property files and format storage
+    result=$(/opt/kafka/bin/kafka-run-class.sh kafka.docker.KafkaDockerWrapper setup \
+          --default-configs-dir /etc/kafka/docker \
+          --mounted-configs-dir /mnt/shared/config \
+          --final-configs-dir /opt/kafka/config 2>&1) || \
+          echo $result | grep -i "already formatted" || \
+          { echo $result && (exit 1) }
+fi
 
 # Using temp env variable to get rid of storage CDS command
 export KAFKA_JVM_PERFORMANCE_OPTS="$TEMP_KAFKA_JVM_PERFORMANCE_OPTS"

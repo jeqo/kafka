@@ -41,9 +41,9 @@ from common import execute, jvm_image
 import tempfile
 import os
 
-def build_jvm(image, tag, kafka_url):
+def build_jvm(image, tag, kafka_url, zk_mode, no_cache):
     image = f'{image}:{tag}'
-    jvm_image(f"docker build -f $DOCKER_FILE -t {image} --build-arg kafka_url={kafka_url} --build-arg build_date={date.today()} $DOCKER_DIR")
+    jvm_image(f"docker build -f $DOCKER_FILE -t {image} --build-arg kafka_url={kafka_url} --build-arg build_date={date.today()} --build-arg kraft_mode={0 if zk_mode else 1} {"--no-cache" if no_cache else ""} $DOCKER_DIR")
 
 def run_jvm_tests(image, tag, kafka_url):
     temp_dir_path = tempfile.mkdtemp()
@@ -70,13 +70,15 @@ if __name__ == '__main__':
     parser.add_argument("--image-tag", "-tag", default="latest", dest="tag", help="Image tag that you want to add to the image")
     parser.add_argument("--image-type", "-type", choices=["jvm"], default="jvm", dest="image_type", help="Image type you want to build")
     parser.add_argument("--kafka-url", "-u", dest="kafka_url", help="Kafka url to be used to download kafka binary tarball in the docker image")
+    parser.add_argument("--zk-mode", "-zk", action="store_true", dest="zk_mode", default=False, help="Enable Zookeeper mode (does not support tests)")
     parser.add_argument("--build", "-b", action="store_true", dest="build_only", default=False, help="Only build the image, don't run tests")
+    parser.add_argument("--no-cache", "-c", action="store_true", dest="no_cache", default=False, help="Do not use docker image layer cache")
     parser.add_argument("--test", "-t", action="store_true", dest="test_only", default=False, help="Only run the tests, don't build the image")
     args = parser.parse_args()
 
     if args.image_type == "jvm" and (args.build_only or not (args.build_only or args.test_only)):
         if args.kafka_url:
-            build_jvm(args.image, args.tag, args.kafka_url)
+            build_jvm(args.image, args.tag, args.kafka_url, args.zk_mode, args.no_cache)
         else:
             raise ValueError("--kafka-url is a required argument for jvm image")
     

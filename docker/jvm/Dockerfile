@@ -22,6 +22,7 @@ USER root
 
 # Get kafka from https://archive.apache.org/dist/kafka and pass the url through build arguments
 ARG kafka_url
+ARG kraft_mode=1
 
 COPY jsa_launch /etc/kafka/docker/jsa_launch
 
@@ -37,6 +38,7 @@ RUN set -eux ; \
     gpg --import KEYS; \
     gpg --batch --verify kafka.tgz.asc kafka.tgz
 
+ENV KRAFT_MODE $kraft_mode
 # Generate jsa files using dynamic CDS for kafka server start command and kafka storage format command
 RUN /etc/kafka/docker/jsa_launch
 
@@ -50,6 +52,7 @@ USER root
 
 # Get kafka from https://archive.apache.org/dist/kafka and pass the url through build arguments
 ARG kafka_url
+ARG kraft_mode
 ARG build_date
 
 
@@ -78,7 +81,12 @@ RUN set -eux ; \
     chmod -R ug+w /etc/kafka /var/lib/kafka /etc/kafka/secrets; \
     cp /opt/kafka/config/log4j.properties /etc/kafka/docker/log4j.properties; \
     cp /opt/kafka/config/tools-log4j.properties /etc/kafka/docker/tools-log4j.properties; \
-    cp /opt/kafka/config/kraft/server.properties /etc/kafka/docker/server.properties; \
+    if [ $kraft_mode -eq 1 ]; \
+    then \
+      cp /opt/kafka/config/kraft/server.properties /etc/kafka/docker/server.properties; \
+    else \
+      cp /opt/kafka/config/server.properties /etc/kafka/docker/server.properties; \
+    fi; \
     rm kafka.tgz kafka.tgz.asc KEYS; \
     apk del wget gpg gpg-agent; \
     apk cache clean;
@@ -91,5 +99,7 @@ COPY --chown=appuser:appuser launch /etc/kafka/docker/launch
 USER appuser
 
 VOLUME ["/etc/kafka/secrets", "/var/lib/kafka/data", "/mnt/shared/config"]
+
+ENV KRAFT_MODE $kraft_mode
 
 CMD ["/etc/kafka/docker/run"]

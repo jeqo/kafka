@@ -14,12 +14,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-KAFKA_CLUSTER_ID="$(opt/kafka/bin/kafka-storage.sh random-uuid)"
 TOPIC="test-topic"
 
-KAFKA_JVM_PERFORMANCE_OPTS="-XX:ArchiveClassesAtExit=storage.jsa" opt/kafka/bin/kafka-storage.sh format -t $KAFKA_CLUSTER_ID -c opt/kafka/config/kraft/server.properties
+echo "KRaft mode: $KRAFT_MODE"
 
-KAFKA_JVM_PERFORMANCE_OPTS="-XX:ArchiveClassesAtExit=kafka.jsa" opt/kafka/bin/kafka-server-start.sh opt/kafka/config/kraft/server.properties &
+if [ $KRAFT_MODE -eq 1 ]; then
+  KAFKA_CLUSTER_ID="$(opt/kafka/bin/kafka-storage.sh random-uuid)"
+  KAFKA_JVM_PERFORMANCE_OPTS="-XX:ArchiveClassesAtExit=storage.jsa" opt/kafka/bin/kafka-storage.sh format -t $KAFKA_CLUSTER_ID -c opt/kafka/config/kraft/server.properties
+  KAFKA_JVM_PERFORMANCE_OPTS="-XX:ArchiveClassesAtExit=kafka.jsa" opt/kafka/bin/kafka-server-start.sh opt/kafka/config/kraft/server.properties &
+fi
+
+if [ $KRAFT_MODE -eq 0 ]; then
+  touch storage.jsa
+  opt/kafka/bin/zookeeper-server-start.sh opt/kafka/config/zookeeper.properties &
+  KAFKA_JVM_PERFORMANCE_OPTS="-XX:ArchiveClassesAtExit=kafka.jsa" opt/kafka/bin/kafka-server-start.sh opt/kafka/config/server.properties &
+fi
+
 
 check_timeout() {
     if [ $TIMEOUT -eq 0 ]; then
