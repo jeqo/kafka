@@ -24,9 +24,8 @@ import org.apache.kafka.common.record.FileRecords.TimestampAndOffset
 import org.apache.kafka.common.record._
 import org.apache.kafka.common.requests.ListOffsetsRequest
 import org.apache.kafka.common.requests.OffsetsForLeaderEpochResponse.UNDEFINED_EPOCH_OFFSET
-import org.apache.kafka.common.requests.ProduceResponse.RecordError
 import org.apache.kafka.common.utils.{PrimitiveRef, Time, Utils}
-import org.apache.kafka.common.{InvalidRecordException, KafkaException, TopicPartition, Uuid}
+import org.apache.kafka.common.{KafkaException, TopicPartition, Uuid}
 import org.apache.kafka.server.common.{OffsetAndEpoch, RequestLocal}
 import org.apache.kafka.server.metrics.KafkaMetricsGroup
 import org.apache.kafka.server.record.BrokerCompressionType
@@ -34,7 +33,7 @@ import org.apache.kafka.server.storage.log.{FetchIsolation, UnexpectedAppendOffs
 import org.apache.kafka.server.util.Scheduler
 import org.apache.kafka.storage.internals.checkpoint.PartitionMetadataFile
 import org.apache.kafka.storage.internals.epoch.LeaderEpochFileCache
-import org.apache.kafka.storage.internals.log.{AbortedTxn, AppendOrigin, AsyncOffsetReader, BatchMetadata, CompletedTxn, FetchDataInfo, LastRecord, LeaderHwChange, LocalLog, LogAppendInfo, LogConfig, LogDirFailureChannel, LogLoader, LogMetricNames, LogOffsetMetadata, LogOffsetSnapshot, LogOffsetsListener, LogSegment, LogSegments, LogStartOffsetIncrementReason, LogValidator, OffsetResultHolder, OffsetsOutOfOrderException, ProducerAppendInfo, ProducerStateManager, ProducerStateManagerConfig, RollParams, SegmentDeletionReason, VerificationGuard, UnifiedLog => JUnifiedLog}
+import org.apache.kafka.storage.internals.log.{AbortedTxn, AppendOrigin, AsyncOffsetReader, BatchMetadata, CompletedTxn, FetchDataInfo, LastRecord, LocalLog, LogAppendInfo, LogConfig, LogDirFailureChannel, LogLoader, LogMetricNames, LogOffsetMetadata, LogOffsetSnapshot, LogOffsetsListener, LogSegment, LogSegments, LogStartOffsetIncrementReason, LogValidator, OffsetResultHolder, ProducerAppendInfo, ProducerStateManager, ProducerStateManagerConfig, RollParams, SegmentDeletionReason, VerificationGuard, UnifiedLog => JUnifiedLog}
 import org.apache.kafka.storage.log.metrics.BrokerTopicStats
 
 import java.io.{File, IOException}
@@ -43,7 +42,7 @@ import java.nio.file.{Files, Path}
 import java.util
 import java.util.concurrent.{ConcurrentHashMap, ConcurrentMap, ScheduledFuture}
 import java.util.stream.Collectors
-import java.util.{Collections, Optional, OptionalInt, OptionalLong}
+import java.util.{Optional, OptionalLong}
 import scala.collection.mutable.{ArrayBuffer, ListBuffer}
 import scala.collection.{Seq, mutable}
 import scala.jdk.CollectionConverters._
@@ -742,7 +741,7 @@ class UnifiedLog(@volatile var logStartOffset: Long,
     // This will ensure that any log data can be recovered with the correct topic ID in the case of failure.
     maybeFlushMetadataFile()
 
-    val appendInfo = analyzeAndValidateRecords(records, origin, ignoreRecordSize, !validateAndAssignOffsets, leaderEpoch)
+    val appendInfo = JUnifiedLog.analyzeAndValidateRecords(topicPartition, records, config, logStartOffset, origin, ignoreRecordSize, !validateAndAssignOffsets, leaderEpoch, brokerTopicStats)
 
     // return if we have no valid messages or if this is a duplicate of the last appended entry
     if (appendInfo.validBytes <= 0) appendInfo
@@ -1049,113 +1048,6 @@ class UnifiedLog(@volatile var logStartOffset: Long,
   private def batchMissingRequiredVerification(batch: MutableRecordBatch, requestVerificationGuard: VerificationGuard): Boolean = {
     producerStateManager.producerStateManagerConfig().transactionVerificationEnabled() && !batch.isControlBatch &&
       !verificationGuard(batch.producerId).verify(requestVerificationGuard)
-  }
-
-  /**
-   * Validate the following:
-   * <ol>
-   * <li> each message matches its CRC
-   * <li> each message size is valid (if ignoreRecordSize is false)
-   * <li> that the sequence numbers of the incoming record batches are consistent with the existing state and with each other
-   * <li> that the offsets are monotonically increasing (if requireOffsetsMonotonic is true)
-   * </ol>
-   *
-   * Also compute the following quantities:
-   * <ol>
-   * <li> First offset in the message set
-   * <li> Last offset in the message set
-   * <li> Number of messages
-   * <li> Number of valid bytes
-   * <li> Whether the offsets are monotonically increasing
-   * <li> Whether any compression codec is used (if many are used, then the last one is given)
-   * </ol>
-   */
-  private def analyzeAndValidateRecords(records: MemoryRecords,
-                                        origin: AppendOrigin,
-                                        ignoreRecordSize: Boolean,
-                                        requireOffsetsMonotonic: Boolean,
-                                        leaderEpoch: Int): LogAppendInfo = {
-    var validBytesCount = 0
-    var firstOffset = JUnifiedLog.UNKNOWN_OFFSET
-    var lastOffset = -1L
-    var lastLeaderEpoch = RecordBatch.NO_PARTITION_LEADER_EPOCH
-    var sourceCompression = CompressionType.NONE
-    var monotonic = true
-    var maxTimestamp = RecordBatch.NO_TIMESTAMP
-    var shallowOffsetOfMaxTimestamp = -1L
-    var readFirstMessage = false
-    var lastOffsetOfFirstBatch = -1L
-
-    records.batches.forEach { batch =>
-      if (origin == AppendOrigin.RAFT_LEADER && batch.partitionLeaderEpoch != leaderEpoch) {
-        throw new InvalidRecordException("Append from Raft leader did not set the batch epoch correctly")
-      }
-      // we only validate V2 and higher to avoid potential compatibility issues with older clients
-      if (batch.magic >= RecordBatch.MAGIC_VALUE_V2 && origin == AppendOrigin.CLIENT && batch.baseOffset != 0)
-        throw new InvalidRecordException(s"The baseOffset of the record batch in the append to $topicPartition should " +
-          s"be 0, but it is ${batch.baseOffset}")
-
-      // update the first offset if on the first message. For magic versions older than 2, we use the last offset
-      // to avoid the need to decompress the data (the last offset can be obtained directly from the wrapper message).
-      // For magic version 2, we can get the first offset directly from the batch header.
-      // When appending to the leader, we will update LogAppendInfo.baseOffset with the correct value. In the follower
-      // case, validation will be more lenient.
-      // Also indicate whether we have the accurate first offset or not
-      if (!readFirstMessage) {
-        if (batch.magic >= RecordBatch.MAGIC_VALUE_V2)
-          firstOffset = batch.baseOffset
-        lastOffsetOfFirstBatch = batch.lastOffset
-        readFirstMessage = true
-      }
-
-      // check that offsets are monotonically increasing
-      if (lastOffset >= batch.lastOffset)
-        monotonic = false
-
-      // update the last offset seen
-      lastOffset = batch.lastOffset
-      lastLeaderEpoch = batch.partitionLeaderEpoch
-
-      // Check if the message sizes are valid.
-      val batchSize = batch.sizeInBytes
-      if (!ignoreRecordSize && batchSize > config.maxMessageSize) {
-        brokerTopicStats.topicStats(topicPartition.topic).bytesRejectedRate.mark(records.sizeInBytes)
-        brokerTopicStats.allTopicsStats.bytesRejectedRate.mark(records.sizeInBytes)
-        throw new RecordTooLargeException(s"The record batch size in the append to $topicPartition is $batchSize bytes " +
-          s"which exceeds the maximum configured value of ${config.maxMessageSize}.")
-      }
-
-      // check the validity of the message by checking CRC
-      if (!batch.isValid) {
-        brokerTopicStats.allTopicsStats.invalidMessageCrcRecordsPerSec.mark()
-        throw new CorruptRecordException(s"Record is corrupt (stored crc = ${batch.checksum()}) in topic partition $topicPartition.")
-      }
-
-      if (batch.maxTimestamp > maxTimestamp) {
-        maxTimestamp = batch.maxTimestamp
-        shallowOffsetOfMaxTimestamp = lastOffset
-      }
-
-      validBytesCount += batchSize
-
-      val batchCompression = CompressionType.forId(batch.compressionType.id)
-      // sourceCompression is only used on the leader path, which only contains one batch if version is v2 or messages are compressed
-      if (batchCompression != CompressionType.NONE)
-        sourceCompression = batchCompression
-    }
-
-    if (requireOffsetsMonotonic && !monotonic)
-        throw new OffsetsOutOfOrderException(s"Out of order offsets found in append to $topicPartition: " +
-          records.records.asScala.map(_.offset))
-
-    val lastLeaderEpochOpt: OptionalInt = if (lastLeaderEpoch != RecordBatch.NO_PARTITION_LEADER_EPOCH)
-      OptionalInt.of(lastLeaderEpoch)
-    else
-      OptionalInt.empty()
-
-    new LogAppendInfo(firstOffset, lastOffset, lastLeaderEpochOpt, maxTimestamp,
-      RecordBatch.NO_TIMESTAMP, logStartOffset, RecordValidationStats.EMPTY, sourceCompression,
-      validBytesCount, lastOffsetOfFirstBatch, Collections.emptyList[RecordError], LeaderHwChange.NONE)
   }
 
   /**
