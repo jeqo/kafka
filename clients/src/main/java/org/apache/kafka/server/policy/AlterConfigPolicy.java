@@ -41,23 +41,32 @@ public interface AlterConfigPolicy extends Configurable, AutoCloseable {
     class RequestMetadata {
 
         private final ConfigResource resource;
-        private final Map<String, String> configs;
+        private final Map<String, String> existingConfigs;
+        private final Map<String, String> proposedConfigs;
 
         /**
          * Create an instance of this class with the provided parameters.
          *
          * This constructor is public to make testing of <code>AlterConfigPolicy</code> implementations easier.
          */
-        public RequestMetadata(ConfigResource resource, Map<String, String> configs) {
+        public RequestMetadata(ConfigResource resource, Map<String, String> existingConfigs, Map<String, String> proposedConfigs) {
             this.resource = resource;
-            this.configs = configs;
+            this.existingConfigs = existingConfigs;
+            this.proposedConfigs = proposedConfigs;
+        }
+
+        /**
+         * Return the current configs in the entity
+         */
+        public Map<String, String> existingConfigs() {
+            return existingConfigs;
         }
 
         /**
          * Return the configs in the request.
          */
-        public Map<String, String> configs() {
-            return configs;
+        public Map<String, String> proposedConfigs() {
+            return proposedConfigs();
         }
 
         public ConfigResource resource() {
@@ -66,7 +75,7 @@ public interface AlterConfigPolicy extends Configurable, AutoCloseable {
 
         @Override
         public int hashCode() {
-            return Objects.hash(resource, configs);
+            return Objects.hash(resource, existingConfigs, proposedConfigs);
         }
 
         @Override
@@ -74,13 +83,17 @@ public interface AlterConfigPolicy extends Configurable, AutoCloseable {
             if ((o == null) || (!o.getClass().equals(getClass()))) return false;
             RequestMetadata other = (RequestMetadata) o;
             return resource.equals(other.resource) &&
-                configs.equals(other.configs);
+                existingConfigs.equals(other.existingConfigs) &&
+                proposedConfigs.equals(other.proposedConfigs);
         }
 
         @Override
         public String toString() {
-            return "AlterConfigPolicy.RequestMetadata(resource=" + resource +
-                    ", configs=" + configs + ")";
+            return "AlterConfigPolicy.RequestMetadata(" +
+                    "resource=" + resource +
+                    ", proposedConfigs=" + proposedConfigs +
+                    ", existingConfigs=" + existingConfigs +
+                    ")";
         }
     }
 
